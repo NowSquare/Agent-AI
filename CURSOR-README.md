@@ -39,29 +39,30 @@ Agent AI is an email-centered automation system built on Laravel 12. It links in
 * SMTP/IMAP inbound is out of scope for MVP.
 * One region; multi-region later.
 
-### MVP Scope & Phases
+### Current Development Status
 
-**Phase 1: Inbound/Webhook/Threading/Auth Baseline**
-- Postmark webhook with HMAC validation
-- Email threading and clean reply extraction
-- Passwordless authentication (challenge/verify)
-- Basic dashboard and thread list pages
-- Database schema (accounts, users, threads, email_messages)
+**✅ COMPLETED: Phase 1A - Database & Models**
+- Complete database schema with 29 migrations
+- 21 Eloquent models with full relationships
+- ULID primary keys, JSONB fields, PostgreSQL optimizations
+- ThreadResolver service and ProcessInboundEmail job
+- Postmark webhook controller with HMAC validation
 
-**Phase 2: LLM/MCP/Actions**
-- LLM client with Ollama fallback
-- Action interpretation and confidence scoring
-- Clarification loop (max 2 rounds)
-- MCP layer with tool registry
-- Action dispatcher and outbound email
-- Memory gate and basic decay
+**🔄 IN PROGRESS: Phase 1B - Auth & UI Foundation**
+- Passwordless authentication (ChallengeController, VerifyController)
+- Basic Blade/Flowbite dashboard and thread pages
+- i18n middleware and language detection
 
-**Phase 3: Attachments/Quality/Observability**
-- Attachment pipeline (scan, extract, summarize)
-- Signed downloads and security
-- Horizon monitoring and queues
-- i18n language detection
-- Testing, linting, and deployment
+**📋 NEXT: Phase 2 - LLM & MCP**
+- LLM client with Ollama fallback and provider support
+- MCP layer (ToolRegistry, McpController, tool schemas)
+- Action interpretation and clarification loop
+- Memory gate with TTL/decay
+
+**📋 FUTURE: Phase 3 - Attachments & Quality**
+- Attachment pipeline (ClamAV scan, text extraction, summarization)
+- Signed downloads and security hardening
+- Horizon monitoring, testing, and deployment
 
 **Roles & Permissions**
 - **Recipient**: Email interactions, signed link confirmations
@@ -133,82 +134,38 @@ Agent AI is an email-centered automation system built on Laravel 12. It links in
 
 ```
 ├── app/
-│   ├── Console/
-│   │   ├── Commands/
-│   │   │   ├── PurgeExpiredMemories.php
-│   │   │   └── ScanAttachmentsCommand.php
-│   │   └── Kernel.php
-│   ├── Events/
-│   │   ├── ActionCompleted.php
-│   │   └── AttachmentScanned.php
-│   ├── Exceptions/
-│   │   ├── LlmTimeoutException.php
-│   │   └── VirusDetectedException.php
 │   ├── Http/
 │   │   ├── Controllers/
-│   │   │   ├── Api/
-│   │   │   │   ├── ActionController.php
-│   │   │   │   └── ThreadController.php
-│   │   │   ├── Auth/
-│   │   │   │   ├── ChallengeController.php
-│   │   │   │   └── VerifyController.php
-│   │   │   ├── McpController.php
 │   │   │   └── Webhook/
 │   │   │       └── PostmarkInboundController.php
-│   │   ├── Middleware/
-│   │   │   ├── LanguageDetection.php
-│   │   │   └── McpAuth.php
-│   │   └── Resources/
-│   │       └── ThreadResource.php
+│   │   └── Middleware/
 │   ├── Jobs/
-│   │   ├── ProcessInboundEmail.php
-│   │   ├── ScanAttachmentJob.php
-│   │   ├── ExtractAttachmentJob.php
-│   │   └── SummarizeThreadJob.php
-│   ├── Listeners/
-│   │   ├── SendClarificationEmail.php
-│   │   └── UpdateThreadContext.php
-│   ├── Mail/
-│   │   ├── ClarificationEmail.php
-│   │   ├── OptionsEmail.php
-│   │   └── WelcomeEmail.php
+│   │   └── ProcessInboundEmail.php
 │   ├── Models/
 │   │   ├── Account.php
 │   │   ├── Action.php
+│   │   ├── Agent.php
+│   │   ├── ApiToken.php
+│   │   ├── Attachment.php
 │   │   ├── AttachmentExtraction.php
-│   │   ├── EmailAttachment.php
+│   │   ├── AuthChallenge.php
+│   │   ├── AvailabilityPoll.php
+│   │   ├── AvailabilityVote.php
+│   │   ├── Contact.php
+│   │   ├── ContactLink.php
 │   │   ├── EmailInboundPayload.php
 │   │   ├── EmailMessage.php
+│   │   ├── Event.php
+│   │   ├── EventParticipant.php
 │   │   ├── Memory.php
+│   │   ├── Membership.php
+│   │   ├── Task.php
 │   │   ├── Thread.php
-│   │   └── User.php
-│   ├── Policies/
-│   │   ├── ActionPolicy.php
-│   │   ├── AttachmentPolicy.php
-│   │   └── MemoryPolicy.php
-│   ├── Providers/
-│   │   ├── AppServiceProvider.php
-│   │   ├── McpServiceProvider.php
-│   │   └── RouteServiceProvider.php
-│   ├── Schemas/
-│   │   ├── ActionInterpretationSchema.php
-│   │   ├── MemoryExtractionSchema.php
-│   │   └── ThreadSummarySchema.php
-│   ├── Services/
-│   │   ├── AttachmentService.php
-│   │   ├── LlmClient.php
-│   │   ├── McpRouter.php
-│   │   └── ThreadResolver.php
-│   └── Mcp/
-│       ├── ToolRegistry.php
-│       ├── Tools/
-│       │   ├── ProcessAttachmentTool.php
-│       │   ├── SendEmailTool.php
-│       │   └── StoreMemoryTool.php
-│       └── ToolSchemas/
-│           ├── ProcessAttachmentSchema.php
-│           ├── SendEmailSchema.php
-│           └── StoreMemorySchema.php
+│   │   ├── User.php
+│   │   ├── UserIdentity.php
+│   │   └── [21 total models]
+│   └── Services/
+│       └── ThreadResolver.php
 ├── bootstrap/
 │   ├── app.php
 │   └── cache/
@@ -314,6 +271,29 @@ Agent AI is an email-centered automation system built on Laravel 12. It links in
 ├── .gitignore
 └── .gitattributes
 ```
+
+## What's Actually Built (Current State)
+
+This README reflects the **current implementation** as of our development session. Many sections below describe future features not yet implemented.
+
+**✅ CURRENTLY IMPLEMENTED:**
+- **Database**: Complete PostgreSQL schema with 29 migrations, 21 Eloquent models
+- **Webhook**: Postmark inbound controller with HMAC validation and encrypted payload storage
+- **Threading**: RFC 5322 email threading via ThreadResolver service
+- **Jobs**: ProcessInboundEmail job with basic structure (LLM integration pending)
+- **Models**: All domain models with ULID PKs, JSONB casts, and comprehensive relationships
+
+**🚧 IN DEVELOPMENT:**
+- Passwordless authentication controllers
+- Basic Blade UI with Flowbite components
+
+**📋 NOT YET IMPLEMENTED:**
+- LLM client and providers
+- MCP layer and tools
+- Attachment processing pipeline
+- Clarification loop and action dispatcher
+- Memory gate with TTL/decay
+- UI dashboard and thread views
 
 ## System Architecture
 
@@ -451,221 +431,85 @@ Schema::table('actions', function (Blueprint $t) {
 
 Use these fields to reliably control the follow-up loop.
 
-### MCP Layer
+### MCP Layer (Planned)
 
-#### ToolRegistry & Guard
+**Status**: Not yet implemented. Will provide schema-driven tool calls with SSRF protection.
 
-```php
-// app/Providers/McpServiceProvider.php
-class McpServiceProvider extends ServiceProvider {
-  public function register(): void {
-    $this->app->bind(ToolRegistry::class, fn() => new ToolRegistry([
-      'send_email' => app(\App\Mcp\Tools\SendEmailTool::class),
-      'store_memory' => app(\App\Mcp\Tools\StoreMemoryTool::class),
-      'process_attachment' => app(\App\Mcp\Tools\ProcessAttachmentTool::class),
-    ]));
-  }
-}
+**Future Implementation:**
+- ToolRegistry with explicit bindings
+- Custom token guard for `api_tokens` table
+- JSON schema validation for tool parameters
+- Authorization checks preventing IDOR attacks
+- No external fetch - only internal Storage access
 
-// app/Mcp/ToolRegistry.php
-class ToolRegistry {
-  public function __construct(private array $tools) {}
-  public function run(string $tool, array $payload): array {
-    abort_unless(isset($this->tools[$tool]), 404, 'Unknown tool');
-    return $this->tools[$tool]->execute($payload);
-  }
-}
-```
+### LLM Client (Planned)
 
-Auth: use a **custom token guard** that matches `api_tokens.token_hash` (SHA-256) and checks abilities.
+**Status**: Not yet implemented. Will provide provider failover and confidence calibration.
 
-#### Example Tool Schema & SSRF Prevention
+**Future Implementation:**
+- Multi-provider support (OpenAI, Anthropic, Ollama)
+- Automatic fallback from external to local LLM
+- Token caps and timeout handling
+- Confidence score calibration per provider
+- Structured JSON output validation
 
-```php
-// app/Mcp/Tools/ProcessAttachmentTool.php
-class ProcessAttachmentTool implements Tool {
-  public function schema(): array {
-    return [
-      'attachment_id' => 'required|exists:email_attachments,id',
-      'action' => 'required|in:extract_text,summarize,analyze_csv'
-    ];
-  }
-  public function execute(array $p): array {
-    $att = EmailAttachment::findOrFail($p['attachment_id']);
-    Authorization::checkAttachmentAccess($att); // prevents IDOR
-    // No external URLs in input; only Storage::read() on whitelisted disk
-    return app(AttachmentService::class)->process($att, $p['action']);
-  }
-}
-```
+### i18n: Language Detection (Planned)
 
-### LLM Client
+**Status**: Not yet implemented. Will use on-prem language detection library.
 
-#### Config
+**Future Implementation:**
+- Language detection on clean reply text
+- Supported locales: en_US, nl_NL, fr_FR, de_DE
+- Fallback to en_US for unsupported languages
+- Language-specific email templates and UI strings
 
-```php
-// config/llm.php
-return [
-  'provider' => env('LLM_PROVIDER','ollama'), // openai|anthropic|groq|ollama
-  'timeouts' => ['connect'=>1.0,'read'=>4.0],
-  'retry' => 1,
-  'models' => [
-    'action' => env('LLM_ACTION_MODEL','llama3'),
-    'memory' => env('LLM_MEMORY_MODEL','llama3'),
-  ],
-  'caps' => ['input_tokens'=>2000,'summary_tokens'=>500,'output_tokens'=>300],
-  'confidence' => [
-    'scale' => '0_1',
-    'auto' => 0.75,
-    'confirm' => 0.50,
-    'provider_scales' => [
-      'openai' => 1.00,
-      'anthropic' => 1.00,
-      'ollama' => 1.00
-    ]
-  ],
-];
-```
+### Attachments Processing (Planned)
 
-#### Service
+**Status**: Models exist, but processing pipeline not yet implemented.
 
-```php
-// app/Services/LlmClient.php
-class LlmClient {
-  public function __construct(private HttpClient $http, private LoggerInterface $log) {}
-  public function json(string $purpose, array $payload, int $timeoutMs = 4000): array {
-    $cfg = config('llm');
-    $provider = $cfg['provider'];
-    try {
-      $resp = $this->callProvider($provider, $purpose, $payload, $timeoutMs);
-    } catch (\Throwable $e) {
-      $this->log->warning('llm.primary.failed', ['p'=>$provider,'err'=>$e->getMessage()]);
-      if ($provider !== 'ollama') {
-        $resp = $this->callProvider('ollama', $purpose, $payload, $timeoutMs);
-      } else {
-        throw $e;
-      }
-    }
-    return $this->validateJson($resp);
-  }
-  // callProvider() maps to OpenAI/Anthropic/Groq/Ollama endpoints and enforces caps (truncate context).
-}
-```
-
-### i18n: Language Detection
-
-Use an on-prem library on the **clean reply**. Example:
-
-```php
-// composer: "patrickschur/language-detection"
-$detector = new LanguageDetection\Language();
-$lang = array_key_first($detector->detect($cleanText)->limit(1)->close());
-$locale = in_array($lang, ['nl','en','fr','de']) ? $lang : 'en';
-App::setLocale($locale);
-```
-
-### Attachments — Processing
-
-#### Storage and Limits
-
-* Allowed MIME: `text/*`, `application/pdf`, `text/csv`, `application/vnd.ms-excel` (csv), `application/json`.
-* Size: default ≤ **25MB** per file; total per email ≤ **40MB**.
-* Disk: `attachments` (local or S3). Path: `attachments/{ulid}/{filename}`.
-* Signed downloads: `GET /attachments/{id}?signature=...` (temporary, nonce).
-
-#### Scan and Extraction
-
-```php
-// app/Jobs/ScanAttachmentJob.php
-class ScanAttachmentJob implements ShouldQueue {
-  public function __construct(public string $attachmentId) {}
-  public function handle(AttachmentService $svc): void {
-    $svc->scanOrFail($this->attachmentId); // ClamAV clamdscan/INSTREAM
-  }
-}
-
-// app/Jobs/ExtractAttachmentJob.php
-class ExtractAttachmentJob implements ShouldQueue {
-  public function __construct(public string $attachmentId) {}
-  public function handle(AttachmentService $svc): void {
-    $svc->extractAndCacheText($this->attachmentId); // txt/md/csv direct; pdf via poppler/spatie
-  }
-}
-```
-
-```php
-// app/Services/AttachmentService.php (sketch)
-class AttachmentService {
-  public function scanOrFail(string $id): void { /* ClamAV call, mark status */ }
-  public function extractAndCacheText(string $id): void { /* produce preview text and store in cache/table */ }
-  public function process(EmailAttachment $att, string $action): array { /* summarize/analyze_csv via LLM */ }
-}
-```
-
-#### Inbound Pipeline in `ProcessInboundEmail`
-
-1. Register attachments from the Postmark payload (filename, MIME, size).
-2. Store the file via `Storage::putFileAs()`.
-3. Queue `ScanAttachmentJob` → when “clean,” queue `ExtractAttachmentJob`.
-4. Add a **short excerpt** (first N KB of text) to the LLM context with a **token cap**.
-
-#### Purge & Retention
-
-* Purge files along with `email_messages` or via TTL (default 30 days for raw, 180 days for attachments).
-* Cron jobs: purge orphaned files, remove caches.
+**Future Implementation:**
+- MIME whitelist: text/*, application/pdf, text/csv, application/json
+- Size limits: 25MB per file, 40MB total per email
+- ClamAV virus scanning before extraction
+- Text extraction: direct for txt/md/csv, spatie/pdf-to-text for PDFs
+- Signed downloads with temporary URLs
+- LLM summarization of attachment content
 
 ### API Endpoints
 
-#### Public/External API
+#### Currently Implemented
 
-| Method | Path                       | Auth   | Purpose                 | Request JSON                                | Response JSON                                                                |
-| ------ | -------------------------- | ------ | ----------------------- | ------------------------------------------- | ---------------------------------------------------------------------------- |
-| POST   | /webhooks/postmark-inbound | HMAC   | Receive inbound email   | Postmark payload                            | `{"queued":true,"payload_id":"01H..."}`                                      |
-| GET    | /a/{action}                | signed | One-click action        | –                                           | `{"status":"completed","action_id":"01H..."}` or `{"status":"already_done"}` |
-| GET    | /login/{token}             | signed | Magic link login        | –                                           | `{"authenticated":true,"user_id":"01H..."}`                                  |
-| POST   | /auth/challenge            | none   | Request code/magic link | `{"identifier":"user@example.com"}`         | `{"challenge_id":"01H..."}`                                                  |
-| POST   | /auth/verify               | none   | Verify code             | `{"challenge_id":"01H...","code":"123456"}` | `{"authenticated":true}`                                                     |
-| GET    | /attachments/{id}          | signed | **Download attachment** | –                                           | binary (Content-Disposition)                                                 |
+| Method | Path                       | Auth   | Purpose                 | Status |
+| ------ | -------------------------- | ------ | ----------------------- | ------ |
+| POST   | /webhooks/postmark-inbound | HMAC   | Receive inbound email   | ✅ Implemented |
 
-#### Internal/UI and MCP API
+#### Planned Implementation
 
-| Method | Path                  | Auth   | Purpose             | Response JSON                                                           |
-| ------ | --------------------- | ------ | ------------------- | ----------------------------------------------------------------------- |
-| ANY    | /mcp/agent            | token  | MCP server endpoint | tool-specific JSON I/O                                                  |
-| POST   | /api/actions/dispatch | bearer | UI form → action    | `{"queued":true,"action_id":"01H..."}`                                  |
-| GET    | /api/threads/{id}     | bearer | Thread detail       | `{"thread":{...},"messages":[...],"actions":[...],"attachments":[...]}` |
+**Public/External API:**
+- `GET /a/{action}` - One-click action confirmations (signed links)
+- `GET /login/{token}` - Magic link login verification
+- `POST /auth/challenge` - Request passwordless authentication
+- `POST /auth/verify` - Verify authentication code
+- `GET /attachments/{id}` - Signed attachment downloads
 
-**Error handling**: 401/403 for auth, 422 on schema validation, 409 on idempotency conflict, 429 on rate limit.
+**Internal/UI and MCP API:**
+- `ANY /mcp/agent` - MCP tool execution endpoint
+- `POST /api/actions/dispatch` - UI form action dispatch
+- `GET /api/threads/{id}` - Thread detail view
 
-### Laravel-Specific Patterns
+**Error handling**: Standard HTTP status codes with JSON error responses.
 
-#### Policies
+### Laravel-Specific Patterns (Current)
 
-```php
-Gate::define('actions.execute', [ActionPolicy::class, 'execute']);
-Gate::define('memories.purge', [MemoryPolicy::class, 'purge']);
-Gate::define('attachments.view', [AttachmentPolicy::class, 'view']);
-```
+**Models**: ULID primary keys with `HasUlids` trait, JSONB casts for flexible data storage.
 
-#### Jobs & Chaining
+**Migrations**: PSR-12 compliant, foreign key constraints with cascade deletes, GIN indexes on JSONB fields.
 
-```php
-Bus::chain([
-  new ProcessInboundEmail($payloadId),
-  new SummarizeThreadJob($threadId),
-])->onQueue('inbound');
-```
+**Jobs**: `ProcessInboundEmail` job with basic structure, ready for LLM integration.
 
-#### Auth & Rate Limiting
+**Routes**: RESTful API design with consistent error handling.
 
-```php
-RateLimiter::for('auth-challenge', fn($r) => Limit::perMinutes(15, 5)->by($r->input('identifier')));
-RateLimiter::for('signed-downloads', fn($r) => Limit::perMinute(30)->by($r->ip()));
-```
-
-#### Threading Headers (RFC)
-
-See existing snippet; unchanged.
+**Future**: Policies, rate limiting, job chaining will be implemented as features are built.
 
 ## Non-Functional Requirements
 
@@ -1424,990 +1268,48 @@ $result['confidence'] *= config("llm.calibration.$provider", 1.0);
 * No chain-of-thought or “think aloud” instructions: we request **final JSON only**.
 * No direct tool-calls by the model: the model outputs intent/parameters; the server decides and validates.
 
-## Appendix H — Migrations and Indexes
+## Database Schema (Current Implementation)
 
-All migrations are **PostgreSQL-optimized**, PSR-12, using **ULID** as the primary key for all domain tables. String fields with enumerations are documented with clear English comments. JSON columns are **jsonb**; GIN indexes are created where needed. Framework tables use Laravel defaults.
+### Schema Overview
 
-### 0. Extensions and Framework/Infra
+All domain tables use **ULID primary keys** with `HasUlids` trait. PostgreSQL **JSONB** columns store structured data. Foreign keys use ULID format. GIN indexes optimize JSONB queries.
 
-Includes enabling `pg_trgm`, jobs, failed_jobs, job_batches, sessions, notifications, password_reset_tokens, personal_access_tokens, cache, and cache_locks.
+### Core Tables
 
-### 1. Domain
+| Table | Purpose | Key Fields |
+|-------|---------|------------|
+| `accounts` | Multi-tenant containers | `name`, `settings_json` |
+| `users` | Platform users | `display_name`, `locale`, `timezone`, `status` |
+| `user_identities` | Login identities (email/phone/OIDC) | `type`, `identifier`, `verified_at` |
+| `memberships` | User-account relationships | `role` |
+| `threads` | Email conversation containers | `subject`, `context_json` |
+| `email_messages` | Individual messages | `direction`, `message_id`, `headers_json` |
+| `actions` | User/system actions | `type`, `payload_json`, `status` |
+| `memories` | Versioned context data | `scope`, `key`, `value_json`, `confidence` |
+| `contacts` | Ad-hoc email participants | `email`, `name`, `meta_json` |
+| `email_inbound_payloads` | Encrypted webhook storage | `ciphertext`, `signature_verified` |
 
-Covers **accounts, users, user_identities, memberships, contacts, contact_links, threads, email_messages, actions, memories, agents, tasks, events, event_participants, availability_polls, availability_votes, auth_challenges, api_tokens, email_inbound_payloads, email_attachments, attachment_extractions**.
+### Migration Files
 
-### 2. Alter Migrations
+```bash
+# Run all migrations
+php artisan migrate
 
-* `alter_threads_add_starter_fk` – adds FK after `email_messages` table exists
-* `alter_actions_add_clarification_state` – tracks clarification loop
-
-### 3. Post-Migrate Indexes
-
-Optional indexes, e.g. `actions_type_idx`.
-
-### 4. Enum Values & Meanings
-
-Exhaustive mapping of all string enums across tables, e.g. `users.status`, `actions.type`, `memories.scope`, `email_attachments.scan_status`, etc.
-
-## Appendix I — Full Migrations and Indexes (PostgreSQL, ULID Primary Keys)
-
-All migrations are **PostgreSQL-optimized**, PSR-12, and use **ULID** as the primary key for all domain tables. String fields with enumerations include clear English comments. JSON columns are **jsonb**; GIN indexes are created where appropriate. Framework tables keep Laravel defaults for compatibility.
-
-### 0. Extensions and Framework/Infra
-
-```php
-<?php
-// 2025_01_01_000000_enable_pg_extensions.php
-// Enables optional but recommended PostgreSQL extensions used by indexes.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
-
-return new class extends Migration {
-    public function up(): void {
-        // Trigram index support (used for fast LIKE/ILIKE on message_id etc.)
-        DB::statement('CREATE EXTENSION IF NOT EXISTS pg_trgm');
-        // GIN indexes on jsonb are supported natively; btree_gin is not required for these migrations.
-    }
-    public function down(): void {
-        // Do not drop extensions on down; they may be shared by other apps.
-    }
-};
+# Available migrations (29 total):
+# Framework: jobs, sessions, cache, notifications, etc.
+# Domain: accounts, users, threads, email_messages, actions, memories, etc.
+# Security: auth_challenges, api_tokens
+# Features: agents, tasks, events, availability_polls, attachments
 ```
 
-```php
-<?php
-// 2025_01_01_000010_create_jobs_table.php
-// Laravel queue jobs (default schema). Keep as-is for Horizon compatibility.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
+### Key Design Decisions
 
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('jobs', function (Blueprint $table) {
-            $table->bigIncrements('id');
-            $table->string('queue')->index();
-            $table->longText('payload');
-            $table->unsignedTinyInteger('attempts');
-            $table->unsignedInteger('reserved_at')->nullable();
-            $table->unsignedInteger('available_at');
-            $table->unsignedInteger('created_at');
-        });
-    }
-    public function down(): void { Schema::dropIfExists('jobs'); }
-};
-```
+* **ULID PKs**: Distributed ID generation, lexicographically sortable
+* **JSONB fields**: Flexible storage for `*_json` columns (settings, payloads, metadata)
+* **Foreign keys**: All FKs use ULID format, cascade on delete where appropriate
+* **Indexes**: GIN indexes on JSONB, trigram on `message_id`, standard BTREE on lookups
+* **Constraints**: Check constraints on enums, unique constraints on business keys
 
-```php
-<?php
-// 2025_01_01_000020_create_failed_jobs_table.php
-// Default Laravel failed jobs table.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('failed_jobs', function (Blueprint $table) {
-            $table->id();
-            $table->string('uuid')->unique();
-            $table->text('connection');
-            $table->text('queue');
-            $table->longText('payload');
-            $table->longText('exception');
-            $table->timestamp('failed_at')->useCurrent();
-        });
-    }
-    public function down(): void { Schema::dropIfExists('failed_jobs'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_000030_create_job_batches_table.php
-// Default Laravel job batches (Bus::batch).
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('job_batches', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->string('name');
-            $table->integer('total_jobs');
-            $table->integer('pending_jobs');
-            $table->integer('failed_jobs');
-            $table->longText('failed_job_ids');
-            $table->mediumText('options')->nullable();
-            $table->integer('cancelled_at')->nullable();
-            $table->integer('created_at');
-            $table->integer('finished_at')->nullable();
-        });
-    }
-    public function down(): void { Schema::dropIfExists('job_batches'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_000040_create_sessions_table.php
-// Session storage (database driver). user_id matches ULID format for domain users.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('sessions', function (Blueprint $table) {
-            $table->string('id')->primary();
-            $table->char('user_id', 26)->nullable()->index(); // ULID of users.id
-            $table->string('ip_address', 45)->nullable();
-            $table->text('user_agent')->nullable();
-            $table->longText('payload');
-            $table->integer('last_activity')->index();
-        });
-    }
-    public function down(): void { Schema::dropIfExists('sessions'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_000050_create_notifications_table.php
-// Default Laravel notifications table.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('notifications', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->string('type');
-            $table->string('notifiable_type');
-            $table->string('notifiable_id')->index();
-            $table->text('data');
-            $table->timestampTz('read_at')->nullable();
-            $table->timestampsTz();
-        });
-    }
-    public function down(): void { Schema::dropIfExists('notifications'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_000060_create_password_reset_tokens_table.php
-// Optional: only used if classic password reset flows are enabled.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('password_reset_tokens', function (Blueprint $table) {
-            $table->string('email')->primary();
-            $table->string('token');
-            $table->timestamp('created_at')->nullable();
-        });
-    }
-    public function down(): void { Schema::dropIfExists('password_reset_tokens'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_000070_create_personal_access_tokens_table.php
-// Optional: required only if using Sanctum. Not used by MCP custom guard.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('personal_access_tokens', function (Blueprint $table) {
-            $table->id();
-            $table->morphs('tokenable');
-            $table->string('name');
-            $table->string('token', 64)->unique();
-            $table->text('abilities')->nullable();
-            $table->timestamp('last_used_at')->nullable();
-            $table->timestamp('expires_at')->nullable();
-            $table->timestamps();
-        });
-    }
-    public function down(): void { Schema::dropIfExists('personal_access_tokens'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_000080_create_cache_tables.php
-// Optional: if using database cache/locks.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('cache', function (Blueprint $table) {
-            $table->string('key')->primary();
-            $table->mediumText('value');
-            $table->integer('expiration');
-        });
-        Schema::create('cache_locks', function (Blueprint $table) {
-            $table->string('key')->primary();
-            $table->string('owner');
-            $table->integer('expiration');
-        });
-    }
-    public function down(): void {
-        Schema::dropIfExists('cache_locks');
-        Schema::dropIfExists('cache');
-    }
-};
-```
-
-### 1. Domain
-
-```php
-<?php
-// 2025_01_01_010000_create_accounts_table.php
-// Tenant (organization) container. One account has many threads, actions, etc.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('accounts', function (Blueprint $t) {
-            $t->ulid('id')->primary();
-            $t->string('name'); // Human-readable account name.
-            $t->json('settings_json')->nullable(); // jsonb: per-account config (retention, locales, etc.)
-            $t->timestampsTz();
-            $t->index('name');
-        });
-    }
-    public function down(): void { Schema::dropIfExists('accounts'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_010100_create_users_table.php
-// Platform users (may belong to multiple accounts via memberships).
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('users', function (Blueprint $t) {
-            $t->ulid('id')->primary();
-            $t->string('display_name')->nullable();
-            $t->string('locale', 12)->default('en'); // e.g., "en", "nl", "fr".
-            $t->string('timezone', 64)->default('Europe/Amsterdam'); // IANA TZ name.
-            $t->string('status', 32)->default('active'); // "active" | "disabled"
-            $t->timestampsTz();
-            $t->index('locale');
-        });
-    }
-    public function down(): void { Schema::dropIfExists('users'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_010200_create_user_identities_table.php
-// Login/contact identities. "type"+"identifier" must be globally unique.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('user_identities', function (Blueprint $t) {
-            $t->ulid('id')->primary();
-            $t->foreignUlid('user_id')->constrained('users')->cascadeOnDelete();
-            $t->string('type', 32); // "email" | "phone" | "oidc"
-            $t->string('identifier'); // e.g., email address.
-            $t->timestampTz('verified_at')->nullable(); // Set when ownership was confirmed.
-            $t->boolean('primary')->default(false); // True if default identity for user.
-            $t->timestampsTz();
-            $t->unique(['type','identifier']);
-        });
-    }
-    public function down(): void { Schema::dropIfExists('user_identities'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_010300_create_memberships_table.php
-// Mapping users to accounts with a role.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('memberships', function (Blueprint $t) {
-            $t->ulid('id')->primary();
-            $t->foreignUlid('account_id')->constrained('accounts')->cascadeOnDelete();
-            $t->foreignUlid('user_id')->constrained('users')->cascadeOnDelete();
-            $t->string('role', 32)->default('member'); // "admin" | "member" | "guest"
-            $t->timestampsTz();
-            $t->unique(['account_id','user_id']);
-        });
-    }
-    public function down(): void { Schema::dropIfExists('memberships'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_010400_create_contacts_table.php
-// Ad-hoc participants under an account; may later link to a real user.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('contacts', function (Blueprint $t) {
-            $t->ulid('id')->primary();
-            $t->foreignUlid('account_id')->constrained('accounts')->cascadeOnDelete();
-            $t->string('email'); // Canonicalized lower-case.
-            $t->string('name')->nullable();
-            $t->json('meta_json')->nullable(); // jsonb: free-form metadata.
-            $t->timestampsTz();
-            $t->unique(['account_id','email']); // One contact per email within an account.
-        });
-    }
-    public function down(): void { Schema::dropIfExists('contacts'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_010500_create_contact_links_table.php
-// Links a contact to a user when an upgrade happens (or is blocked).
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('contact_links', function (Blueprint $t) {
-            $t->ulid('id')->primary();
-            $t->foreignUlid('contact_id')->constrained('contacts')->cascadeOnDelete();
-            $t->foreignUlid('user_id')->constrained('users')->cascadeOnDelete();
-            $t->string('status', 32)->default('linked'); // "linked" | "blocked"
-            $t->timestampsTz();
-            $t->unique(['contact_id','user_id']);
-        });
-    }
-    public function down(): void { Schema::dropIfExists('contact_links'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_010600_create_threads_table.php
-// Conversation container. Subject lives here; individual messages may override if needed.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('threads', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('account_id')->constrained('accounts')->cascadeOnDelete();
-            $t->string('subject'); // Canonical subject (normalized).
-            $t->ulid('starter_message_id')->nullable(); // FK added in a later migration (email_messages created after).
-            $t->json('context_json')->nullable(); // jsonb: rolling summary, state, counters.
-            $t->timestampsTz();
-            $t->index('account_id');
-        });
-        DB::statement('CREATE INDEX threads_context_gin ON threads USING GIN ((context_json))');
-    }
-    public function down(): void { Schema::dropIfExists('threads'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_010700_create_email_messages_table.php
-// Individual email messages within a thread. Stores addressing and delivery metadata.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('email_messages', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('thread_id')->constrained('threads')->cascadeOnDelete();
-
-            $t->string('direction', 16); // "inbound" | "outbound"
-            $t->string('message_id')->unique(); // RFC 5322 Message-ID.
-            $t->string('in_reply_to')->nullable()->index();
-            $t->string('references', 2048)->nullable(); // Space-separated list.
-
-            // Addressing; arrays serialized as jsonb for consistency.
-            $t->string('from_email')->nullable(); // Lower-case email.
-            $t->string('from_name')->nullable();
-            $t->json('to_json')->nullable();   // jsonb: array of {"email","name"}
-            $t->json('cc_json')->nullable();   // jsonb
-            $t->json('bcc_json')->nullable();  // jsonb
-
-            $t->string('subject')->nullable(); // Optional per-message subject override.
-            $t->json('headers_json')->nullable(); // jsonb: selected headers for quick access.
-
-            // Provider metadata (mainly for outbound delivery status).
-            $t->string('provider_message_id')->nullable(); // e.g. Postmark MessageID.
-            $t->string('delivery_status', 32)->nullable(); // "queued" | "sent" | "bounced" | "failed" | null for inbound.
-            $t->json('delivery_error_json')->nullable();   // jsonb: provider error payload.
-
-            // Bodies
-            $t->longText('text_body')->nullable();
-            $t->longText('html_body')->nullable();
-
-            // Misc
-            $t->string('x_thread_id')->nullable(); // Internal hint header.
-            $t->unsignedBigInteger('raw_size_bytes')->nullable();
-
-            $t->timestampsTz();
-            $t->index('thread_id');
-            $t->index(['direction','delivery_status']);
-            $t->index('from_email');
-        });
-
-        // Optional trigram index for fast substring search on message_id.
-        DB::statement('CREATE INDEX IF NOT EXISTS email_messages_message_id_trgm ON email_messages USING GIN (message_id gin_trgm_ops)');
-    }
-    public function down(): void { Schema::dropIfExists('email_messages'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_010800_create_actions_table.php
-// User/system actions related to a thread; executed via signed links or MCP tools.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('actions', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('account_id')->constrained('accounts')->cascadeOnDelete();
-            $t->foreignUlid('thread_id')->constrained('threads')->cascadeOnDelete();
-
-            $t->string('type', 64);
-            // Allowed: "approve","reject","revise","select_option","provide_value",
-            // "schedule_propose_times","schedule_confirm","unsubscribe","info_request","stop"
-
-            $t->json('payload_json')->nullable(); // jsonb: action parameters as validated by schema.
-            $t->string('status', 32)->default('pending'); // "pending" | "completed" | "cancelled" | "failed"
-            $t->timestampTz('expires_at')->nullable();   // Signed link expiry if applicable.
-            $t->timestampTz('completed_at')->nullable();
-            $t->json('error_json')->nullable(); // jsonb: failure diagnostics.
-
-            $t->timestampsTz();
-            $t->index(['thread_id','status']);
-            $t->index('type');
-        });
-
-        DB::statement('CREATE INDEX actions_payload_gin ON actions USING GIN ((payload_json))');
-    }
-    public function down(): void { Schema::dropIfExists('actions'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_010900_create_memories_table.php
-// Versioned "memory" items used for personalization and state recall.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('memories', function (Blueprint $t){
-            $t->ulid('id')->primary();
-
-            $t->string('scope', 32); // "conversation" | "user" | "account"
-            $t->char('scope_id', 26); // ULID of the scope owner.
-            $t->string('key'); // Memory key (namespaced string, e.g. "locale.preference").
-            $t->json('value_json'); // jsonb: arbitrary structured value.
-
-            $t->float('confidence'); // Range [0,1]
-            $t->string('ttl_category', 32); // "volatile" | "seasonal" | "durable" | "legal"
-            $t->timestampTz('expires_at')->nullable();
-
-            $t->integer('version')->default(1);
-            $t->char('superseded_by', 26)->nullable(); // Points to newer memory ULID when superseded.
-            $t->string('provenance')->nullable(); // e.g., email_message_id or tool reference.
-
-            $t->timestampsTz();
-            $t->index(['scope','scope_id','key']);
-        });
-
-        DB::statement('CREATE INDEX memories_value_gin ON memories USING GIN ((value_json))');
-    }
-    public function down(): void { Schema::dropIfExists('memories'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_011000_create_agents_table.php
-// Virtual "agents" that execute tasks (MCP-backed or internal).
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('agents', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('account_id')->constrained('accounts')->cascadeOnDelete();
-
-            $t->string('name');
-            $t->string('role')->nullable(); // Free-form descriptor (e.g., "scheduler", "notifier")
-            $t->json('capabilities_json')->nullable(); // jsonb: advertised tool abilities etc.
-
-            $t->timestampsTz();
-            $t->index('account_id');
-        });
-    }
-    public function down(): void { Schema::dropIfExists('agents'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_011100_create_tasks_table.php
-// Work units executed by agents; may carry structured inputs and outputs.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('tasks', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('account_id')->constrained('accounts')->cascadeOnDelete();
-            $t->foreignUlid('thread_id')->constrained('threads')->cascadeOnDelete();
-            $t->foreignUlid('agent_id')->constrained('agents')->cascadeOnDelete();
-
-            $t->string('status', 32)->default('pending'); // "pending" | "running" | "succeeded" | "failed" | "cancelled"
-            $t->json('input_json')->nullable();  // jsonb
-            $t->json('result_json')->nullable(); // jsonb
-            $t->timestampTz('started_at')->nullable();
-            $t->timestampTz('finished_at')->nullable();
-
-            $t->timestampsTz();
-            $t->index(['account_id','thread_id']);
-        });
-
-        DB::statement('CREATE INDEX tasks_input_gin ON tasks USING GIN ((input_json))');
-    }
-    public function down(): void { Schema::dropIfExists('tasks'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_011200_create_events_table.php
-// Calendar event objects created from schedule_confirm actions.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('events', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('account_id')->constrained('accounts')->cascadeOnDelete();
-
-            $t->string('title');
-            $t->text('description')->nullable();
-            $t->string('location')->nullable();
-            $t->timestampTz('starts_at');
-            $t->timestampTz('ends_at')->nullable();
-
-            $t->timestampsTz();
-            $t->index('starts_at');
-        });
-    }
-    public function down(): void { Schema::dropIfExists('events'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_011300_create_event_participants_table.php
-// Participants per event; either a user OR a contact (mutually exclusive).
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('event_participants', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('event_id')->constrained('events')->cascadeOnDelete();
-
-            $t->string('type', 16); // "user" | "contact"
-            $t->char('user_id', 26)->nullable();
-            $t->char('contact_id', 26)->nullable();
-            $t->string('response', 16)->nullable(); // "accepted" | "declined" | "tentative" | null
-
-            $t->timestampsTz();
-            $t->index('event_id');
-        });
-
-        // Partial unique constraints to prevent duplicate participation.
-        DB::statement("CREATE UNIQUE INDEX event_participants_user_unique ON event_participants (event_id, user_id) WHERE type = 'user' AND user_id IS NOT NULL");
-        DB::statement("CREATE UNIQUE INDEX event_participants_contact_unique ON event_participants (event_id, contact_id) WHERE type = 'contact' AND contact_id IS NOT NULL");
-    }
-    public function down(): void { Schema::dropIfExists('event_participants'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_011400_create_availability_polls_table.php
-// Polls produced by schedule_propose_times to collect availability.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('availability_polls', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('thread_id')->constrained('threads')->cascadeOnDelete();
-
-            $t->json('options_json'); // jsonb: list of ISO8601 datetimes (UTC).
-            $t->string('status', 32)->default('open'); // "open" | "closed"
-            $t->timestampTz('closed_at')->nullable();
-
-            $t->timestampsTz();
-            $t->index('thread_id');
-        });
-    }
-    public function down(): void { Schema::dropIfExists('availability_polls'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_011500_create_availability_votes_table.php
-// Votes per poll; voter is either a user OR a contact (not both).
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('availability_votes', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('poll_id')->constrained('availability_polls')->cascadeOnDelete();
-
-            $t->string('type', 16); // "user" | "contact"
-            $t->char('user_id', 26)->nullable();
-            $t->char('contact_id', 26)->nullable();
-            $t->json('choices_json'); // jsonb: either indices or ISO8601 set.
-
-            $t->timestampsTz();
-            $t->index('poll_id');
-        });
-
-        // Ensure one vote per (poll, user) or (poll, contact).
-        DB::statement("CREATE UNIQUE INDEX availability_votes_user_unique ON availability_votes (poll_id, user_id) WHERE type = 'user' AND user_id IS NOT NULL");
-        DB::statement("CREATE UNIQUE INDEX availability_votes_contact_unique ON availability_votes (poll_id, contact_id) WHERE type = 'contact' AND contact_id IS NOT NULL");
-    }
-    public function down(): void { Schema::dropIfExists('availability_votes'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_011600_create_auth_challenges_table.php
-// Passwordless login challenges (code + optional magic-link token).
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('auth_challenges', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('user_identity_id')->nullable()->constrained('user_identities')->cascadeOnDelete();
-
-            $t->string('identifier'); // Email or phone used to initiate the challenge.
-            $t->string('channel', 16); // "email" | "sms"
-            $t->string('code_hash');   // Hash of the verification code.
-            $t->string('token')->nullable(); // Opaque magic-link token (signed in URL).
-            $t->timestampTz('expires_at');
-            $t->timestampTz('consumed_at')->nullable();
-            $t->unsignedSmallInteger('attempts')->default(0); // Incremented on verify attempts.
-            $t->ipAddress('ip')->nullable();
-
-            $t->timestampsTz();
-            $t->index(['identifier','expires_at']);
-        });
-    }
-    public function down(): void { Schema::dropIfExists('auth_challenges'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_011700_create_api_tokens_table.php
-// Simple token store for MCP "auth:token" guard (not Sanctum).
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('api_tokens', function (Blueprint $t){
-            $t->ulid('id')->primary();
-
-            $t->string('name'); // Friendly name for the token (e.g., "MCP Agent A").
-            $t->string('token_hash', 64)->unique(); // SHA-256 hex of the token.
-            $t->json('abilities')->nullable(); // jsonb: list of allowed tool names/actions.
-
-            // Optional scoping of a token to a user and/or an account.
-            $t->char('user_id', 26)->nullable();
-            $t->char('account_id', 26)->nullable();
-
-            $t->timestampTz('last_used_at')->nullable();
-            $t->timestampTz('expires_at')->nullable();
-            $t->timestampsTz();
-
-            $t->index(['user_id','account_id']);
-        });
-
-        // Enforce at least one scope (user or account) if your policy requires it:
-        // DB::statement("ALTER TABLE api_tokens ADD CONSTRAINT api_tokens_scope_chk CHECK (user_id IS NOT NULL OR account_id IS NOT NULL)");
-    }
-    public function down(): void { Schema::dropIfExists('api_tokens'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_011800_create_email_inbound_payloads_table.php
-// Encrypted raw inbound payloads for audit and reprocessing; short retention.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('email_inbound_payloads', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->string('provider', 32)->default('postmark'); // Source provider identifier.
-            $t->binary('ciphertext'); // Encrypted JSON payload (application-level encryption).
-            $t->json('meta_json')->nullable(); // jsonb: signature status, IP, headers subset.
-            $t->boolean('signature_verified')->default(false);
-            $t->string('remote_ip', 45)->nullable();
-            $t->unsignedBigInteger('content_length')->nullable();
-
-            $t->timestampTz('received_at')->index();
-            $t->timestampTz('purge_after')->index(); // Usually now()+30 days.
-
-            $t->timestampsTz();
-        });
-    }
-    public function down(): void { Schema::dropIfExists('email_inbound_payloads'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_011900_create_email_attachments_table.php
-// File attachments for messages; scanned and optionally text-extracted.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('email_attachments', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('email_message_id')->constrained('email_messages')->cascadeOnDelete();
-
-            $t->string('filename'); // Original filename.
-            $t->string('mime', 128)->nullable(); // e.g., "text/plain","application/pdf","text/csv".
-            $t->unsignedBigInteger('size_bytes')->nullable(); // Raw byte size as received.
-
-            $t->string('storage_disk')->default('attachments'); // Laravel disk name.
-            $t->string('storage_path'); // Relative path on the disk.
-
-            // Scanning & extraction lifecycle
-            $t->string('scan_status', 16)->default('pending'); // "pending" | "clean" | "infected" | "error"
-            $t->string('scan_virus')->nullable(); // Virus signature name if infected.
-            $t->timestampTz('scanned_at')->nullable();
-
-            $t->string('extract_status', 16)->nullable(); // "queued" | "done" | "error" | null (not applicable)
-            $t->timestampTz('extracted_at')->nullable();
-
-            $t->timestampsTz();
-            $t->index('email_message_id');
-            $t->index(['scan_status','extract_status']);
-        });
-    }
-    public function down(): void { Schema::dropIfExists('email_attachments'); }
-};
-```
-
-```php
-<?php
-// 2025_01_01_012000_create_attachment_extractions_table.php
-// Optional separate store for extracted text/summaries to avoid bloating main table.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::create('attachment_extractions', function (Blueprint $t){
-            $t->ulid('id')->primary();
-            $t->foreignUlid('attachment_id')->constrained('email_attachments')->cascadeOnDelete();
-
-            $t->longText('text_excerpt')->nullable(); // First N KB of text for LLM context (truncated).
-            $t->string('text_disk')->nullable(); // Disk where the full text is stored (optional).
-            $t->string('text_path')->nullable(); // Relative path to full text file.
-            $t->unsignedBigInteger('text_bytes')->nullable();
-            $t->unsignedInteger('pages')->nullable(); // For PDFs.
-
-            $t->json('summary_json')->nullable(); // jsonb: cached summaries (per locale or purpose).
-
-            $t->timestampsTz();
-            $t->index('attachment_id');
-        });
-    }
-    public function down(): void { Schema::dropIfExists('attachment_extractions'); }
-};
-```
-
-### 2. Alter Migrations and Additions
-
-```php
-<?php
-// 2025_01_01_020000_alter_threads_add_starter_fk.php
-// Adds FK for threads.starter_message_id after email_messages exists.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::table('threads', function (Blueprint $t){
-            // Set FK to email_messages(id); on delete set null to keep the thread if the message is removed.
-            $t->foreign('starter_message_id')->references('id')->on('email_messages')->nullOnDelete();
-        });
-    }
-    public function down(): void {
-        Schema::table('threads', function (Blueprint $t){
-            $t->dropForeign(['starter_message_id']);
-        });
-    }
-};
-```
-
-```php
-<?php
-// 2025_01_01_020010_alter_actions_add_clarification_state.php
-// Tracks the clarification loop state for low-confidence interpretations.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Database\Schema\Blueprint;
-use Illuminate\Support\Facades\Schema;
-
-return new class extends Migration {
-    public function up(): void {
-        Schema::table('actions', function(Blueprint $t){
-            $t->unsignedTinyInteger('clarification_rounds')->default(0)->after('error_json'); // Number of clarification messages sent.
-            $t->unsignedTinyInteger('clarification_max')->default(2)->after('clarification_rounds'); // Upper bound (usually 2).
-            $t->timestampTz('last_clarification_sent_at')->nullable()->after('clarification_max');
-        });
-    }
-    public function down(): void {
-        Schema::table('actions', function(Blueprint $t){
-            $t->dropColumn(['clarification_rounds','clarification_max','last_clarification_sent_at']);
-        });
-    }
-};
-```
-
-### 3. Post-Migrate Indexes and Checks
-
-```php
-<?php
-// 2025_01_01_030000_post_migrate_indexes.php
-// Optional performance indexes applied after base schema exists.
-use Illuminate\Database\Migrations\Migration;
-use Illuminate\Support\Facades\DB;
-
-return new class extends Migration {
-    public function up(): void {
-        // Fast filter by action type.
-        DB::statement('CREATE INDEX IF NOT EXISTS actions_type_idx ON actions (type)');
-        // Already created: email_messages_message_id_trgm.
-    }
-    public function down(): void {
-        DB::statement('DROP INDEX IF EXISTS actions_type_idx');
-    }
-};
-```
-
-### 4. Enum Values and Meanings (Authoritative Mapping)
-
-To avoid ambiguity, below are all string fields with fixed values and their exact meaning:
-
-* `users.status`: `"active"` user can log in; `"disabled"` access blocked.
-* `user_identities.type`: `"email"` email address; `"phone"` telephone number; `"oidc"` OpenID Connect subject.
-* `memberships.role`: `"admin"` full rights within account; `"member"` standard; `"guest"` minimal access.
-* `email_messages.direction`: `"inbound"` received via webhook; `"outbound"` sent by system.
-* `email_messages.delivery_status`: `"queued"` scheduled at provider; `"sent"` delivered; `"bounced"` provider bounce; `"failed"` permanently failed; `null` for inbound.
-* `actions.type`: `"approve"|"reject"|"revise"|"select_option"|"provide_value"|"schedule_propose_times"|"schedule_confirm"|"unsubscribe"|"info_request"|"stop"`.
-* `actions.status`: `"pending"` awaiting execution/confirmation; `"completed"` successful; `"cancelled"` canceled/expired; `"failed"` executed with error.
-* `memories.scope`: `"conversation"` bound to thread; `"user"` bound to user; `"account"` bound to account.
-* `memories.ttl_category`: `"volatile"` short-lived; `"seasonal"` medium-lived; `"durable"` long-lived; `"legal"` policy-bound.
-* `agents.role`: free text, descriptive only (no logic bound).
-* `tasks.status`: `"pending"|"running"|"succeeded"|"failed"|"cancelled"`.
-* `event_participants.type`: `"user"` refers to users.id; `"contact"` refers to contacts.id.
-* `event_participants.response`: `"accepted"|"declined"|"tentative"` or `null` unknown.
-* `availability_polls.status`: `"open"` voting allowed; `"closed"` closed; `closed_at` set on transition.
-* `availability_votes.type`: `"user"` or `"contact"` with the corresponding id.
-* `auth_challenges.channel`: `"email"` via email; `"sms"` via SMS.
-* `email_attachments.scan_status`: `"pending"` not scanned yet; `"clean"` no malware; `"infected"` malware detected; `"error"` scan could not be performed.
-* `email_attachments.extract_status`: `"queued"` extraction scheduled; `"done"` text extracted; `"error"` extraction failed; `null` not applicable (e.g., unreadable binary).
-
-### Deployment Notes
-
-* Run migrations **exactly in filename order** (2025_01_01_000000_*, 2025_01_01_010000_*, etc.) to avoid FK errors.
-* Ensure the `attachments` disk exists in `config/filesystems.php`.
-* Configure a **retention scheduler** for `email_inbound_payloads.purge_after` and orphaned attachment files.
-* The ClamAV daemon must be reachable for scan jobs **before** extraction starts.
 
 ## Getting Started (Developer Setup)
 
@@ -3714,289 +2616,32 @@ touch resources/lang/nl_NL/messages.php
 App::setLocale('nl_NL');
 ```
 
-## Configuration Files
+## Configuration Overview
 
-### Complete Config Examples
+**Environment Variables**: See `.env.example` for complete configuration template.
 
-#### `config/llm.php`
-```php
-<?php
+**Key Configs**:
+- `config/database.php` - PostgreSQL with JSONB support
+- `config/queue.php` - Redis queues for async processing
+- `config/mail.php` - Postmark integration
+- `config/filesystems.php` - Local storage with attachments disk
 
-return [
-    'provider' => env('LLM_PROVIDER', 'ollama'),
-    'model' => env('LLM_MODEL', 'gpt-4o-mini'),
-    'timeout_ms' => 4000,
-    'retry' => ['max' => 1, 'on' => [408, 429, 500, 502, 503, 504]],
-    'calibration' => [
-        'openai' => 1.00,
-        'anthropic' => 0.97,
-        'ollama' => 0.92,
-    ],
-    'caps' => [
-        'input_tokens' => 2000,
-        'summary_tokens' => 500,
-        'output_tokens' => 300,
-    ],
-];
-```
+**Future Configs** (not yet implemented):
+- `config/llm.php` - Provider settings and token limits
+- `config/prompts.php` - LLM prompt templates
+- `config/mcps.php` - MCP tool registry
 
-#### `config/prompts.php`
-```php
-<?php
+## Testing Strategy (Future)
 
-return [
-    'action_interpret' => [
-        'temperature' => 0.2,
-        'backstory' => 'You convert a user email reply into exactly one allowed action with parameters. Output JSON only.',
-        'template' => 'You are a strict JSON generator... [full template from Appendix G]',
-    ],
-    'clarify_question' => [
-        'temperature' => 0.3,
-        'backstory' => 'You write one concise clarification question matching the user's language.',
-        'template' => 'Write ONE short question to disambiguate... [full template]',
-    ],
-    'options_email_draft' => [
-        'temperature' => 0.4,
-        'backstory' => 'You draft a brief options email in the user's language.',
-        'template' => 'Write a brief email offering 2-4 likely actions... [full template]',
-    ],
-    'memory_extract' => [
-        'temperature' => 0.2,
-        'backstory' => 'Extract non-sensitive, useful facts as key-value memories.',
-        'template' => 'Extract relevant, non-sensitive facts... [full template]',
-    ],
-    'thread_summarize' => [
-        'temperature' => 0.3,
-        'backstory' => 'Summarize a thread for fast recall.',
-        'template' => 'Summarize the thread concisely... [full template]',
-    ],
-    'language_detect' => [
-        'temperature' => 0.0,
-        'backstory' => 'Return language code only.',
-        'template' => 'Detect the primary language... [full template]',
-    ],
-    'attachment_summarize' => [
-        'temperature' => 0.3,
-        'backstory' => 'Summarize attachment text for decision-making.',
-        'template' => 'Summarize the attachment in locale... [full template]',
-    ],
-    'csv_schema_detect' => [
-        'temperature' => 0.2,
-        'backstory' => 'Infer simple CSV schema from a small sample.',
-        'template' => 'Infer CSV schema from sample lines... [full template]',
-    ],
-    'clarify_email_draft' => [
-        'temperature' => 0.4,
-        'backstory' => 'Draft a short clarification email.',
-        'template' => 'Draft a brief email asking exactly ONE... [full template]',
-    ],
-    'poll_email_draft' => [
-        'temperature' => 0.4,
-        'backstory' => 'Draft an availability poll email.',
-        'template' => 'Draft a short availability poll email... [full template]',
-    ],
-];
-```
+**Unit Tests**: Models, services, jobs with comprehensive coverage.
 
-#### `config/mcps.php`
-```php
-<?php
+**Feature Tests**: Webhook processing, authentication flows, API endpoints.
 
-return [
-    'tools' => [
-        'send_email' => \App\Mcp\Tools\SendEmailTool::class,
-        'store_memory' => \App\Mcp\Tools\StoreMemoryTool::class,
-        'process_attachment' => \App\Mcp\Tools\ProcessAttachmentTool::class,
-    ],
-    'auth' => [
-        'guard' => 'mcp_token',
-        'token_table' => 'api_tokens',
-    ],
-];
-```
+**Integration Tests**: End-to-end email processing with LLM mocks.
 
-### Filesystem Configuration (`config/filesystems.php`)
+**Golden Set**: ≥100 examples per action type for LLM training and validation.
 
-Add the attachments disk:
-
-```php
-'disks' => [
-    // ... existing disks
-
-    'attachments' => [
-        'driver' => 'local',
-        'root' => storage_path('app/attachments'),
-        'throw' => false,
-    ],
-],
-```
-
-### Language Files Structure
-
-```
-resources/lang/
-├── en_US/
-│   ├── auth.php
-│   ├── actions.php
-│   ├── validation.php
-│   ├── pagination.php
-│   └── messages.php
-└── nl_NL/
-    ├── auth.php
-    ├── actions.php
-    ├── validation.php
-    ├── pagination.php
-    └── messages.php
-```
-
-Example `resources/lang/en_US/actions.php`:
-```php
-<?php
-
-return [
-    'approve' => 'Approve',
-    'reject' => 'Reject',
-    'revise' => 'Revise',
-    'select_option' => 'Select Option',
-    'provide_value' => 'Provide Value',
-    'schedule_propose_times' => 'Schedule Meeting',
-    'schedule_confirm' => 'Confirm Meeting',
-    'unsubscribe' => 'Unsubscribe',
-    'info_request' => 'Request Information',
-    'stop' => 'Stop',
-];
-```
-
-## LLM Testing Data (Golden Set Examples)
-
-### Action Interpretation Examples
-
-#### Example 1: Approve Action (High Confidence)
-**Input**:
-```
-Subject: Re: Meeting Request
-From: user@example.com
-
-Yes, that works for me. Let's go ahead with the meeting.
-```
-
-**Expected Output**:
-```json
-{
-  "action_type": "approve",
-  "parameters": {},
-  "scope_hint": "conversation",
-  "confidence": 0.95,
-  "needs_clarification": false,
-  "clarification_prompt": null
-}
-```
-
-#### Example 2: Reject Action (High Confidence)
-**Input**:
-```
-Subject: Re: Invoice Review
-From: user@example.com
-
-I cannot approve this invoice. The amounts are incorrect.
-```
-
-**Expected Output**:
-```json
-{
-  "action_type": "reject",
-  "parameters": {
-    "reason": "The amounts are incorrect"
-  },
-  "scope_hint": "conversation",
-  "confidence": 0.90,
-  "needs_clarification": false,
-  "clarification_prompt": null
-}
-```
-
-#### Example 3: Schedule Proposal (Medium Confidence - Needs Clarification)
-**Input**:
-```
-Subject: Re: Project Discussion
-From: user@example.com
-
-Let's meet sometime next week. I'm free on Tuesday or Wednesday.
-```
-
-**Expected Output**:
-```json
-{
-  "action_type": "schedule_propose_times",
-  "parameters": {
-    "duration_min": 60,
-    "timezone": "Europe/Amsterdam",
-    "constraints": "Tuesday or Wednesday next week"
-  },
-  "scope_hint": "conversation",
-  "confidence": 0.65,
-  "needs_clarification": true,
-  "clarification_prompt": "What time would work best for you on Tuesday or Wednesday?"
-}
-```
-
-#### Example 4: Provide Value (Low Confidence - Options Email)
-**Input**:
-```
-Subject: Re: Budget Request
-From: user@example.com
-
-I think we can do $5000 for this project.
-```
-
-**Expected Output**:
-```json
-{
-  "action_type": "provide_value",
-  "parameters": {
-    "key": "budget",
-    "value": "$5000"
-  },
-  "scope_hint": "conversation",
-  "confidence": 0.45,
-  "needs_clarification": false,
-  "clarification_prompt": null
-}
-```
-
-### Memory Extraction Examples
-
-#### Example Memory Extraction
-**Input**: Same as above examples
-
-**Expected Output**:
-```json
-{
-  "items": [
-    {
-      "key": "meeting_preference",
-      "value": "Tuesday or Wednesday",
-      "scope": "user",
-      "ttl_category": "seasonal",
-      "confidence": 0.85,
-      "provenance": "email_message_id:01H..."
-    }
-  ]
-}
-```
-
-### Thread Summarization Examples
-
-**Input**: Thread with 3 messages about meeting scheduling
-
-**Expected Output**:
-```json
-{
-  "summary": "User requested to schedule a meeting, system asked for clarification, user provided availability preferences.",
-  "key_entities": ["meeting", "Tuesday", "Wednesday", "next week"],
-  "open_questions": ["What specific times work best?"]
-}
-```
+**CI/CD**: GitHub Actions with PostgreSQL, Redis, automated testing.
 
 ## Troubleshooting
 
@@ -4346,4 +2991,29 @@ aws s3 cp backup_$DATE.sql s3://your-backup-bucket/
 aws s3 cp attachments_$DATE.tar.gz s3://your-backup-bucket/
 ```
 
-This completes the turn-key development setup for Agent AI. The documentation now provides everything needed to get started with development, including setup instructions, wireframes, configuration examples, testing data, troubleshooting guides, and production deployment instructions.
+## Summary
+
+**Agent AI** is an email-centered automation system built with Laravel 12, featuring:
+
+✅ **Currently Implemented**:
+- Complete PostgreSQL schema with 29 migrations and 21 Eloquent models
+- Postmark webhook integration with HMAC validation
+- RFC 5322 email threading via ThreadResolver service
+- ULID primary keys, JSONB storage, comprehensive relationships
+- Basic ProcessInboundEmail job structure
+
+🚧 **In Development**:
+- Passwordless authentication system
+- Blade/Flowbite UI foundation
+
+📋 **Planned Features**:
+- LLM client with Ollama fallback and provider support
+- MCP layer for schema-driven tool calls
+- Action interpretation and clarification loops
+- Attachment processing pipeline (ClamAV, extraction, summarization)
+- Memory gate with TTL/decay
+- i18n language detection and multilingual UI
+
+**Tech Stack**: Laravel 12, PHP 8.4, PostgreSQL 17+, Redis 7, Postmark, Ollama, ClamAV, Tailwind/Flowbite.
+
+**Development Status**: Phase 1A (Database/Models) complete. Ready for Phase 1B (Auth/UI) and Phase 2 (LLM/MCP).
