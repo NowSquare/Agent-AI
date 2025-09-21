@@ -50,10 +50,11 @@ brew install poppler clamav
 ```
 
 > Configure Postmark webhook for inbound emails:
-> - Use ngrok to expose your local app: `ngrok http https://agent-ai.test`
+> - Use ngrok to expose your local app: `ngrok http --url=abc123.ngrok-free.app 80 --host-header=agent-ai.test`
 > - Set up Postmark inbound webhook with HTTP Basic Auth:
 >   `https://webhook-user:webhook-pass@your-ngrok-url.ngrok-free.app/webhooks/inbound-email`
 > - Configure `WEBHOOK_USER` and `WEBHOOK_PASS` in your `.env` file
+
 
 ### Option B — Docker (Windows/Linux/macOS)
 

@@ -18,7 +18,7 @@
   (so Cursor sees routes, schema, Tinker, logs)
 
 * Terminal D: Webhook testing
-  - Start ngrok: `ngrok http https://agent-ai.test`
+  - Start ngrok: `ngrok http --url=abc123.ngrok-free.app 80 --host-header=agent-ai.test`
   - Copy the ngrok HTTPS URL (e.g., `https://abc123.ngrok-free.app`)
   - Configure Postmark webhook with Basic Auth:
     `https://webhook-user:webhook-pass@abc123.ngrok-free.app/webhooks/inbound-email`
