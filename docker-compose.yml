@@ -1,0 +1,86 @@
+version: "3.8"
+
+services:
+  app:
+    build: .
+    container_name: agentai_app
+    env_file: .env
+    ports:
+      - "8080:8080" # App at http://localhost:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./storage:/var/www/html/storage
+      - ./bootstrap/cache:/var/www/html/bootstrap/cache
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 3s
+      start_period: 20s
+      retries: 3
+
+  postgres:
+    image: postgres:17
+    container_name: agentai_pg
+    environment:
+      POSTGRES_DB: agent_ai
+      POSTGRES_USER: agent_user
+      POSTGRES_PASSWORD: your_secure_password
+    ports: ["5432:5432"]
+    volumes:
+      - pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U agent_user -d agent_ai"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: agentai_redis
+    ports: ["6379:6379"]
+    volumes:
+      - redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Local dev mail (exclude in prod)
+  mailpit:
+    image: axllent/mailpit
+    container_name: agentai_mailpit
+    ports: ["8025:8025","1025:1025"]
+    environment:
+      # Make Mailpit POST inbound emails to the Laravel webhook in the app container
+      MP_WEBHOOK_URL: "http://app:8080/webhooks/inbound-email"
+      # Secure the webhook with the same shared secret used in .env(.docker)
+      MP_WEBHOOK_AUTH: "X-Inbound-Token: ${INBOUND_WEBHOOK_SECRET}"
+    profiles: ["dev"]
+
+  # ClamAV daemon
+  clamav:
+    image: clamav/clamav:latest
+    container_name: agentai_clamav
+    ports: ["3310:3310"]
+    volumes:
+      - clamav_data:/var/lib/clamav
+
+  # Local LLM (optional but handy)
+  ollama:
+    image: ollama/ollama:latest
+    container_name: agentai_ollama
+    ports: ["11434:11434"]
+    volumes:
+      - ollama_data:/root/.ollama
+    profiles: ["dev"]
+
+volumes:
+  pg: {}
+  redis: {}
+  clamav_data: {}
+  ollama_data: {}
