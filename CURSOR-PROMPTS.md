@@ -102,6 +102,12 @@ CONVENTIONS
 - Routes split: routes/web.php (UI, webhooks, signed links), routes/api.php (MCP/internal).
 - Icons: Use **Lucide** via `<i data-lucide="...">` in Blade. The app initializes icons in `resources/js/app.js` with `createIcons(...)`. If DOM updates (Livewire/Alpine), call `createIcons(...)` again.
 
+⚠️ MIGRATION RULE (IMPORTANT)
+- Always **modify the existing migration files** when adding or changing columns/relationships.  
+- Do **NOT** create separate `add_x_to_y_table` or `alter_*` migrations.  
+- The goal is to keep the schema definition consolidated and readable during the project’s active development.  
+- Forward-only migration hygiene still applies: ensure `php artisan migrate:fresh` works cleanly at all times.
+
 OPERATING PROCEDURE (ALWAYS FOLLOW)
 1) READ ME FIRST
    - Summarize @CURSOR-README.md in your own words (no code), calling out MVP features, roles, key workflows (inbound email → threading → LLM → actions/MCP → outbound; attachments scan/extract), and dev expectations (Herd/Docker, **Mailpit in dev**, Ollama local).
@@ -207,6 +213,12 @@ REQUIRED DELIVERABLES ACROSS PHASES
 - i18n middleware; language detection; `resources/lang/*`.
 - Blade pages: dashboard, threads/{id}, action confirmation, attachment download; Flowbite forms; shared layout.
 - Tests: Feature/Unit for inbound (Mailpit/Postmark payloads), threading, LLM fallback, MCP calls, attachments scan/extract, i18n detection, Horizon gate.
+
+⚠️ MIGRATION RULE (IMPORTANT)
+- Always **modify the existing migration files** when adding or changing columns/relationships.  
+- Do **NOT** create separate `add_x_to_y_table` or `alter_*` migrations.  
+- The goal is to keep the schema definition consolidated and readable during the project’s active development.  
+- Forward-only migration hygiene still applies: ensure `php artisan migrate:fresh` works cleanly at all times.
 
 FINAL OUTPUT
 - RUN COMMANDS — single ordered block of all shell commands to copy/paste.
