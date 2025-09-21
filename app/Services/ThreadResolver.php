@@ -10,6 +10,26 @@ class ThreadResolver
     /**
      * Resolve or create a thread for an incoming email message.
      */
+    public function resolveOrCreate(
+        \App\Models\Account $account,
+        string $subject,
+        ?string $messageId,
+        ?string $inReplyTo,
+        ?string $references
+    ): Thread {
+        $emailData = [
+            'subject' => $subject,
+            'message_id' => $messageId,
+            'in_reply_to' => $inReplyTo,
+            'references' => $references,
+        ];
+
+        return $this->resolve($emailData, $account->id);
+    }
+
+    /**
+     * Resolve or create a thread for an incoming email message.
+     */
     public function resolve(array $emailData, string $accountId): Thread
     {
         // Try to find existing thread by threading headers
