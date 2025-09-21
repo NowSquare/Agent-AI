@@ -35,7 +35,14 @@ class ProcessInboundEmail implements ShouldQueue
 
         // Retrieve and decrypt payload
         $payloadRecord = EmailInboundPayload::findOrFail($this->payloadId);
-        $payload = json_decode(Crypt::decryptString($payloadRecord->ciphertext), true);
+
+        // Handle binary ciphertext field (PostgreSQL may return as resource)
+        $ciphertext = $payloadRecord->ciphertext;
+        if (is_resource($ciphertext)) {
+            $ciphertext = stream_get_contents($ciphertext);
+        }
+
+        $payload = json_decode(Crypt::decryptString($ciphertext), true);
 
         if (!$payload) {
             Log::error('Failed to decrypt or decode payload', ['payload_id' => $this->payloadId]);

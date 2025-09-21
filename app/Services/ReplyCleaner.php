@@ -128,7 +128,7 @@ class ReplyCleaner
             '/^Il\s+.*\s+ha\s+scritto:$/i',    // Italian: "Il [date] [person] ha scritto:"
             '/^Forwarded\s+message:/i',        // Forward markers
             '/^Doorstuurbbericht:/i',          // Dutch forward
-            '/^---+\s*Forwarded\s+message\s*---+/$/i',
+            '/^---+\s*Forwarded\s+message\s*---+$/i',
             '/^Begin\s+forwarded\s+message:/i',
             '/^Original\s+message:/i',
             '/^Oorspronkelijk\s+bericht:/i',   // Dutch original
