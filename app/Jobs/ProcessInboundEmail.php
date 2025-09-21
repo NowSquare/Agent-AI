@@ -52,6 +52,24 @@ class ProcessInboundEmail implements ShouldQueue
         // Parse Postmark payload
         $emailData = $this->parsePostmarkPayload($payload);
 
+        // Validate required fields
+        if (empty($emailData['message_id'])) {
+            Log::warning('Skipping payload with missing MessageID', [
+                'payload_id' => $this->payloadId,
+                'subject' => $emailData['subject'] ?? 'N/A',
+            ]);
+            return;
+        }
+
+        // Check if message already exists (prevent duplicates)
+        if (EmailMessage::where('message_id', $emailData['message_id'])->exists()) {
+            Log::info('Email message already exists, skipping duplicate', [
+                'message_id' => $emailData['message_id'],
+                'payload_id' => $this->payloadId,
+            ]);
+            return;
+        }
+
         // Get or create account (for now, use default account)
         $account = Account::firstOrCreate([
             'name' => 'Default Account',
@@ -70,7 +88,7 @@ class ProcessInboundEmail implements ShouldQueue
         );
 
         // Create email message
-        $emailMessage = EmailMessage::create([
+        $messageData = [
             'thread_id' => $thread->id,
             'direction' => 'inbound',
             'message_id' => $emailData['message_id'],
@@ -83,11 +101,13 @@ class ProcessInboundEmail implements ShouldQueue
             'bcc_json' => $emailData['bcc'] ?? [],
             'subject' => $emailData['subject'],
             'headers_json' => $emailData['headers'] ?? [],
-            'text_body' => $emailData['text_body'],
-            'html_body' => $emailData['html_body'],
+            'body_text' => $emailData['text_body'],
+            'body_html' => $emailData['html_body'],
             'x_thread_id' => $emailData['x_thread_id'] ?? null,
             'raw_size_bytes' => $emailData['raw_size_bytes'] ?? null,
-        ]);
+        ];
+
+        $emailMessage = EmailMessage::create($messageData);
 
         // Register attachments (if any)
         if (!empty($emailData['attachments'])) {
