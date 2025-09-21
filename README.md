@@ -15,11 +15,11 @@ This README explains **how to run Agent-AI** locally with **Laravel Herd** (reco
 **Pick your mode first:**
 - macOS devs → **Herd** → `cp .env.herd .env`
 - Windows/Linux devs (or macOS without Herd) → **Docker** → `cp .env.docker .env`
-- Fallback (any OS) → **Artisan-only** with your own Postgres + Redis + Mailpit
+- Fallback (any OS) → **Artisan-only** with your own Postgres + Redis
 
-> In development, **Mailpit is the default for both sending and receiving email**.
-> - Outbound: Laravel sends via SMTP to Mailpit (`127.0.0.1:1025` or service `mailpit`).
-> - Inbound: Mailpit POSTs incoming messages to `/webhooks/inbound-email` with a shared secret.
+> In development, **Postmark handles inbound webhooks**.
+> - Outbound: Laravel sends via Postmark SMTP.
+> - Inbound: Postmark sends webhooks to `/webhooks/inbound-email` with HMAC validation.
 
 ---
 
@@ -28,7 +28,7 @@ This README explains **how to run Agent-AI** locally with **Laravel Herd** (reco
 - **Laravel 12** (PHP 8.3/8.4 ready), Vite, Tailwind v4, Flowbite UI  
 - **PostgreSQL** database (Herd or Docker)  
 - **Redis** queues (Herd or Docker) and **Laravel Horizon** dashboard  
-- **Mail**: Mailpit by default in dev (send & receive), Postmark in prod  
+- **Mail**: Postmark for both development and production (webhooks + SMTP)  
 - **LLM** via **Ollama** (local) or any HTTP provider  
 - File scanning (ClamAV) & PDF text extraction (Spatie + poppler)  
 - **Laravel Boost**: MCP server for smarter AI-assisted development in Cursor
@@ -46,20 +46,13 @@ You only need **system-level tools**:
 - Redis (via Herd, optional)  
 - **System deps (Homebrew):**
 ```bash
-brew install poppler clamav mailpit
+brew install poppler clamav
 ```
 
-> Start Mailpit if it’s not running:
->
-> ```bash
-> # simple foreground run with webhook to your app
-> mailpit --smtp 127.0.0.1:1025 --ui 127.0.0.1:8025 \
->   --webhook-url http://agent-ai.test/webhooks/inbound-email \
->   --webhook-auth "X-Inbound-Token: $(grep INBOUND_WEBHOOK_SECRET .env | cut -d= -f2 | tr -d '\"')"
-> ```
->
-> Or run as a service (configure flags in a plist if needed):
-> `brew services start mailpit`
+> Configure Postmark webhook for inbound emails:
+> - Set up Postmark inbound webhook pointing to `/webhooks/inbound-email`
+> - Use ngrok or similar: `ngrok http 8080`
+> - Webhook URL: `https://your-ngrok-url.ngrok.io/webhooks/inbound-email`
 
 ### Option B — Docker (Windows/Linux/macOS)
 
@@ -267,17 +260,10 @@ During development, keep these processes running in separate terminals:
 * Terminal C: `php artisan boost:mcp`  
   (so Cursor sees routes, schema, Tinker, logs)
 
-* Terminal D: **Mailpit**  
-  - macOS (Herd/Homebrew):  
-    ```bash
-    brew services start mailpit
-    # or run manually with webhook:
-    mailpit --smtp 127.0.0.1:1025 --ui 127.0.0.1:8025 \
-      --webhook-url http://agent-ai.test/webhooks/inbound-email \
-      --webhook-auth "X-Inbound-Token: $INBOUND_WEBHOOK_SECRET"
-    ```
-  - Docker: Mailpit runs as a service from `docker-compose.yml` (ports 1025/8025).  
-    Add `MP_WEBHOOK_URL` and `MP_WEBHOOK_AUTH` to its environment if you want inbound POSTs.
+* Terminal D: **Webhook testing**
+  - Set up Postmark inbound webhook
+  - Use ngrok: `ngrok http 8080`
+  - Configure Postmark webhook URL: `https://your-ngrok-url.ngrok.io/webhooks/inbound-email`
 
 ---
 

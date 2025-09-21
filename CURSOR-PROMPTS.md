@@ -2,43 +2,25 @@
 
 ## Start the dev loop
 
-> Note: Dev uses **Mailpit** for send & receive.  
-> Make sure it is running and posting to `/webhooks/inbound-email`.  
-> 
-> - **macOS (Herd):**  
->   ```bash
->   brew install mailpit        # once
->   brew services start mailpit # background service
->   # or run manually with webhook:
->   mailpit --smtp 127.0.0.1:1025 --ui 127.0.0.1:8025 \
->     --webhook-url http://agent-ai.test/webhooks/inbound-email \
->     --webhook-auth "X-Inbound-Token: $INBOUND_WEBHOOK_SECRET"
->   ```
-> - **Docker:** Mailpit runs as a service from `docker-compose.yml` (ports 1025/8025).  
->   Set `MP_WEBHOOK_URL` and `MP_WEBHOOK_AUTH` in the env if you want inbound POSTs.
+> Note: Dev uses **Postmark** for inbound email webhooks.
+> Configure Postmark webhook to point to `/webhooks/inbound-email`.
+> Use ngrok or similar to expose local server for webhook testing.
 
 ---
 
-* Terminal A: `npm run dev`  
+* Terminal A: `npm run dev`
   (Vite dev server, hot reloads)
 
-* Terminal B: `php artisan horizon`  
-  (or `php artisan queue:work` if you don’t want Horizon)
+* Terminal B: `php artisan horizon`
+  (or `php artisan queue:work` if you don't want Horizon)
 
-* Terminal C: `php artisan boost:mcp`  
+* Terminal C: `php artisan boost:mcp`
   (so Cursor sees routes, schema, Tinker, logs)
 
-* Terminal D: Mailpit  
-  - **macOS (Herd):**
-    ```bash
-    brew services start mailpit
-    # or run manually with webhook:
-    mailpit --smtp 127.0.0.1:1025 --ui 127.0.0.1:8025 \
-      --webhook-url http://agent-ai.test/webhooks/inbound-email \
-      --webhook-auth "X-Inbound-Token: $INBOUND_WEBHOOK_SECRET"
-    ```
-  - **Docker:** Mailpit runs as a service from `docker-compose.yml` (ports 1025/8025).  
-    Add `MP_WEBHOOK_URL` and `MP_WEBHOOK_AUTH` to its environment if you want inbound POSTs.
+* Terminal D: Webhook testing
+  - Set up Postmark webhook pointing to your local server
+  - Use ngrok: `ngrok http 8080`
+  - Configure webhook URL: `https://your-ngrok-url.ngrok.io/webhooks/inbound-email`
 
 Run migrations when needed:
 ```bash

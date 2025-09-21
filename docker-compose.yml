@@ -50,18 +50,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # Local dev mail (exclude in prod)
-  mailpit:
-    image: axllent/mailpit
-    container_name: agentai_mailpit
-    ports: ["8025:8025","1025:1025"]
-    environment:
-      # Make Mailpit POST inbound emails to the Laravel webhook in the app container
-      MP_WEBHOOK_URL: "http://app:8080/webhooks/inbound-email"
-      # Secure the webhook with the same shared secret used in .env(.docker)
-      MP_WEBHOOK_AUTH: "X-Inbound-Token: ${INBOUND_WEBHOOK_SECRET}"
-    profiles: ["dev"]
-
   # ClamAV daemon
   clamav:
     image: clamav/clamav:latest

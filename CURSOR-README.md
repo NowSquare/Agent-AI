@@ -280,12 +280,10 @@ This README reflects the **current implementation** as of our development sessio
 - **Database**: Complete PostgreSQL schema with 29 migrations, 21 Eloquent models
 - **Webhook**: Postmark inbound controller with HMAC validation and encrypted payload storage
 - **Threading**: RFC 5322 email threading via ThreadResolver service
-- **Jobs**: ProcessInboundEmail job with basic structure (LLM integration pending)
+- **Jobs**: ProcessInboundEmail job with email parsing, threading, and reply cleaning
 - **Models**: All domain models with ULID PKs, JSONB casts, and comprehensive relationships
-
-**🚧 IN DEVELOPMENT:**
-- Passwordless authentication controllers
-- Basic Blade UI with Flowbite components
+- **Authentication**: Passwordless auth with email codes and magic links
+- **UI**: Basic Blade/Flowbite dashboard and auth pages
 
 **📋 NOT YET IMPLEMENTED:**
 - LLM client and providers
@@ -800,9 +798,6 @@ services:
   redis:
     image: redis:7
     volumes: ["redis:/data"]
-  mailpit:
-    image: axllent/mailpit
-    ports: ["8025:8025"]
   clamav:
     image: clamav/clamav:latest
   ollama:
@@ -1445,14 +1440,6 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-
-  mailpit:
-    image: axllent/mailpit
-    ports:
-      - "8025:8025"
-      - "1025:1025"
-    environment:
-      MP_SMTP_AUTH_ACCEPT_ANY: 1
 
   clamav:
     image: clamav/clamav:latest
