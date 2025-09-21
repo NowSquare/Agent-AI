@@ -34,15 +34,38 @@ class ProcessInboundEmail implements ShouldQueue
         Log::info('Processing inbound email', ['payload_id' => $this->payloadId]);
 
         // Retrieve and decrypt payload
-        $payloadRecord = EmailInboundPayload::findOrFail($this->payloadId);
+        try {
+            $payloadRecord = EmailInboundPayload::findOrFail($this->payloadId);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            Log::error('Payload not found for processing', [
+                'payload_id' => $this->payloadId,
+                'error' => $e->getMessage(),
+            ]);
+            return;
+        }
 
-        // Handle binary ciphertext field (PostgreSQL may return as resource)
+        // Handle binary ciphertext field (PostgreSQL may return as resource or encoded)
         $ciphertext = $payloadRecord->ciphertext;
         if (is_resource($ciphertext)) {
             $ciphertext = stream_get_contents($ciphertext);
         }
 
-        $payload = json_decode(Crypt::decryptString($ciphertext), true);
+        // Ensure we have a string
+        if (!is_string($ciphertext)) {
+            $ciphertext = (string) $ciphertext;
+        }
+
+        try {
+            $payload = json_decode(Crypt::decryptString($ciphertext), true);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException $e) {
+            Log::error('Failed to decrypt payload', [
+                'payload_id' => $this->payloadId,
+                'ciphertext_length' => strlen($ciphertext),
+                'ciphertext_preview' => substr($ciphertext, 0, 50),
+                'error' => $e->getMessage(),
+            ]);
+            throw $e;
+        }
 
         if (!$payload) {
             Log::error('Failed to decrypt or decode payload', ['payload_id' => $this->payloadId]);
