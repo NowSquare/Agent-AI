@@ -27,5 +27,7 @@ Route::get('/login/{token}', [LoginController::class, 'magicLink'])->name('login
 // Dashboard (protected)
 Route::middleware('auth')->get('/dashboard', DashboardController::class)->name('dashboard');
 
-// Webhooks
-Route::post('/webhooks/inbound-email', PostmarkInboundController::class);
+// Webhooks (exclude from CSRF protection)
+Route::withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])->group(function () {
+    Route::post('/webhooks/inbound-email', PostmarkInboundController::class);
+});

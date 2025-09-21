@@ -1583,7 +1583,8 @@ APP_LOCALE=en_US
 APP_FALLBACK_LOCALE=en_US
 
 # Webhook Security
-POSTMARK_WEBHOOK_SECRET=your-webhook-secret
+WEBHOOK_USER=postmark
+WEBHOOK_PASS=your-very-long-random-password
 
 # Logging
 LOG_CHANNEL=stack
@@ -1665,7 +1666,8 @@ APP_LOCALE=en_US
 APP_FALLBACK_LOCALE=en_US
 
 # Webhook Security
-POSTMARK_WEBHOOK_SECRET=your-webhook-secret
+WEBHOOK_USER=postmark
+WEBHOOK_PASS=your-very-long-random-password
 
 # Logging
 LOG_CHANNEL=stack
@@ -2659,7 +2661,7 @@ ClamAV connection refused
 HMAC verification failed
 ```
 **Solutions**:
-- Verify `POSTMARK_WEBHOOK_SECRET` in `.env` matches Postmark dashboard
+- Verify `WEBHOOK_USER` and `WEBHOOK_PASS` in `.env` for HTTP Basic Auth
 - Check webhook URL encoding in Postmark (should be your ngrok/localtunnel URL)
 - Ensure raw request body is used for HMAC calculation
 - Test with Postmark's webhook tester

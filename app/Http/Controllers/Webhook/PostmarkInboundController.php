@@ -15,18 +15,17 @@ class PostmarkInboundController extends Controller
 {
     public function __invoke(Request $request): JsonResponse
     {
-        $payload = $request->getContent();
-        $signature = $request->header('X-Postmark-Signature');
-
-        // Validate HMAC signature
-        if (!$this->validateSignature($payload, $signature)) {
-            Log::warning('Postmark webhook signature validation failed', [
+        // Validate HTTP Basic Auth credentials
+        if (!$this->validateBasicAuth($request)) {
+            Log::warning('Postmark webhook authentication failed', [
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
             ]);
 
-            return response()->json(['error' => 'Invalid signature'], 401);
+            return response()->json(['error' => 'Unauthorized'], 401);
         }
+
+        $payload = $request->getContent();
 
         // Store encrypted payload
         $payloadId = $this->storePayload($payload, $request);
@@ -40,21 +39,21 @@ class PostmarkInboundController extends Controller
         ]);
     }
 
-    private function validateSignature(string $payload, ?string $signature): bool
+    private function validateBasicAuth(Request $request): bool
     {
-        if (!$signature) {
+        $expectedUser = config('services.postmark.webhook_user');
+        $expectedPass = config('services.postmark.webhook_pass');
+
+        if (!$expectedUser || !$expectedPass) {
+            Log::error('Postmark webhook credentials not configured');
             return false;
         }
 
-        $secret = config('services.postmark.webhook_secret');
-        if (!$secret) {
-            Log::error('Postmark webhook secret not configured');
-            return false;
-        }
+        $providedUser = $request->getUser();
+        $providedPass = $request->getPassword();
 
-        $expected = hash_hmac('sha256', $payload, $secret);
-
-        return hash_equals($expected, $signature);
+        return hash_equals($expectedUser, $providedUser ?? '')
+            && hash_equals($expectedPass, $providedPass ?? '');
     }
 
     private function storePayload(string $payload, Request $request): string

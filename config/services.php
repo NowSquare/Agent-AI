@@ -16,7 +16,8 @@ return [
 
     'postmark' => [
         'token' => env('POSTMARK_TOKEN'),
-        'webhook_secret' => env('POSTMARK_WEBHOOK_SECRET'),
+        'webhook_user' => env('WEBHOOK_USER'),
+        'webhook_pass' => env('WEBHOOK_PASS'),
     ],
 
     'resend' => [
