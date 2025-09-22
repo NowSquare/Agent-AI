@@ -12,7 +12,7 @@ return [
     */
 
     'provider' => env('LLM_PROVIDER', 'ollama'),
-    'model' => env('LLM_MODEL', 'llama3.2'),
+    'model' => env('LLM_MODEL', 'gpt-oss:20b'),
 
     /*
     |--------------------------------------------------------------------------
@@ -20,7 +20,7 @@ return [
     |--------------------------------------------------------------------------
     */
 
-    'timeout_ms' => 4000,
+    'timeout_ms' => 600000, // 10 minutes for email processing (async, so no rush)
     'retry' => [
         'max' => 1,
         'on' => [408, 429, 500, 502, 503, 504], // HTTP status codes to retry
@@ -55,6 +55,6 @@ return [
     'caps' => [
         'input_tokens' => 2000,     // Clean reply + context
         'summary_tokens' => 500,    // Thread summaries
-        'output_tokens' => 300,     // JSON responses
+        'output_tokens' => 1000,    // JSON responses (increased for gpt-oss)
     ],
 ];
