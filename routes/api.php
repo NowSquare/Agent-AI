@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ActionController;
+use App\Http\Controllers\Api\AgentSpecializationController;
 use App\Http\Controllers\Api\MemoryController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -30,3 +31,14 @@ Route::prefix('memories')->name('api.memories.')->group(function () {
         ->name('forget')
         ->middleware('signed');
 });
+
+// Agent specialization management
+Route::apiResource('agent-specializations', AgentSpecializationController::class)
+    ->names([
+        'index' => 'api.agent-specializations.index',
+        'store' => 'api.agent-specializations.store',
+        'show' => 'api.agent-specializations.show',
+        'update' => 'api.agent-specializations.update',
+        'destroy' => 'api.agent-specializations.destroy',
+    ])
+    ->middleware('auth');
