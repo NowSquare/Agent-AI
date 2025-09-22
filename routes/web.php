@@ -37,6 +37,11 @@ Route::post('/a/{action}/cancel', [App\Http\Controllers\ActionConfirmationContro
 // Options selection routes
 Route::get('/a/{action}/choose/{key}', [App\Http\Controllers\ActionConfirmationController::class, 'chooseOption'])->name('action.options.choose');
 
+// Signed attachment downloads
+Route::get('/attachments/{attachment}', [App\Http\Controllers\AttachmentDownloadController::class, 'show'])
+    ->name('attachments.show')
+    ->middleware('signed');
+
 // Webhooks (exclude from CSRF protection)
 Route::withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])->group(function () {
     Route::post('/webhooks/inbound-email', PostmarkInboundController::class);
