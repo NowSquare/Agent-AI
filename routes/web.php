@@ -27,6 +27,10 @@ Route::get('/login/{token}', [LoginController::class, 'magicLink'])->name('login
 // Dashboard (protected)
 Route::middleware('auth')->get('/dashboard', DashboardController::class)->name('dashboard');
 
+// Signed action links (public, no auth required)
+Route::get('/a/{action}', [App\Http\Controllers\ActionConfirmationController::class, 'show'])->name('action.confirm.show');
+Route::post('/a/{action}', [App\Http\Controllers\ActionConfirmationController::class, 'confirm'])->name('action.confirm');
+
 // Webhooks (exclude from CSRF protection)
 Route::withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])->group(function () {
     Route::post('/webhooks/inbound-email', PostmarkInboundController::class);
