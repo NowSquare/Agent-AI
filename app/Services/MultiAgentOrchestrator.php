@@ -317,7 +317,7 @@ Return a JSON structure with:
     }
 
     /**
-     * Execute tasks in proper dependency order.
+     * Execute tasks in proper dependency order with coordinator oversight.
      */
     private function executeTasksInOrder(Action $action, Thread $thread, Account $account): void
     {
@@ -330,6 +330,11 @@ Return a JSON structure with:
         $maxIterations = 10; // Prevent infinite loops
         $iteration = 0;
 
+        Log::info('MultiAgentOrchestrator: Starting coordinated task execution', [
+            'action_id' => $action->id,
+            'total_tasks' => $tasks->count(),
+        ]);
+
         while ($tasks->where('status', 'pending')->count() > 0 && $iteration < $maxIterations) {
             $iteration++;
 
@@ -340,13 +345,25 @@ Return a JSON structure with:
 
                 // Check if dependencies are met
                 if ($this->areDependenciesMet($task, $executedTasks)) {
+                    Log::info('MultiAgentOrchestrator: Executing task', [
+                        'task_id' => $task->id,
+                        'agent_id' => $task->agent_id,
+                        'description' => $task->input_json['task_description'] ?? 'unknown',
+                    ]);
+
                     $this->agentProcessor->processTask($task);
                     $executedTasks[] = $task->id;
                 }
             }
         }
 
-        // Compile results from all tasks
+        Log::info('MultiAgentOrchestrator: Task execution complete, compiling final response', [
+            'action_id' => $action->id,
+            'executed_tasks' => count($executedTasks),
+            'remaining_tasks' => $tasks->where('status', 'pending')->count(),
+        ]);
+
+        // Compile results from all tasks into single coordinated response
         $this->compileFinalResponse($action, $tasks);
     }
 
@@ -367,7 +384,7 @@ Return a JSON structure with:
     }
 
     /**
-     * Compile final response from all completed tasks.
+     * Compile final response from all completed tasks - COORDINATOR SYNTHESIS.
      */
     private function compileFinalResponse(Action $action, $tasks): void
     {
@@ -377,12 +394,20 @@ Return a JSON structure with:
         foreach ($completedTasks as $task) {
             $results[] = [
                 'agent' => $task->agent->name,
+                'role' => $task->agent->role,
                 'task' => $task->input_json['task_description'] ?? '',
                 'result' => $task->result_json['response'] ?? '',
+                'confidence' => $task->result_json['confidence'] ?? 0,
             ];
         }
 
-        // Compile into final response
+        Log::info('MultiAgentOrchestrator: Synthesizing agent responses', [
+            'action_id' => $action->id,
+            'agents_contributed' => collect($results)->pluck('agent')->unique()->values(),
+            'total_tasks' => $completedTasks->count(),
+        ]);
+
+        // Coordinator synthesizes all agent outputs into single coherent response
         $finalResponse = $this->compileResultsIntoResponse($results);
 
         $action->update([
@@ -392,17 +417,19 @@ Return a JSON structure with:
                 'final_response' => $finalResponse,
                 'task_results' => $results,
                 'processing_type' => 'multi_agent_orchestration',
+                'coordinator_synthesis' => true,
             ]),
         ]);
 
-        Log::info('MultiAgentOrchestrator: Completed orchestration', [
+        Log::info('MultiAgentOrchestrator: Orchestration complete - single coordinated response sent', [
             'action_id' => $action->id,
-            'tasks_completed' => $completedTasks->count(),
+            'synthesized_from_agents' => count($results),
+            'response_length' => strlen($finalResponse),
         ]);
     }
 
     /**
-     * Compile individual task results into coherent final response.
+     * Compile individual task results into coherent final response - COORDINATED SYNTHESIS.
      */
     private function compileResultsIntoResponse(array $results): string
     {
@@ -410,10 +437,39 @@ Return a JSON structure with:
             return "I've processed your request but encountered some issues. Please try again.";
         }
 
-        $response = "Here's what I've accomplished:\n\n";
+        // Group results by agent for better organization
+        $agentGroups = collect($results)->groupBy('agent');
 
-        foreach ($results as $result) {
-            $response .= "**{$result['agent']}**: {$result['result']}\n\n";
+        $response = "I've coordinated a comprehensive response to your request:\n\n";
+
+        foreach ($agentGroups as $agentName => $agentResults) {
+            $response .= "**{$agentName}**:\n";
+
+            foreach ($agentResults as $result) {
+                // Clean up and format the agent response
+                $cleanedResult = $this->cleanAgentResponse($result['result']);
+                $response .= "{$cleanedResult}\n\n";
+            }
+        }
+
+        $response .= "---\n";
+        $response .= "*This response was coordinated by multiple AI agents working together.*";
+
+        return $response;
+    }
+
+    /**
+     * Clean and format agent responses for better readability.
+     */
+    private function cleanAgentResponse(string $response): string
+    {
+        // Remove any duplicate headers or formatting
+        $response = preg_replace('/^#+\s*.+$/m', '', $response); // Remove markdown headers
+        $response = trim($response);
+
+        // Ensure proper formatting
+        if (!str_ends_with($response, '.')) {
+            $response .= '.';
         }
 
         return $response;
