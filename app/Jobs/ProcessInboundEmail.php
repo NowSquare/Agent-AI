@@ -306,10 +306,14 @@ class ProcessInboundEmail implements ShouldQueue
                 $account
             );
 
+            // Handle confidence-based clarification logic
+            $confidence = $interpretation['confidence'] ?? 0.0;
+            $this->handleConfidenceThresholds($action, $confidence);
+
             // Extract and store memories
             $this->extractMemories($llmClient, $emailMessage, $thread, $account, $cleanReply, $locale);
 
-            // Mark as successfully processed
+            // Mark as successfully processed (even when awaiting user input)
             $emailMessage->update([
                 'processing_status' => 'processed',
                 'processed_at' => now(),
@@ -318,8 +322,9 @@ class ProcessInboundEmail implements ShouldQueue
             Log::info('LLM processing completed', [
                 'message_id' => $emailMessage->id,
                 'action_type' => $interpretation['action_type'] ?? null,
-                'confidence' => $interpretation['confidence'] ?? null,
-                'needs_clarification' => $interpretation['needs_clarification'] ?? false,
+                'confidence' => $confidence,
+                'action_status' => $action->status,
+                'clarification_needed' => $this->clarificationNeeded($confidence),
             ]);
 
         } catch (\Throwable $e) {
@@ -577,5 +582,53 @@ class ProcessInboundEmail implements ShouldQueue
         Log::info('Created fallback action due to LLM failure', [
             'message_id' => $emailMessage->id,
         ]);
+    }
+
+    /**
+     * Handle confidence-based clarification logic.
+     */
+    private function handleConfidenceThresholds(Action $action, float $confidence): void
+    {
+        if ($confidence >= 0.75) {
+            // High confidence: auto-dispatch immediately
+            Log::info('High confidence action, dispatching immediately', [
+                'action_id' => $action->id,
+                'confidence' => $confidence,
+            ]);
+            $this->dispatchAction($action);
+        } elseif ($confidence >= 0.50) {
+            // Medium confidence: send clarification email
+            Log::info('Medium confidence action, sending clarification email', [
+                'action_id' => $action->id,
+                'confidence' => $confidence,
+            ]);
+            $action->update(['status' => 'awaiting_confirmation']);
+            \App\Jobs\SendClarificationEmail::dispatch($action);
+        } else {
+            // Low confidence: send options email
+            Log::info('Low confidence action, sending options email', [
+                'action_id' => $action->id,
+                'confidence' => $confidence,
+            ]);
+            $action->update(['status' => 'awaiting_input']);
+            \App\Jobs\SendOptionsEmail::dispatch($action);
+        }
+    }
+
+    /**
+     * Check if clarification is needed based on confidence.
+     */
+    private function clarificationNeeded(float $confidence): bool
+    {
+        return $confidence < 0.75;
+    }
+
+    /**
+     * Dispatch an action for processing.
+     */
+    private function dispatchAction(Action $action): void
+    {
+        $dispatcher = app(\App\Services\ActionDispatcher::class);
+        $dispatcher->dispatch($action);
     }
 }
