@@ -14,6 +14,7 @@ class EmailMessage extends Model
     protected $fillable = [
         'thread_id',
         'direction',
+        'processing_status',
         'message_id',
         'in_reply_to',
         'references',
