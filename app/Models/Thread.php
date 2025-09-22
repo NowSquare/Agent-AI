@@ -23,6 +23,8 @@ class Thread extends Model
     {
         return [
             'context_json' => 'array',
+            'version_history' => 'array',
+            'last_activity_at' => 'datetime',
         ];
     }
 
@@ -49,5 +51,26 @@ class Thread extends Model
     public function memories(): HasMany
     {
         return $this->hasMany(Memory::class);
+    }
+
+    public function metadata(): HasMany
+    {
+        return $this->hasMany(ThreadMetadata::class);
+    }
+
+    public function incrementVersion(string $reason = null): void
+    {
+        $history = $this->version_history ?? [];
+        $history[] = [
+            'version' => $this->version + 1,
+            'reason' => $reason,
+            'timestamp' => now()->toIso8601String(),
+        ];
+
+        $this->update([
+            'version' => $this->version + 1,
+            'version_history' => $history,
+            'last_activity_at' => now(),
+        ]);
     }
 }

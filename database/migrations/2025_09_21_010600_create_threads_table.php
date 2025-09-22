@@ -18,8 +18,12 @@ return new class extends Migration
             $table->string('subject'); // Canonical subject (normalized).
             $table->ulid('starter_message_id')->nullable();
             $table->json('context_json')->nullable(); // jsonb: rolling summary, state, counters.
+            $table->integer('version')->default(1);
+            $table->json('version_history')->nullable();
+            $table->timestampTz('last_activity_at')->nullable();
             $table->timestampsTz();
             $table->index('account_id');
+            $table->index('last_activity_at');
         });
         // Note: GIN index on jsonb requires additional PostgreSQL extensions, added later if needed
     }
