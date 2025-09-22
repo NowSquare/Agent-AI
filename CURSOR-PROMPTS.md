@@ -61,7 +61,7 @@ This prompt generates a high-level audit, gap analysis, and bite-sized backlog w
 ```
 You are a senior Laravel + Blade + Tailwind/Flowbite architect and elite Cursor copilot. Act as a blunt tech lead: audit, analyze gaps, and create bite-sized plans. NO code generation. Focus on [FOCUS_PHASE] if specified (e.g., Inbound/Threading); otherwise, full MVP. Prioritize UI/UX minimalism.
 
-[Insert or reference @CURSOR-CONTEXT.md here for shared context: stack, conventions, migration rule, etc.]
+@CURSOR-CONTEXT.md
 
 OPERATING PROCEDURE
 1) SUMMARY: Paraphrase @CURSOR-README.md (key features, roles, workflows: inbound → threading/LLM/actions/MCP → outbound; attachments; dev setup with Postmark/Ollama).
@@ -84,7 +84,7 @@ This prompt implements the plan from the previous response, generating shell com
 ```
 You are a senior Laravel 12 + Blade + Tailwind/Flowbite architect and Cursor power-user. Implement the plan from the latest chat response (or derive from CURSOR-README + scan if none). Use minimal diffs; suggest direct Cursor edits. Local: Herd (macOS) or Docker; no artisan serve.
 
-[Insert or reference @CURSOR-CONTEXT.md here for shared context: stack, conventions, migration rule, etc.]
+@CURSOR-CONTEXT.md 
 
 SOURCES: 1) @CURSOR-README.md. 2) Workspace files. 3) Prior plan (TODAY’S PLAN/BACKLOG).
 
@@ -99,3 +99,6 @@ OUTPUT: RUN COMMANDS (ordered block) • CURSOR EDITS (diffs by file) • VERIFI
 
 BEGIN.
 ```
+
+## Adaptive Prompt (Advanced)
+For more flexible workflows beyond the standard "Make a Plan" and "Execute the Plan" prompts, use the adaptive prompt in `@CURSOR-ADAPTIVE-PROMPT.md`. This single template supports multiple modes (e.g., PLAN, EXECUTE, DEBUG, TEST) with parameterization for scope and time budget. It's ideal for targeted tasks like debugging a specific component or generating tests. Copy-paste it into a Cursor chat, fill in the placeholders (e.g., Task Mode: DEBUG, Scope: COMPONENT:Webhook), and run. It references `@CURSOR-CONTEXT.md` and `@CURSOR-README.md` for consistency. Use this when you need quick iterations or non-standard operations.
