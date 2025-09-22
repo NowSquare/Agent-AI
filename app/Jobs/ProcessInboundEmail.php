@@ -5,9 +5,11 @@ namespace App\Jobs;
 use App\Mcp\Tools\ActionInterpretationTool;
 use App\Models\Account;
 use App\Models\Action;
+use App\Models\Attachment;
 use App\Models\EmailInboundPayload;
 use App\Models\EmailMessage;
 use App\Models\Memory;
+use App\Services\AttachmentService;
 use App\Services\LlmClient;
 use App\Services\ReplyCleaner;
 use App\Services\ThreadResolver;
@@ -39,7 +41,8 @@ class ProcessInboundEmail implements ShouldQueue
         ReplyCleaner $replyCleaner,
         ThreadResolver $threadResolver,
         LlmClient $llmClient,
-        ActionInterpretationTool $actionInterpreter
+        ActionInterpretationTool $actionInterpreter,
+        AttachmentService $attachmentService
     ): void {
         Log::info('Processing inbound email', ['payload_id' => $this->payloadId]);
 
@@ -149,7 +152,7 @@ class ProcessInboundEmail implements ShouldQueue
 
         // Register attachments (if any)
         if (! empty($emailData['attachments'])) {
-            $this->registerAttachments($emailMessage, $emailData['attachments']);
+            $this->registerAttachments($emailMessage, $emailData['attachments'], $attachmentService);
         }
 
         Log::info('Email processed successfully', [
@@ -256,14 +259,126 @@ class ProcessInboundEmail implements ShouldQueue
     /**
      * Register attachments for the email message.
      */
-    private function registerAttachments(EmailMessage $emailMessage, array $attachments): void
+    private function registerAttachments(EmailMessage $emailMessage, array $attachments, AttachmentService $attachmentService): void
     {
-        // TODO: Implement attachment processing
-        // For now, just log them
-        Log::info('Attachments found', [
+        $maxTotalSize = config('attachments.total_max_size_mb', 40) * 1024 * 1024;
+        $totalSize = 0;
+        $storedCount = 0;
+
+        Log::info('Processing attachments', [
             'message_id' => $emailMessage->id,
             'count' => count($attachments),
         ]);
+
+        foreach ($attachments as $attachmentData) {
+            // Convert Postmark attachment format to UploadedFile-like object
+            $fileContent = base64_decode($attachmentData['Content'] ?? '');
+            if (empty($fileContent)) {
+                Log::warning('Empty attachment content, skipping', [
+                    'message_id' => $emailMessage->id,
+                    'attachment_name' => $attachmentData['Name'] ?? 'unknown',
+                ]);
+
+                continue;
+            }
+
+            $fileSize = strlen($fileContent);
+
+            // Check total size limit
+            if ($totalSize + $fileSize > $maxTotalSize) {
+                Log::warning('Attachment total size limit exceeded, skipping remaining', [
+                    'message_id' => $emailMessage->id,
+                    'current_total' => $totalSize,
+                    'new_size' => $fileSize,
+                    'limit' => $maxTotalSize,
+                ]);
+                break;
+            }
+
+            // Create a temporary UploadedFile-like object
+            $tempFile = tmpfile();
+            fwrite($tempFile, $fileContent);
+            fseek($tempFile, 0);
+
+            $uploadedFile = new class($tempFile, $attachmentData['Name'] ?? 'unknown', $attachmentData['ContentType'] ?? 'application/octet-stream', $fileSize) extends \Illuminate\Http\UploadedFile
+            {
+                public function __construct($tempFile, $name, $mime, $size)
+                {
+                    parent::__construct(stream_get_meta_data($tempFile)['uri'], $name, $mime, null, true);
+                    $this->size = $size;
+                }
+            };
+
+            // Store attachment using service
+            $attachment = $attachmentService->store($uploadedFile, $emailMessage->id);
+
+            if ($attachment) {
+                $totalSize += $fileSize;
+                $storedCount++;
+
+                // Dispatch scan job
+                ScanAttachment::dispatch($attachment->id)->onQueue('attachments');
+
+                Log::info('Attachment stored and scan dispatched', [
+                    'message_id' => $emailMessage->id,
+                    'attachment_id' => $attachment->id,
+                    'filename' => $attachment->filename,
+                    'size_bytes' => $attachment->size_bytes,
+                ]);
+            } else {
+                Log::warning('Attachment storage failed', [
+                    'message_id' => $emailMessage->id,
+                    'filename' => $attachmentData['Name'] ?? 'unknown',
+                    'mime' => $attachmentData['ContentType'] ?? 'unknown',
+                    'size_bytes' => $fileSize,
+                ]);
+            }
+
+            // Clean up temp file
+            fclose($tempFile);
+        }
+
+        Log::info('Attachment processing completed', [
+            'message_id' => $emailMessage->id,
+            'total_attachments' => count($attachments),
+            'stored_count' => $storedCount,
+            'total_size_bytes' => $totalSize,
+        ]);
+    }
+
+    /**
+     * Get attachments excerpt for LLM context.
+     */
+    private function getAttachmentsExcerpt(EmailMessage $emailMessage): string
+    {
+        $attachments = $emailMessage->attachments()->get();
+
+        if ($attachments->isEmpty()) {
+            return '';
+        }
+
+        $excerpts = [];
+        foreach ($attachments as $attachment) {
+            $excerpt = $attachment->getAttachmentsExcerpt();
+            if (! empty($excerpt)) {
+                $excerpts[] = "Attachment: {$attachment->filename}\n{$excerpt}";
+            }
+        }
+
+        if (empty($excerpts)) {
+            return '';
+        }
+
+        // Combine excerpts, keeping under LLM token limits
+        $combined = implode("\n\n", $excerpts);
+
+        Log::info('Attachments excerpt assembled for LLM', [
+            'message_id' => $emailMessage->id,
+            'attachments_count' => $attachments->count(),
+            'excerpt_length' => strlen($combined),
+        ]);
+
+        return $combined;
     }
 
     /**
@@ -286,8 +401,8 @@ class ProcessInboundEmail implements ShouldQueue
             // Get recent memories for context
             $recentMemories = $this->getRecentMemories($account, $thread);
 
-            // Get attachments excerpt (placeholder for now)
-            $attachmentsExcerpt = ''; // TODO: Implement attachment text extraction
+            // Get attachments excerpt for LLM context
+            $attachmentsExcerpt = $this->getAttachmentsExcerpt($emailMessage);
 
             // Interpret action using MCP tool
             $interpretation = $this->interpretActionWithMCP(
