@@ -13,53 +13,20 @@ return [
 
     'action_interpret' => [
         'temperature' => 0.2,
-        'backstory' => 'You convert a user email reply into exactly one allowed action with parameters. Output JSON only.',
-        'template' => 'You are a strict JSON generator. Detect exactly ONE action from the whitelist below based on the user\'s reply and context. Return JSON matching the schema. No prose, no explanations.
+        'backstory' => 'You analyze user emails and determine the appropriate action.',
+        'template' => 'Analyze this user email and determine what action they want. Answer with just the action type from the list below.
 
-ALLOWED action_type:
-- "approve"
-- "reject"
-- "revise"
-- "select_option"
-- "provide_value"
-- "schedule_propose_times"
-- "schedule_confirm"
-- "unsubscribe"
-- "info_request"
-- "stop"
+User message: :clean_reply
+Context: :thread_summary
 
-PARAMETERS by action_type (all strings unless noted):
-- approve:       { "reason": (optional, ≤120 chars) }
-- reject:        { "reason": (required if present in text, ≤200 chars) }
-- revise:        { "changes": [string,...] } // list concrete requested changes
-- select_option: { "option_id": string | "label": string } // prefer option_id if visible in thread
-- provide_value: { "key": string, "value": string } // e.g. "budget":"under 500 EUR"
-- schedule_propose_times: { "duration_min": number, "timezone": string, "window_start": ISO8601?, "window_end": ISO8601?, "constraints": string? }
-- schedule_confirm:       { "selected_start": ISO8601, "duration_min": number, "timezone": string }
-- unsubscribe:   { "scope": "thread"|"account"|"all" } // thread = this conversation only
-- info_request:  { "question": string }
-- stop:          { "reason": string? }
+Available actions:
+- info_request (asking for information/recipes/help)
+- approve (approving something)
+- reject (declining something)
+- revise (wanting to change something)
+- stop (wanting to end the conversation)
 
-SCORING:
-- confidence in [0,1]; be conservative.
-- If insufficient info: choose the closest action and set needs_clarification true with a short prompt.
-
-INPUT:
-- locale: :detected_locale
-- thread_summary: :thread_summary
-- clean_reply: :clean_reply
-- attachments_excerpt: :attachments_excerpt  // may be empty
-- recent_memories: :recent_memories          // relevant subset
-
-OUTPUT JSON SCHEMA:
-{
-  "action_type": "approve|reject|revise|select_option|provide_value|schedule_propose_times|schedule_confirm|unsubscribe|info_request|stop",
-  "parameters": { ... },
-  "scope_hint": "conversation|user|account|null",
-  "confidence": 0.0-1.0,
-  "needs_clarification": true|false,
-  "clarification_prompt": "string or null"
-}',
+What is the main action they want? Answer with just one word from the list above:',
     ],
 
     'clarify_question' => [
@@ -143,11 +110,11 @@ Return JSON:
     'language_detect' => [
         'temperature' => 0.0,
         'backstory' => 'Return language code only.',
-        'template' => 'Detect the primary language (BCP-47 like "nl" or "en-GB") of the given text.
+        'template' => 'What is the primary language of this text? Answer with just the language code (like "en", "nl", "fr", "de").
 
-text: :sample_text
+Text: :sample_text
 
-Return JSON: { "language": "bcp47", "confidence": 0.0-1.0 }',
+Language code:',
     ],
 
     'attachment_summarize' => [

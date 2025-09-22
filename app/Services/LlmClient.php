@@ -20,6 +20,57 @@ class LlmClient
     }
 
     /**
+     * Make a plain text completion request.
+     */
+    public function call(
+        string $promptKey,
+        array $vars = [],
+        ?int $maxOutputTokens = null
+    ): string {
+        $prompt = $this->buildPrompt($promptKey, $vars);
+        $maxOutputTokens = $maxOutputTokens ?: $this->config['caps']['output_tokens'];
+
+        $providers = $this->getProviderPriority();
+        $lastError = null;
+
+        foreach ($providers as $provider) {
+            try {
+                Log::debug('Attempting LLM call', [
+                    'provider' => $provider,
+                    'prompt_key' => $promptKey,
+                    'input_tokens' => $this->estimateTokens($prompt),
+                ]);
+
+                $result = $this->callProvider($provider, $prompt, $maxOutputTokens);
+
+                Log::debug('LLM call successful', [
+                    'provider' => $provider,
+                    'prompt_key' => $promptKey,
+                    'output_length' => strlen($result),
+                ]);
+
+                return $result;
+
+            } catch (\Throwable $e) {
+                $lastError = $e;
+                Log::warning('LLM provider failed', [
+                    'provider' => $provider,
+                    'prompt_key' => $promptKey,
+                    'error' => $e->getMessage(),
+                ]);
+
+                continue;
+            }
+        }
+
+        throw new \RuntimeException(
+            "All LLM providers failed: {$lastError?->getMessage()}",
+            0,
+            $lastError
+        );
+    }
+
+    /**
      * Make a JSON-mode completion request.
      */
     public function json(
@@ -43,11 +94,11 @@ class LlmClient
 
                 $result = $this->callProvider($provider, $prompt, $maxOutputTokens);
 
-        // Validate JSON response
-        $json = json_decode($result, true);
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            throw new \RuntimeException('Invalid JSON response: ' . json_last_error_msg());
-        }
+                // Validate JSON response
+                $json = json_decode($result, true);
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new \RuntimeException('Invalid JSON response: '.json_last_error_msg());
+                }
 
                 // Apply confidence calibration
                 if (isset($json['confidence'])) {
@@ -83,7 +134,7 @@ class LlmClient
             'last_error' => $lastError?->getMessage(),
         ]);
 
-        throw new \RuntimeException('All LLM providers failed: ' . $lastError?->getMessage());
+        throw new \RuntimeException('All LLM providers failed: '.$lastError?->getMessage());
     }
 
     /**
@@ -93,7 +144,7 @@ class LlmClient
     {
         $template = config("prompts.{$key}.template");
 
-        if (!$template) {
+        if (! $template) {
             throw new \InvalidArgumentException("Prompt template '{$key}' not found");
         }
 
@@ -147,14 +198,15 @@ class LlmClient
                     ['role' => 'user', 'content' => $prompt],
                 ],
                 'max_tokens' => $maxTokens,
-                'temperature' => config("prompts.action_interpret.temperature", 0.2),
+                'temperature' => config('prompts.action_interpret.temperature', 0.2),
             ]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             throw new \RuntimeException("OpenAI API error: {$response->status()} {$response->body()}");
         }
 
         $data = $response->json();
+
         return $data['choices'][0]['message']['content'] ?? '';
     }
 
@@ -173,11 +225,12 @@ class LlmClient
                 ],
             ]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             throw new \RuntimeException("Anthropic API error: {$response->status()} {$response->body()}");
         }
 
         $data = $response->json();
+
         return $data['content'][0]['text'] ?? '';
     }
 
@@ -188,21 +241,22 @@ class LlmClient
     {
 
         $response = Http::timeout($this->config['timeout_ms'] / 1000)
-            ->post(config('services.ollama.url', 'http://localhost:11434') . '/api/generate', [
+            ->post(config('services.ollama.url', 'http://localhost:11434').'/api/generate', [
                 'model' => config('services.ollama.model', 'llama2'),
                 'prompt' => $prompt,
                 'stream' => false,
                 'options' => [
                     'num_predict' => $maxTokens,
-                    'temperature' => config("prompts.action_interpret.temperature", 0.2),
+                    'temperature' => config('prompts.action_interpret.temperature', 0.2),
                 ],
             ]);
 
-        if (!$response->successful()) {
+        if (! $response->successful()) {
             throw new \RuntimeException("Ollama API error: {$response->status()} {$response->body()}");
         }
 
         $data = $response->json();
+
         return $data['response'] ?? '';
     }
 
