@@ -34,4 +34,17 @@ class Agent extends Model
     {
         return $this->hasMany(Task::class);
     }
+
+    public function specializations(): HasMany
+    {
+        return $this->hasMany(AgentSpecialization::class);
+    }
+
+    public function hasSpecialization(string $name): bool
+    {
+        return $this->specializations()
+            ->where('name', $name)
+            ->where('is_active', true)
+            ->exists();
+    }
 }
