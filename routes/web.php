@@ -32,6 +32,10 @@ Route::middleware('auth')->get('/dashboard', DashboardController::class)->name('
 // Signed action links (public, no auth required)
 Route::get('/a/{action}', [App\Http\Controllers\ActionConfirmationController::class, 'show'])->name('action.confirm.show');
 Route::post('/a/{action}', [App\Http\Controllers\ActionConfirmationController::class, 'confirm'])->name('action.confirm');
+Route::post('/a/{action}/cancel', [App\Http\Controllers\ActionConfirmationController::class, 'cancel'])->name('action.confirm.cancel');
+
+// Options selection routes
+Route::get('/a/{action}/choose/{key}', [App\Http\Controllers\ActionConfirmationController::class, 'chooseOption'])->name('action.options.choose');
 
 // Webhooks (exclude from CSRF protection)
 Route::withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])->group(function () {

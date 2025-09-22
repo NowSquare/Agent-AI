@@ -194,6 +194,49 @@ IMPORTANT: Your response must be valid JSON. Do not include any text before or a
   "confidence": 0.8,
   "reasoning": "Brief explanation of your approach (optional)"
 }',
+
+    'clarification_subject' => [
+        'temperature' => 0.3,
+        'backstory' => 'Generate a clear, concise subject line for clarification emails.',
+        'template' => 'Create a subject line for an email asking the user to confirm their request. Keep it under 60 characters.
+
+Request type: :action_type
+Summary: :action_summary
+
+Subject line:',
+    ],
+
+    'clarification_body_intro' => [
+        'temperature' => 0.4,
+        'backstory' => 'Generate a brief, professional introduction for clarification emails.',
+        'template' => 'Write a 2-3 sentence introduction for an email asking the user to confirm their interpreted request.
+
+Action: :action_type
+Summary: :action_summary
+Context: :thread_context
+
+Introduction text:',
+    ],
+
+    'options_subject' => [
+        'temperature' => 0.3,
+        'backstory' => 'Generate a clear subject line for options/clarification emails.',
+        'template' => 'Create a subject line for an email offering the user multiple options to clarify their request. Keep it under 60 characters.
+
+Context: We interpreted their request but need clarification.
+
+Subject line:',
+    ],
+
+    'options_body_intro' => [
+        'temperature' => 0.4,
+        'backstory' => 'Generate a brief, helpful introduction for options emails.',
+        'template' => 'Write a 2-3 sentence introduction explaining that we need clarification and offering options.
+
+Original request: :original_question
+Options available: :available_options
+
+Introduction text:',
     ],
 
     'define_agents' => [
@@ -249,5 +292,6 @@ Can we continue with this, or do you want to change anything?',
 
 **Output:**
 "YES" or "NO"',
+    ],
     ],
 ];
