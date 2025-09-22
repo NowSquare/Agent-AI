@@ -127,7 +127,7 @@ class MemoryService
     /**
      * Calculate the final score for a memory based on multiple factors.
      */
-    private function calculateScore(Memory $memory): float
+    public function calculateScore(Memory $memory): float
     {
         // Base score is the confidence
         $score = $memory->confidence;
