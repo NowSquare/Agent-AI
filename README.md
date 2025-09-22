@@ -9,7 +9,7 @@ Agent-AI is a Laravel-based application for building practical, privacy-respecti
 
 This README explains **how to run Agent-AI** locally with **Laravel Herd** (recommended on macOS), with **Docker** (Windows/Linux/macOS), or via **Artisan**. It also shows how to integrate **Laravel Boost** so Cursor can use Laravel-aware tools during development.
 
-**Current Status**: Email processing pipeline is active with LLM interpretation using gpt-oss:20b. Inbound emails are processed asynchronously (10-minute LLM timeout, 15-minute queue timeout) for comprehensive analysis and action generation.
+**Current Status**: Full email automation pipeline active with intelligent agent coordination. Inbound emails are processed asynchronously with LLM interpretation, specialized agent routing, and coordinated multi-agent responses. Features intelligent complexity detection, agent specialization (Italian Chef, Tech Support), and professional single-email responses with thread continuity.
 
 ---
 
@@ -35,6 +35,9 @@ This README explains **how to run Agent-AI** locally with **Laravel Herd** (reco
 * **Redis** queues with **Laravel Horizon** dashboard
 * **Mail**: Postmark for all email (outbound + inbound webhooks)
 * **LLM**: Local Ollama (gpt-oss:20b) or remote HTTP providers
+* **Agent System**: Intelligent coordination with specialized agents (Italian Chef, Tech Support, etc.)
+* **Smart Routing**: Automatic complexity detection for single-agent vs multi-agent processing
+* **Thread Continuity**: Reply-to headers with thread IDs for conversation persistence
 * File scanning (ClamAV) & PDF text extraction (Spatie + poppler)
 * **Laravel Boost**: MCP server for AI-assisted development in Cursor
 
@@ -209,7 +212,38 @@ Postmark should call your ngrok URL with these credentials.
 
 ---
 
-## 7) Laravel Boost (AI-assisted development)
+## 7) Agent Coordination System
+
+Agent-AI uses an intelligent **Coordinator + Specialized Agents** architecture:
+
+### Simple Queries (Fast Path)
+```
+User Email → LLM Analysis → Single Best Agent → Immediate Response
+Example: "What's a pasta recipe?" → Chef Mario → Authentic Italian Recipe
+```
+
+### Complex Queries (Orchestration Path)
+```
+User Email → Complexity Detection → Multi-Agent Orchestrator →
+LLM Agent Planning → Coordinator Execution → Coordinated Single Response
+Example: "Plan anniversary dinner" → Multiple agents collaborate → Comprehensive plan
+```
+
+### Key Features
+- **Automatic Complexity Detection**: Keywords like "plan", "organize", "schedule" trigger orchestration
+- **Agent Specialization**: Domain experts with authentic personalities and expertise
+- **Single Response Guarantee**: Users get one comprehensive email, never multiple fragmented responses
+- **Thread Continuity**: All responses include thread IDs for conversation persistence
+- **Fallback Resilience**: Graceful degradation when LLM processing fails
+
+### Current Specialized Agents
+- **Chef Mario**: Italian cuisine expert with 25+ years Milan experience
+- **Tech Support**: Technical specialist with methodical troubleshooting
+- **CoordinatorAgent**: Dynamic agent for complex multi-step planning
+
+---
+
+## 8) Laravel Boost (AI-assisted development)
 
 Run the MCP server so Cursor can use Boost tools:
 
@@ -225,7 +259,7 @@ In Cursor → **Settings → MCP**:
 
 ---
 
-## 8) Common tasks
+## 9) Common tasks
 
 * Dev server: `npm run dev`
 * Prod build: `npm run build`

@@ -293,6 +293,135 @@ This README reflects the **current implementation** as of our development sessio
 - Memory gate with TTL/decay
 - UI dashboard and thread views
 
+## Agent Coordination Flow
+
+### Complete Email Processing Pipeline
+
+#### Phase 1: Email Ingestion & Analysis
+1. **Postmark Webhook** (`POST /webhooks/inbound-email`)
+   - Receives inbound email via HTTP Basic Auth
+   - Validates HMAC signature
+   - Stores encrypted payload in `EmailInboundPayload`
+
+2. **Webhook Processing** (`ProcessWebhookPayload` job)
+   - Decrypts and parses email content
+   - Extracts headers, subject, body, attachments
+   - Creates/updates `EmailMessage` with status `'received'`
+   - Dispatches `ProcessInboundEmail` job
+
+3. **Email Parsing** (`ProcessInboundEmail` job)
+   - Updates status to `'processing'`
+   - Extracts clean reply text (removes quoted content)
+   - Resolves email threading (RFC 5322)
+   - Processes attachments (scanning, extraction)
+   - Calls LLM for action interpretation
+
+#### Phase 2: Intelligent Agent Routing
+
+4. **Complexity Detection** (`Coordinator::shouldUseMultiAgentOrchestration()`)
+   - Analyzes question for complexity keywords: "plan", "organize", "schedule", "multiple", "research"
+   - Checks message length (>100 chars = complex)
+   - Routes to appropriate processing path
+
+**Simple Path:**
+- Single Agent Selection (`AgentRegistry::findBestAgentForAction()`)
+- Agent matching by keywords, expertise, role
+- Direct task creation and execution
+
+**Complex Path:**
+- Multi-Agent Orchestration (`MultiAgentOrchestrator`)
+- LLM generates agent plan and task breakdown
+- Coordinator creates tasks with dependency management
+- Sequential execution with proper ordering
+
+#### Phase 3: Agent Processing & Response
+
+5. **Task Execution** (`AgentProcessor`)
+   - Builds contextual prompts with agent personality
+   - Includes thread history, user context, agent expertise
+   - Calls LLM with agent-specific prompts
+   - Handles fallbacks for processing failures
+
+6. **Response Coordination**
+   - Single agent: Direct response generation
+   - Multi-agent: Coordinator synthesizes all agent outputs
+   - Unified response compilation with proper formatting
+
+7. **Email Dispatch** (`SendActionResponse` job)
+   - Generates response email via Postmark
+   - Includes thread ID in reply-to header for continuity
+   - Updates action status to `'completed'`
+   - Comprehensive logging and error handling
+
+### Agent System Architecture
+
+#### Agent Registry (`AgentRegistry`)
+- **Chef Mario**: Italian cuisine expert, 25+ years Milan experience
+  - Keywords: recipe, cooking, italian, pasta, pizza, chef, food
+  - Capabilities: info_request, culinary expertise
+  - Personality: passionate, authentic, traditional
+
+- **Tech Support**: Technical specialist
+  - Keywords: technical, support, software, hardware, programming
+  - Capabilities: info_request, troubleshooting
+  - Personality: helpful, patient, methodical
+
+- **Dynamic Agents**: Created on-demand for complex tasks
+  - CoordinatorAgent: Multi-step planning and coordination
+  - Generated via LLM when specialized agents needed
+
+#### Coordinator Responsibilities
+- **Complexity Assessment**: Automatic detection of multi-step requests
+- **Agent Selection**: Intelligent routing to domain experts
+- **Task Orchestration**: Dependency management and execution ordering
+- **Response Synthesis**: Unified output from multiple agent contributions
+- **Quality Assurance**: Validation and error recovery
+
+### API Endpoints & Actions
+
+#### Currently Implemented Endpoints
+
+| Method | Path | Purpose | Status |
+|--------|------|---------|--------|
+| `POST` | `/webhooks/inbound-email` | Postmark webhook receiver | ✅ Implemented |
+| `GET` | `/a/{action}` | Action confirmation page | ✅ Implemented |
+| `POST` | `/a/{action}` | Execute confirmed action | ✅ Implemented |
+| `POST` | `/api/actions/dispatch` | Internal action dispatching | ✅ Implemented |
+
+#### Action Types & Flows
+
+**info_request** (Most Common)
+- User asks question → LLM interprets → Routes to best agent → Agent generates response → Single email reply
+
+**Complex Orchestration**
+- User requests planning → Multi-agent detection → LLM agent planning → Coordinator execution → Synthesized response
+
+**Confirmation Flow** (Future)
+- Action created → User receives confirmation email → Signed link → Action execution
+
+### Data Flow & State Management
+
+#### Database Entities
+- `EmailMessage`: Raw email data, processing status, threading
+- `Thread`: Conversation container, context, participants
+- `Action`: User intent interpretation, execution status, results
+- `Task`: Agent-specific work units, dependencies, results
+- `Agent`: Specialized AI assistants, capabilities, personalities
+- `Memory`: User preferences, context learning, TTL management
+
+#### Processing States
+```
+EmailMessage: received → processing → processed
+Action: pending → processing → completed/failed
+Task: pending → processing → completed/failed
+```
+
+#### Error Handling
+- LLM failures → Fallback responses with reduced confidence
+- Agent processing errors → Graceful degradation to basic responses
+- Email delivery failures → Comprehensive logging, retry logic
+- Thread continuity → Reply-to headers maintain conversation context
+
 ## System Architecture
 
 ### High-level Architecture Diagram
@@ -306,20 +435,34 @@ flowchart LR
   PM -->|HMAC Webhook| API[/Laravel /webhooks/postmark-inbound/]
   API --> Q[Redis Queue]
 
-  Q --> J1[ProcessInboundEmail]
-  J1 --> T[Thread Resolver]
-  J1 --> CL[Clean Reply Extractor]
-  J1 --> A1[Attachment Registrar]
-  A1 --> VS[ClamAV Scan]
-  VS -->|ok| AX[Attachment Extractor]
-  AX --> ATX[Text/Summary Cache]
-  J1 --> L1[LLM: Action Interpreter]
+  Q --> J1[ProcessWebhookPayload]
+  J1 --> J2[ProcessInboundEmail]
 
-  L1 -->|Action JSON| ACT[Action Dispatcher]
-  ACT --> MCP[MCP Layer (Tools/Prompts/Resources)]
-  MCP --> DB[(PostgreSQL)]
+  J2 --> T[Thread Resolver]
+  J2 --> CL[Clean Reply Extractor]
+  J2 --> A1[Attachment Processor]
+  J2 --> L1[LLM: Action Interpreter]
+
+  L1 -->|Action Intent| C[Coordinator]
+  C -->|Simple| SA[Single Agent Router]
+  C -->|Complex| MA[Multi-Agent Orchestrator]
+
+  SA --> AR[Agent Registry]
+  AR --> AP[Agent Processor]
+
+  MA --> LAP[LLM Agent Planner]
+  LAP --> TC[Task Coordinator]
+  TC --> AP
+
+  AP -->|Response| ACT[Action Dispatcher]
   ACT --> OUT[Mailer (Postmark Outbound)]
   OUT --> U
+
+  subgraph Agent System
+    CM[Chef Mario<br/>Italian Cuisine]
+    TS[Tech Support<br/>Technical Help]
+    DA[Dynamic Agents<br/>On-Demand]
+  end
 
   subgraph Web UI
     U2[Browser] --> SL[Signed Link /a/{action}]
@@ -329,25 +472,29 @@ flowchart LR
     U2 --> DLS[Signed Download /attachments/{id}]
   end
 
-  J1 --> L2[LLM: Memory Gate]
+  J2 --> L2[LLM: Memory Gate]
   L2 --> MEM[memories]
-  DB <--> APP
+  DB[(PostgreSQL)] <--> APP
 
-  L1 -. timeout .-> ALT[Fallback: local LLM]
-  ALT -. failure .-> OPT[Options mail with signed links]
+  L1 -. timeout .-> ALT[Fallback Responses]
+  MA -. failure .-> FBA[Fallback Agent]
 ```
 
 ### Component Descriptions
 
 * **Webhook Controller**: validates HMAC/IP, stores payload encrypted, queues processing.
-* **ProcessInboundEmail**: resolves thread, extracts clean reply, registers attachments, triggers scan/extraction, calls LLMs, writes memories.
+* **ProcessInboundEmail**: resolves thread, extracts clean reply, registers attachments, triggers scan/extraction, calls LLMs for action interpretation, routes to coordinator.
+* **Coordinator**: Intelligent complexity detection, agent selection, orchestration management.
+* **Agent Registry**: Manages specialized agents (Chef Mario, Tech Support), intelligent matching by expertise and keywords.
+* **Multi-Agent Orchestrator**: Handles complex requests with LLM agent planning, task dependency management, coordinated execution.
+* **Agent Processor**: Executes agent tasks with personality-driven prompts, contextual responses, fallback handling.
+* **Action Dispatcher**: Routes processed actions to response generation and email delivery.
 * **Attachment Pipeline**: ClamAV scan, MIME/size checks, extraction (txt/md/csv direct; pdf via pdf-to-text), signed downloads.
-* **Action Dispatcher**: idempotent execution, MCP tool calls, outbound in the same thread.
-* **MCP layer**: internal router with JSON schemas for tools, prompts, and resources; ToolRegistry with explicit bindings.
+* **Memory System**: Learns user preferences, maintains context across conversations with TTL management.
 * **LLM Client**: provider + fallback, timeouts/retry, token caps, confidence calibration.
 * **Auth**: passwordless challenges (codes and magic links).
 * **UI**: Blade/Flowbite wizards, i18n middleware.
-* **Observability**: Horizon, optional Pulse/Sentry, LLM call logging.
+* **Observability**: Horizon, comprehensive logging, LLM call tracking, agent performance metrics.
 
 ### Technology Stack (Laravel 12)
 
@@ -1836,12 +1983,16 @@ aws s3 cp attachments_$DATE.tar.gz s3://your-backup-bucket/
 
 ✅ **Currently Implemented**:
 - Complete PostgreSQL schema with 29 migrations and 21 Eloquent models
-- Postmark webhook integration with HMAC validation
-- RFC 5322 email threading via ThreadResolver service
+- Postmark webhook integration with HMAC validation and thread continuity
+- RFC 5322 email threading via ThreadResolver service with reply-to thread IDs
 - ULID primary keys, JSONB storage, comprehensive relationships
 - LLM client with gpt-oss:20b model and Ollama fallback
+- Intelligent Agent Coordination System with specialized agents
 - ProcessInboundEmail job with LLM interpretation and action generation
+- Multi-Agent Orchestrator for complex query handling
 - Email processing status tracking and async timeouts (10min LLM, 15min queue)
+- Action dispatching with signed links and confirmation flows
+- Agent Registry with intelligent routing (Chef Mario, Tech Support, dynamic agents)
 
 🚧 **In Development**:
 - Passwordless authentication system
@@ -1849,10 +2000,10 @@ aws s3 cp attachments_$DATE.tar.gz s3://your-backup-bucket/
 - MCP layer and tool execution
 
 📋 **Planned Features**:
-- MCP layer for schema-driven tool calls
+- MCP layer for schema-driven tool calls with SSRF protection
 - Action interpretation and clarification loops
 - Attachment processing pipeline (ClamAV, extraction, summarization)
-- Memory gate with TTL/decay
+- Memory gate with TTL/decay and user preference learning
 - i18n language detection and multilingual UI
 
 **Tech Stack**: Laravel 12, PHP 8.4, PostgreSQL 17+, Redis 7, Postmark, Ollama, ClamAV, Tailwind/Flowbite.
