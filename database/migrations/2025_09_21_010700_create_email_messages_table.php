@@ -17,6 +17,7 @@ return new class extends Migration
             $table->foreignUlid('thread_id')->constrained('threads')->cascadeOnDelete();
 
             $table->string('direction', 16); // "inbound" | "outbound"
+            $table->string('processing_status', 32)->default('received'); // "received" | "queued" | "processing" | "processed" | "failed"
             $table->string('message_id')->unique(); // RFC 5322 Message-ID.
             $table->string('in_reply_to')->nullable()->index();
             $table->string('references', 2048)->nullable(); // Space-separated list.
@@ -43,10 +44,12 @@ return new class extends Migration
             // Misc
             $table->string('x_thread_id')->nullable(); // Internal hint header.
             $table->unsignedBigInteger('raw_size_bytes')->nullable();
+            $table->timestampTz('processed_at')->nullable(); // When LLM processing completed.
 
             $table->timestampsTz();
             $table->index('thread_id');
             $table->index(['direction','delivery_status']);
+            $table->index(['direction','processing_status']);
             $table->index('from_email');
         });
 
