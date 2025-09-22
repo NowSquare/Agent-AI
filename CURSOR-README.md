@@ -14,7 +14,7 @@ Agent AI is an email-centered automation system built on Laravel 12. It links in
 
 ### Technical Scope
 
-* Inbound via Postmark webhook (HMAC + IP allowlist).
+* Inbound via Postmark webhook (HTTP Basic Auth with shared secret).
 * Threading with `Message-ID`, `In-Reply-To`, `References`.
 * LLM-first interpretation and follow-up loop with signed links.
 * **MCP layer**: custom Laravel component with schema-driven tools.
@@ -775,7 +775,7 @@ CLAMAV_PORT=3310
 ### Security
 
 * SPF/DKIM/DMARC; List-Unsubscribe where needed.
-* Webhook HMAC + IP allowlist; throttling.
+* Webhook HTTP Basic Auth (Postmark standard); throttling.
 * Signed links: expiry 15–60 min, nonce; no PII in URL; idempotent.
 * Passwordless rate limits; timing-safe compares.
 * OWASP: input validation, CSRF, XSS sanitization, **SSRF prevention** in MCP tools (no external fetch).

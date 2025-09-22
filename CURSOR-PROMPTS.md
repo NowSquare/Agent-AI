@@ -83,7 +83,7 @@ CONTEXT
   - Frontend: Blade + Tailwind 4.x + Flowbite (latest), Vite
   - LLM: Ollama (local) + optional remote providers
   - Security & docs: ClamAV (latest), spatie/pdf-to-text (latest)
-  - Email: Development uses **Postmark** for BOTH send & receive (inbound webhook → `/webhooks/inbound-email` with shared secret). Production uses Postmark (outbound + inbound webhook).
+  - Email: Development uses **Postmark** for BOTH send & receive (inbound webhook → `/webhooks/inbound-email` with HTTP Basic Auth). Production uses Postmark (outbound + inbound webhook). Postmark webhook URL format: `https://WEBHOOK_USER:WEBHOOK_PASS@your-domain.com/webhooks/inbound-email`.
   - Self-hosting: Docker Compose (Windows/Linux/macOS). Local macOS often uses Laravel Herd.
 - Do NOT use `php artisan serve` (Herd serves http://<folder>.test).
 
