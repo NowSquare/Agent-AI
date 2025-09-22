@@ -116,8 +116,11 @@ Agent AI is an email-centered automation system built on Laravel 12. It links in
 - **Requests**: Form validation (`FormRequest` classes)
 
 **Frontend Patterns**
-- Blade components for reusable UI elements
+- Blade components for reusable UI elements:
+  - `<x-thread-metadata>` - Thread info, metadata, and version history
+  - `<x-action-status>` - Action state indicators
 - Tailwind utility classes, Flowbite components
+- Dark mode support with `dark:` variants
 - i18n with `__()` helper and language files
 - Form requests for validation, CSRF protection
 - Signed links for secure actions (15-60 min expiry)
@@ -727,6 +730,11 @@ CLAMAV_PORT=3310
 | Method | Path                       | Auth   | Purpose                 | Status |
 | ------ | -------------------------- | ------ | ----------------------- | ------ |
 | POST   | /webhooks/postmark-inbound | HMAC   | Receive inbound email   | ✅ Implemented |
+| GET    | /api/agent-specializations | Auth   | List specializations    | ✅ Implemented |
+| POST   | /api/agent-specializations | Auth   | Create specialization   | ✅ Implemented |
+| GET    | /api/agent-specializations/{id} | Auth | Get specialization   | ✅ Implemented |
+| PUT    | /api/agent-specializations/{id} | Auth | Update specialization| ✅ Implemented |
+| DELETE | /api/agent-specializations/{id} | Auth | Delete specialization| ✅ Implemented |
 
 #### Implemented Endpoints
 
