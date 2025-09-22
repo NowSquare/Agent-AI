@@ -1,0 +1,216 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Agent;
+use App\Models\Account;
+use Illuminate\Support\Collection;
+
+class AgentRegistry
+{
+    /**
+     * Get all available agents for an account.
+     */
+    public function getAvailableAgents(Account $account): Collection
+    {
+        return $account->agents()->get();
+    }
+
+    /**
+     * Find the best agent for a given action and context.
+     */
+    public function findBestAgentForAction(Account $account, array $actionData, array $context = []): ?Agent
+    {
+        $agents = $this->getAvailableAgents($account);
+
+        if ($agents->isEmpty()) {
+            return $this->getDefaultAgent($account);
+        }
+
+        // Score each agent based on relevance to the action
+        $scoredAgents = $agents->map(function (Agent $agent) use ($actionData, $context) {
+            return [
+                'agent' => $agent,
+                'score' => $this->calculateAgentScore($agent, $actionData, $context),
+            ];
+        });
+
+        // Return the highest scoring agent
+        $bestMatch = $scoredAgents->sortByDesc('score')->first();
+
+        return $bestMatch ? $bestMatch['agent'] : $this->getDefaultAgent($account);
+    }
+
+    /**
+     * Calculate how well an agent matches an action.
+     */
+    private function calculateAgentScore(Agent $agent, array $actionData, array $context): float
+    {
+        $score = 0.0;
+        $capabilities = $agent->capabilities_json ?? [];
+
+        // Action type matching
+        $actionType = $actionData['type'] ?? '';
+        if (in_array($actionType, $capabilities['action_types'] ?? [])) {
+            $score += 2.0;
+        }
+
+        // Keyword/domain matching
+        $keywords = $this->extractKeywords($actionData, $context);
+        foreach ($keywords as $keyword) {
+            if ($this->agentHasKeyword($agent, $keyword)) {
+                $score += 1.0;
+            }
+        }
+
+        // Role/expertise matching
+        $role = $agent->role ?? '';
+        if ($this->roleMatchesAction($role, $actionData)) {
+            $score += 1.5;
+        }
+
+        // Language matching
+        $detectedLocale = $context['locale'] ?? 'en';
+        if (in_array($detectedLocale, $capabilities['languages'] ?? ['en'])) {
+            $score += 0.5;
+        }
+
+        return $score;
+    }
+
+    /**
+     * Extract relevant keywords from action and context.
+     */
+    private function extractKeywords(array $actionData, array $context): array
+    {
+        $keywords = [];
+
+        // From action payload
+        if (isset($actionData['payload_json'])) {
+            $payload = $actionData['payload_json'];
+            if (isset($payload['question'])) {
+                $keywords = array_merge($keywords, $this->extractKeywordsFromText($payload['question']));
+            }
+        }
+
+        // From context
+        if (isset($context['thread_summary'])) {
+            $keywords = array_merge($keywords, $this->extractKeywordsFromText($context['thread_summary']));
+        }
+
+        return array_unique($keywords);
+    }
+
+    /**
+     * Extract keywords from text using simple heuristics.
+     */
+    private function extractKeywordsFromText(string $text): array
+    {
+        $text = strtolower($text);
+
+        // Common domain keywords
+        $domainKeywords = [
+            'recipe', 'cooking', 'chef', 'food', 'italian', 'pasta', 'pizza',
+            'legal', 'lawyer', 'contract', 'court', 'lawsuit',
+            'programming', 'code', 'developer', 'software', 'tech',
+            'health', 'medical', 'doctor', 'patient', 'treatment',
+            'finance', 'money', 'investment', 'banking', 'tax',
+        ];
+
+        return array_filter($domainKeywords, function ($keyword) use ($text) {
+            return str_contains($text, $keyword);
+        });
+    }
+
+    /**
+     * Check if agent has a specific keyword in capabilities.
+     */
+    private function agentHasKeyword(Agent $agent, string $keyword): bool
+    {
+        $capabilities = $agent->capabilities_json ?? [];
+
+        $keywords = array_merge(
+            $capabilities['keywords'] ?? [],
+            $capabilities['domains'] ?? [],
+            $capabilities['expertise'] ?? []
+        );
+
+        return in_array(strtolower($keyword), array_map('strtolower', $keywords));
+    }
+
+    /**
+     * Check if agent role matches the action.
+     */
+    private function roleMatchesAction(string $role, array $actionData): bool
+    {
+        $role = strtolower($role);
+        $actionType = strtolower($actionData['type'] ?? '');
+
+        $roleMappings = [
+            'chef' => ['info_request'],
+            'cook' => ['info_request'],
+            'lawyer' => ['info_request', 'approve', 'reject'],
+            'developer' => ['info_request'],
+            'doctor' => ['info_request'],
+            'financial advisor' => ['info_request'],
+        ];
+
+        return in_array($actionType, $roleMappings[$role] ?? []);
+    }
+
+    /**
+     * Get or create a default agent for the account.
+     */
+    private function getDefaultAgent(Account $account): Agent
+    {
+        return Agent::firstOrCreate(
+            ['account_id' => $account->id, 'name' => 'General Assistant'],
+            [
+                'role' => 'General Assistant',
+                'capabilities_json' => [
+                    'action_types' => ['info_request', 'approve', 'reject', 'revise'],
+                    'keywords' => ['general', 'help', 'information'],
+                    'languages' => ['en'],
+                    'expertise' => ['general_assistance'],
+                ],
+            ]
+        );
+    }
+
+    /**
+     * Create a sample Italian chef agent for testing.
+     */
+    public function createSampleAgents(Account $account): void
+    {
+        Agent::firstOrCreate(
+            ['account_id' => $account->id, 'name' => 'Chef Mario'],
+            [
+                'role' => 'Master Italian Chef',
+                'capabilities_json' => [
+                    'action_types' => ['info_request'],
+                    'keywords' => ['recipe', 'cooking', 'italian', 'pasta', 'pizza', 'chef', 'food'],
+                    'domains' => ['culinary', 'italian_cuisine', 'cooking'],
+                    'expertise' => ['italian_cooking', 'recipes', 'food_preparation'],
+                    'languages' => ['en', 'it'],
+                    'personality' => 'passionate, authentic, traditional Italian cooking',
+                    'experience' => '25 years as head chef in Milan restaurants',
+                ],
+            ]
+        );
+
+        Agent::firstOrCreate(
+            ['account_id' => $account->id, 'name' => 'Tech Support'],
+            [
+                'role' => 'Technical Support Specialist',
+                'capabilities_json' => [
+                    'action_types' => ['info_request'],
+                    'keywords' => ['technical', 'support', 'software', 'hardware', 'computer', 'programming'],
+                    'domains' => ['technology', 'software', 'hardware'],
+                    'expertise' => ['technical_support', 'troubleshooting', 'programming'],
+                    'languages' => ['en'],
+                    'personality' => 'helpful, patient, methodical',
+                ],
+            ]
+        );
+    }
+}

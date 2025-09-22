@@ -214,4 +214,73 @@ options: [ { "label":"Tue 14:00", "token":"{{LINK_OPT_1}}" }, ... ]
 OUTPUT:
 { "subject":"string (≤80 chars)", "text":"string (≤600 chars)", "html":"string (≤800 chars)" }',
     ],
+
+    'agent_response' => [
+        'temperature' => 0.7,
+        'backstory' => 'Generate a response from a specialized agent with specific role and expertise.',
+        'template' => ':prompt
+
+IMPORTANT: Your response must be valid JSON. Do not include any text before or after the JSON.
+
+{
+  "response": "Your detailed response here, based on your expertise and role",
+  "confidence": 0.8,
+  "reasoning": "Brief explanation of your approach (optional)"
+}',
+    ],
+
+    'define_agents' => [
+        'temperature' => 0.4,
+        'backstory' => 'Break down user requests into specialized agents with clear, actionable tasks.',
+        'template' => ':prompt',
+    ],
+
+    'respond_to_user' => [
+        'temperature' => 0.5,
+        'backstory' => 'Present proposed agents and tasks to user for confirmation.',
+        'template' => '# :goal
+
+You are processing a response to the user\'s query:
+**Subject:** ":conversation_subject"
+**Message:** ":conversation_plaintext_content"
+
+**Goal:**
+:goal
+
+**Defined Agents:**
+:defined_agents
+
+**Instructions:**
+- Verify the interpreted goal aligns with the user\'s request and restate it succinctly.
+- Summarize the defined agents and their tasks in a user-friendly list.
+- Use the user\'s language and tone for consistency.
+- Prompt the user to confirm or suggest changes with a direct question.
+- Format using Markdown for readability.
+
+**Example Output:**
+# Plan Your Weekend Event
+I understood your goal as organizing a fun weekend event. Here\'s the plan:
+- **TimeAgent**: Gets the current date and time.
+- **CalendarAgent**: Finds free slots this weekend.
+- **EventAgent**: Suggests activities under $50.
+Can we continue with this, or do you want to change anything?',
+    ],
+
+    'handle_response' => [
+        'temperature' => 0.4,
+        'backstory' => 'Classify whether user confirms proceeding or requests changes.',
+        'template' => '### Classify User Response
+
+**Instructions:**
+- Analyze the user\'s message to determine intent.
+- Return **"YES"** if the user explicitly agrees or uses positive phrases.
+- Return **"NO"** if the user requests changes or expresses uncertainty.
+- Ignore unrelated content and focus on confirmation intent.
+
+**User Message:**
+":conversation_plaintext_content"
+
+**Output:**
+"YES" or "NO"',
+    ],
 ];
