@@ -59,10 +59,16 @@ Agent AI is an email-centered automation system built on Laravel 12. It links in
 - Action interpretation and clarification loop
 - Memory gate with TTL/decay
 
-**📋 FUTURE: Phase 3 - Attachments & Quality**
-- Attachment pipeline (ClamAV scan, text extraction, summarization)
-- Signed downloads and security hardening
-- Horizon monitoring, testing, and deployment
+**✅ COMPLETED: Phase 3 - Attachments Pipeline**
+- Full attachment pipeline: MIME/size limits, ClamAV scan, text extraction, LLM summarization
+- Signed downloads with expiry and nonce validation
+- Async processing on dedicated queue, LLM context integration
+- Security hardening and comprehensive logging
+
+**📋 FUTURE: Phase 4 - Quality & Production**
+- Comprehensive testing and monitoring
+- Performance optimization and production deployment
+- Advanced features and polish
 
 **Roles & Permissions**
 - **Recipient**: Email interactions, signed link confirmations
@@ -286,12 +292,9 @@ This README reflects the **current implementation** as of our development sessio
 - **UI**: Basic Blade/Flowbite dashboard and auth pages
 
 **📋 NOT YET IMPLEMENTED:**
-- LLM client and providers
-- MCP layer and tools
-- Attachment processing pipeline
-- Clarification loop and action dispatcher
-- Memory gate with TTL/decay
-- UI dashboard and thread views
+- Comprehensive testing suite
+- UI dashboard and thread views with attachment previews
+- Advanced memory management features
 
 ## Agent Coordination Flow with Laravel MCP
 
@@ -680,17 +683,42 @@ Use these fields to reliably control the follow-up loop.
 - Fallback to en_US for unsupported languages
 - Language-specific email templates and UI strings
 
-### Attachments Processing (Planned)
+### Attachments Processing (Implemented)
 
-**Status**: Models exist, but processing pipeline not yet implemented.
+**Status**: Fully implemented end-to-end attachment pipeline with security and async processing.
 
-**Future Implementation:**
-- MIME whitelist: text/*, application/pdf, text/csv, application/json
-- Size limits: 25MB per file, 40MB total per email
-- ClamAV virus scanning before extraction
-- Text extraction: direct for txt/md/csv, spatie/pdf-to-text for PDFs
-- Signed downloads with temporary URLs
-- LLM summarization of attachment content
+**Implementation Details:**
+- **MIME whitelist**: text/plain, text/markdown, text/csv, application/pdf
+- **Size limits**: 25MB per file (configurable), 40MB total per email (configurable)
+- **Security**: Mandatory ClamAV scan before any extraction; infected files quarantined
+- **Text extraction**: Direct for txt/md/csv; spatie/pdf-to-text for PDFs with timeout guards
+- **LLM summarization**: attachment_summarize prompt generates concise gist + 3-6 bullets
+- **Async processing**: Scan → Extract → Summarize chain on dedicated 'attachments' queue
+- **Signed downloads**: GET /attachments/{id} with 15-60min expiry, nonce validation, infected denial
+- **LLM integration**: attachments_excerpt assembled from summaries for action interpretation context
+
+**Environment Variables:**
+```env
+ATTACH_MAX_SIZE_MB=25
+ATTACH_TOTAL_MAX_SIZE_MB=40
+CLAMAV_HOST=127.0.0.1
+CLAMAV_PORT=3310
+```
+
+**Flow Diagram:**
+1. Email received → ProcessInboundEmail stores attachments + dispatches ScanAttachment
+2. ScanAttachment (queue=attachments) → calls ClamAV → clean: ExtractAttachmentText, infected: stop
+3. ExtractAttachmentText → extracts text → SummarizeAttachment
+4. SummarizeAttachment → calls LLM → stores summary in summarize_json
+5. ProcessInboundEmail::getAttachmentsExcerpt() → assembles context for ActionInterpretationTool
+
+**Security Features:**
+- ClamAV mandatory scanning prevents malware processing
+- Signed URLs with short expiry prevent unauthorized access
+- Nonce validation prevents replay attacks
+- MIME whitelist prevents dangerous file types
+- Size limits prevent DoS attacks
+- Comprehensive logging for audit trails
 
 ### API Endpoints
 
@@ -700,14 +728,14 @@ Use these fields to reliably control the follow-up loop.
 | ------ | -------------------------- | ------ | ----------------------- | ------ |
 | POST   | /webhooks/postmark-inbound | HMAC   | Receive inbound email   | ✅ Implemented |
 
-#### Planned Implementation
+#### Implemented Endpoints
 
 **Public/External API:**
 - `GET /a/{action}` - One-click action confirmations (signed links)
 - `GET /login/{token}` - Magic link login verification
 - `POST /auth/challenge` - Request passwordless authentication
 - `POST /auth/verify` - Verify authentication code
-- `GET /attachments/{id}` - Signed attachment downloads
+- `GET /attachments/{attachment}` - Signed attachment downloads (clean files only, 15-60min expiry)
 
 **Internal/UI and MCP API:**
 - `ANY /mcp/agent` - MCP tool execution endpoint

@@ -113,6 +113,18 @@ php artisan tinker
    WEBHOOK_PASS=your-long-random-password
    ```
 
+6. **Configure attachments** (optional, for production):
+
+   ```ini
+   # Attachment processing
+   ATTACH_MAX_SIZE_MB=25
+   ATTACH_TOTAL_MAX_SIZE_MB=40
+   CLAMAV_HOST=127.0.0.1
+   CLAMAV_PORT=3310
+   ```
+
+   > Attachments are processed asynchronously on the `attachments` queue. Files are scanned with ClamAV, text extracted, and summarized by LLM for action context. Signed downloads expire in 15-60 minutes.
+
 ---
 
 ## 3) Quickstart (Herd — macOS)
