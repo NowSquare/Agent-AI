@@ -32,22 +32,31 @@ php artisan migrate
 
 This document (`CURSOR-PROMPTS.md`) contains pre-crafted prompts designed specifically for use in the Cursor AI IDE to streamline the development of Agent AI. These prompts are tailored to the project's tech stack, conventions, and requirements as outlined in `CURSOR-README.md`. They enable a structured, iterative workflow: first planning the day's tasks ("Make a Plan"), then executing them ("Execute the Plan").
 
-## Laravel Boost Prerequisite
+## Laravel Boost & MCP Prerequisites
 
-Before running any of the prompts below, make sure Laravel Boost is running.
+Before running any of the prompts below, make sure **both** Laravel Boost AND the Agent AI MCP server are running.
 
-1. Start the MCP server (also in dev loop above):
+### 1. Laravel Boost (for Cursor Integration)
 ```bash
-   php artisan boost:mcp
+php artisan boost:mcp
 ```
 
-2. In Cursor → **Settings → MCP**, add it as a server:
+In Cursor → **Settings → MCP**, add it as a server:
+- Command: `php`
+- Args: `artisan`, `boost:mcp`
+- Working directory: project root
 
-   * Command: `php`
-   * Args: `artisan`, `boost:mcp`
-   * Working directory: project root
+This unlocks Boost tools (DB schema, routes, Artisan, logs, docs).
 
-This unlocks Boost tools (DB schema, routes, Artisan, logs, docs) inside Cursor so the “Make a Plan” and “Execute the Plan” prompts work with real project context.
+### 2. Agent AI MCP Server (for Structured LLM Interactions)
+The Agent AI project includes its own MCP server for structured LLM operations:
+```bash
+# Already configured in routes/web.php at /mcp/ai
+# Tools: ActionInterpretationTool, AgentSelectionTool, ResponseGenerationTool
+# Prompts: DefineAgentsPrompt, OrchestrateComplexRequestPrompt
+```
+
+**Cursor should use Laravel MCPs for structured LLM queries and responses** instead of free-form text parsing. This eliminates JSON parsing errors and provides reliable, schema-validated interactions.
 
 ### Why These Prompts?
 - **Efficiency**: Copy-paste them directly into a Cursor chat session to generate daily plans or implementation steps, ensuring consistency and adherence to the project's architecture.

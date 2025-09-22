@@ -293,7 +293,7 @@ This README reflects the **current implementation** as of our development sessio
 - Memory gate with TTL/decay
 - UI dashboard and thread views
 
-## Agent Coordination Flow
+## Agent Coordination Flow with Laravel MCP
 
 ### Complete Email Processing Pipeline
 
@@ -314,7 +314,7 @@ This README reflects the **current implementation** as of our development sessio
    - Extracts clean reply text (removes quoted content)
    - Resolves email threading (RFC 5322)
    - Processes attachments (scanning, extraction)
-   - Calls LLM for action interpretation
+   - Calls MCP `ActionInterpretationTool` for structured action interpretation
 
 #### Phase 2: Intelligent Agent Routing
 
@@ -330,7 +330,7 @@ This README reflects the **current implementation** as of our development sessio
 
 **Complex Path:**
 - Multi-Agent Orchestration (`MultiAgentOrchestrator`)
-- LLM generates agent plan and task breakdown
+- MCP `DefineAgentsPrompt` generates structured agent plan and task breakdown
 - Coordinator creates tasks with dependency management
 - Sequential execution with proper ordering
 
@@ -339,8 +339,8 @@ This README reflects the **current implementation** as of our development sessio
 5. **Task Execution** (`AgentProcessor`)
    - Builds contextual prompts with agent personality
    - Includes thread history, user context, agent expertise
-   - Calls LLM with agent-specific prompts
-   - Handles fallbacks for processing failures
+   - Calls MCP `ResponseGenerationTool` with agent context and instructions
+   - Handles fallbacks at tool level for processing failures
 
 6. **Response Coordination**
    - Single agent: Direct response generation
@@ -492,6 +492,7 @@ flowchart LR
 * **Attachment Pipeline**: ClamAV scan, MIME/size checks, extraction (txt/md/csv direct; pdf via pdf-to-text), signed downloads.
 * **Memory System**: Learns user preferences, maintains context across conversations with TTL management.
 * **LLM Client**: provider + fallback, timeouts/retry, token caps, confidence calibration.
+* **Laravel MCP Framework**: Structured tools and prompts for error-resistant LLM interactions.
 * **Auth**: passwordless challenges (codes and magic links).
 * **UI**: Blade/Flowbite wizards, i18n middleware.
 * **Observability**: Horizon, comprehensive logging, LLM call tracking, agent performance metrics.
@@ -508,7 +509,7 @@ flowchart LR
 | UI          | Blade + Tailwind + Flowbite      | latest  | Fast, accessible                |
 | Icons       | Lucide                           | latest  | Accessible, SVG-based icons     |
 | LLM         | Ollama + provider                | n/a     | Fallback and flexibility        |
-| MCP         | Custom Laravel component         | n/a     | Safe schema-enforced calls      |
+| Laravel MCP | Laravel MCP Framework            | ^0.x    | Structured, error-resistant LLM interactions |
 | AV Scan     | ClamAV (daemon)                  | latest  | Virus/malware detection         |
 | PDF text    | poppler-utils/spatie/pdf-to-text | latest  | Extraction                      |
 | Container   | Docker/Compose                   | latest  | Self-hosting                    |
@@ -587,12 +588,45 @@ Use these fields to reliably control the follow-up loop.
 - Authorization checks preventing IDOR attacks
 - No external fetch - only internal Storage access
 
-### LLM Client (Implemented)
+### LLM Client & Laravel MCP Framework (Implemented)
 
-**Status**: Implemented with gpt-oss:20b model and Ollama fallback.
+**Status**: Fully implemented with Laravel MCP framework for structured, error-resistant LLM interactions.
 
-**Future Implementation:**
+**Architecture:**
+- **Laravel MCP Server** at `/mcp/ai` providing RESTful API for structured operations
+- **Schema-driven tools** with JSON validation and error handling
+- **Structured prompts** for complex multi-agent orchestration
+- **Fallback mechanisms** at tool and prompt levels
+
+**MCP Tools (Structured Operations):**
+- **`ActionInterpretationTool`**: Email content → validated action JSON (type, parameters, confidence)
+  - Input: `clean_reply`, `thread_summary`, `attachments_excerpt`, `recent_memories`
+  - Output: Structured JSON with `action_type`, `parameters`, `confidence`
+- **`AgentSelectionTool`**: Context analysis → optimal agent selection
+  - Input: `account_id`, `action_data`, `context` (thread, locale, memories)
+  - Output: `agent_id`, `agent_name`, `capabilities`, `confidence_score`
+- **`ResponseGenerationTool`**: Agent expertise → formatted response
+  - Input: `agent_id`, `user_query`, `context` (thread, instructions, locale)
+  - Output: `response`, `confidence`, `processing_time`, `model_used`
+
+**MCP Prompts (Complex Orchestration):**
+- **`DefineAgentsPrompt`**: Complex requests → agent breakdown with tasks & dependencies
+  - Arguments: `conversation_subject`, `conversation_plaintext_content`, `goal`, `available_tools`
+  - Returns: JSON with agent definitions, roles, capabilities, and task orchestrations
+- **`OrchestrateComplexRequestPrompt`**: Multi-agent coordination → user confirmation flow
+  - Arguments: `goal`, `defined_agents`, `conversation_subject`, `conversation_plaintext_content`
+  - Returns: Formatted coordination message for user approval
+
+**Error Prevention:**
+- **Schema validation** prevents malformed requests/responses
+- **Tool-level fallbacks** when LLM calls fail
+- **Structured JSON** eliminates text parsing errors
+- **Dependency injection** for clean, testable code
+
+**Future Enhancements:**
 - Multi-provider support (OpenAI, Anthropic) with automatic failover
+- Tool chaining for complex multi-step operations
+- MCP resource integration for external data sources
 - Enhanced confidence score calibration and fallback logic
 - Dynamic token limit adjustment based on model capabilities
 

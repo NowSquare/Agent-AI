@@ -34,7 +34,9 @@ This README explains **how to run Agent-AI** locally with **Laravel Herd** (reco
 * **PostgreSQL** database (Herd or Docker)
 * **Redis** queues with **Laravel Horizon** dashboard
 * **Mail**: Postmark for all email (outbound + inbound webhooks)
-* **LLM**: Local Ollama (gpt-oss:20b) or remote HTTP providers
+* **Laravel MCP Framework**: Structured LLM interactions via Model Context Protocol
+* **MCP Server**: RESTful API at `/mcp/ai` with tools and prompts for reliable LLM operations
+* **LLM Integration**: Local Ollama (gpt-oss:20b) with fallback mechanisms
 * **Agent System**: Intelligent coordination with specialized agents (Italian Chef, Tech Support, etc.)
 * **Smart Routing**: Automatic complexity detection for single-agent vs multi-agent processing
 * **Thread Continuity**: Reply-to headers with thread IDs for conversation persistence
