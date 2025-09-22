@@ -5,7 +5,9 @@ use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\Auth\VerifyController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\Webhook\PostmarkInboundController;
+use App\Mcp\Servers\AgentAiServer;
 use Illuminate\Support\Facades\Route;
+use Laravel\Mcp\Facades\Mcp;
 
 Route::get('/', function () {
     return view('welcome');
@@ -34,4 +36,9 @@ Route::post('/a/{action}', [App\Http\Controllers\ActionConfirmationController::c
 // Webhooks (exclude from CSRF protection)
 Route::withoutMiddleware([\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class])->group(function () {
     Route::post('/webhooks/inbound-email', PostmarkInboundController::class);
+});
+
+// MCP Server routes
+Route::prefix('mcp')->group(function () {
+    Mcp::web('/ai', AgentAiServer::class)->name('mcp.ai');
 });
