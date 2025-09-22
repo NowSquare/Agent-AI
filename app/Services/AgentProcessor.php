@@ -4,12 +4,15 @@ namespace App\Services;
 
 use App\Models\Task;
 use App\Models\Agent;
+use App\Models\Memory;
+use App\Services\MemoryService;
 use Illuminate\Support\Facades\Log;
 
 class AgentProcessor
 {
     public function __construct(
         private LlmClient $llmClient,
+        private MemoryService $memoryService,
     ) {}
 
     /**
@@ -188,6 +191,13 @@ class AgentProcessor
         if (!empty($threadContext['summary'])) {
             $prompt .= "Summary: {$threadContext['summary']}\n";
         }
+        
+        // Add memory context if available
+        $memoryExcerpt = $this->getMemoryContext($threadContext['thread_id'], $threadContext['account_id']);
+        if (!empty($memoryExcerpt)) {
+            $prompt .= "\nRELEVANT MEMORIES:\n{$memoryExcerpt}\n";
+        }
+        
         $prompt .= "\nRecent conversation:\n";
         foreach ($threadContext['recent_messages'] as $message) {
             $direction = $message['direction'] === 'inbound' ? 'User' : 'Assistant';
@@ -210,5 +220,50 @@ class AgentProcessor
         $prompt .= "RESPONSE:";
 
         return $prompt;
+    }
+
+    /**
+     * Get relevant memory context for the prompt.
+     */
+    private function getMemoryContext(string $threadId, string $accountId): string
+    {
+        // Get memories from all scopes, ordered by relevance
+        $memories = collect([]);
+        
+        // Thread-specific memories
+        $threadMemories = $this->memoryService->retrieve(
+            Memory::SCOPE_CONVERSATION,
+            $threadId,
+            null,
+            3
+        );
+        $memories = $memories->merge($threadMemories);
+        
+        // Account-level memories
+        $accountMemories = $this->memoryService->retrieve(
+            Memory::SCOPE_ACCOUNT,
+            $accountId,
+            null,
+            3
+        );
+        $memories = $memories->merge($accountMemories);
+        
+        // Format memories for prompt context
+        if ($memories->isEmpty()) {
+            return '';
+        }
+        
+        $excerpt = '';
+        foreach ($memories as $memory) {
+            $value = is_array($memory->value_json) ? json_encode($memory->value_json) : $memory->value_json;
+            $excerpt .= "- {$memory->key}: {$value}\n";
+        }
+        
+        // Truncate if too long (keep under typical token limits)
+        if (strlen($excerpt) > config('memory.max_excerpt_chars', 1200)) {
+            $excerpt = substr($excerpt, 0, config('memory.max_excerpt_chars', 1200)) . "...\n";
+        }
+        
+        return $excerpt;
     }
 }

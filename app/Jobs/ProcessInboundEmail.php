@@ -11,6 +11,7 @@ use App\Models\EmailMessage;
 use App\Models\Memory;
 use App\Services\AttachmentService;
 use App\Services\LlmClient;
+use App\Services\MemoryService;
 use App\Services\ReplyCleaner;
 use App\Services\ThreadResolver;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -42,7 +43,8 @@ class ProcessInboundEmail implements ShouldQueue
         ThreadResolver $threadResolver,
         LlmClient $llmClient,
         ActionInterpretationTool $actionInterpreter,
-        AttachmentService $attachmentService
+        AttachmentService $attachmentService,
+        MemoryService $memoryService
     ): void {
         Log::info('Processing inbound email', ['payload_id' => $this->payloadId]);
 
@@ -302,10 +304,17 @@ class ProcessInboundEmail implements ShouldQueue
 
             $uploadedFile = new class($tempFile, $attachmentData['Name'] ?? 'unknown', $attachmentData['ContentType'] ?? 'application/octet-stream', $fileSize) extends \Illuminate\Http\UploadedFile
             {
+                private int $fileSize;
+
                 public function __construct($tempFile, $name, $mime, $size)
                 {
                     parent::__construct(stream_get_meta_data($tempFile)['uri'], $name, $mime, null, true);
-                    $this->size = $size;
+                    $this->fileSize = $size;
+                }
+
+                public function getSize(): int
+                {
+                    return $this->fileSize;
                 }
             };
 
@@ -406,7 +415,7 @@ class ProcessInboundEmail implements ShouldQueue
 
             // Interpret action using MCP tool
             $interpretation = $this->interpretActionWithMCP(
-                $actionInterpreter,
+                app(ActionInterpretationTool::class),
                 $cleanReply,
                 $threadSummary,
                 $attachmentsExcerpt,
@@ -501,11 +510,48 @@ class ProcessInboundEmail implements ShouldQueue
     /**
      * Get recent memories for context.
      */
-    private function getRecentMemories(Account $account, $thread): array
+    private function getRecentMemories(Account $account, $thread): string
     {
-        // TODO: Implement memory retrieval with decay
-        // For now, return empty array
-        return [];
+        $memoryService = app(MemoryService::class);
+        
+        // Get memories from all scopes, ordered by relevance
+        $memories = collect([]);
+        
+        // Thread-specific memories
+        $threadMemories = $memoryService->retrieve(
+            Memory::SCOPE_CONVERSATION,
+            $thread->id,
+            null,
+            3
+        );
+        $memories = $memories->merge($threadMemories);
+        
+        // Account-level memories
+        $accountMemories = $memoryService->retrieve(
+            Memory::SCOPE_ACCOUNT,
+            $account->id,
+            null,
+            3
+        );
+        $memories = $memories->merge($accountMemories);
+        
+        // Format memories for prompt context
+        if ($memories->isEmpty()) {
+            return '';
+        }
+        
+        $excerpt = "Relevant Context:\n";
+        foreach ($memories as $memory) {
+            $value = is_array($memory->value_json) ? json_encode($memory->value_json) : $memory->value_json;
+            $excerpt .= "- {$memory->key}: {$value}\n";
+        }
+        
+        // Truncate if too long (keep under typical token limits)
+        if (strlen($excerpt) > config('memory.max_excerpt_chars', 1200)) {
+            $excerpt = substr($excerpt, 0, config('memory.max_excerpt_chars', 1200)) . "...\n";
+        }
+        
+        return $excerpt;
     }
 
     /**
@@ -560,26 +606,45 @@ class ProcessInboundEmail implements ShouldQueue
                 'detected_locale' => $locale,
                 'clean_reply' => $cleanReply,
                 'thread_summary' => $this->getThreadSummary($thread),
-                'attachments_excerpt' => '', // TODO: Implement
+                'attachments_excerpt' => $this->getAttachmentsExcerpt($emailMessage),
             ]);
 
+            $memoryService = app(MemoryService::class);
+            $meta = [
+                'prompt_key' => 'memory_extract',
+                'model' => config('llm.default_model'),
+                'locale' => $locale,
+            ];
+
             foreach ($memoryResult['items'] ?? [] as $item) {
-                Memory::create([
-                    'account_id' => $account->id,
-                    'scope' => $item['scope'],
-                    'scope_id' => match ($item['scope']) {
-                        'conversation' => $thread->id,
-                        'user' => null, // TODO: Get user ID
-                        'account' => $account->id,
-                    },
-                    'key' => $item['key'],
-                    'value_json' => $item['value'] ?? null,
-                    'confidence' => $item['confidence'] ?? 0.5,
-                    'ttl_category' => $item['ttl_category'] ?? 'volatile',
-                    'expires_at' => $this->calculateExpiry($item['ttl_category']),
-                    'provenance' => $item['provenance'] ?? "email_message_id:{$emailMessage->id}",
-                ]);
+                $scopeId = match ($item['scope']) {
+                    Memory::SCOPE_CONVERSATION => $thread->id,
+                    Memory::SCOPE_USER => null, // TODO: Get user ID
+                    Memory::SCOPE_ACCOUNT => $account->id,
+                    default => null,
+                };
+
+                if (!$scopeId) {
+                    continue;
+                }
+
+                $memoryService->writeGate(
+                    scope: $item['scope'],
+                    scopeId: $scopeId,
+                    key: $item['key'],
+                    value: $item['value'] ?? [],
+                    confidence: $item['confidence'] ?? 0.5,
+                    ttlClass: $item['ttl_category'] ?? Memory::TTL_VOLATILE,
+                    emailMessageId: $emailMessage->message_id,
+                    threadId: $thread->id,
+                    meta: $meta
+                );
             }
+
+            Log::info('Memory extraction completed', [
+                'message_id' => $emailMessage->id,
+                'memories_count' => count($memoryResult['items'] ?? []),
+            ]);
 
         } catch (\Throwable $e) {
             Log::warning('Memory extraction failed', [
@@ -606,41 +671,20 @@ class ProcessInboundEmail implements ShouldQueue
     /**
      * Interpret action using MCP ActionInterpretationTool.
      */
-    private function interpretActionWithMCP(ActionInterpretationTool $actionInterpreter, string $cleanReply, string $threadSummary, string $attachmentsExcerpt, array $recentMemories): array
+    private function interpretActionWithMCP(ActionInterpretationTool $actionInterpreter, string $cleanReply, string $threadSummary, string $attachmentsExcerpt, string $recentMemories): array
     {
         try {
             // Create a mock Request object for the MCP tool
-            $request = new class($cleanReply, $threadSummary, $attachmentsExcerpt, $recentMemories) extends \Laravel\Mcp\Request
-            {
-                public function __construct(
-                    private string $cleanReply,
-                    private string $threadSummary,
-                    private string $attachmentsExcerpt,
-                    private array $recentMemories
-                ) {}
-
-                public function string(string $key, ?string $default = null): string
-                {
-                    return match ($key) {
-                        'clean_reply' => $this->cleanReply,
-                        'thread_summary' => $this->threadSummary,
-                        'attachments_excerpt' => $this->attachmentsExcerpt,
-                        default => $default ?? ''
-                    };
-                }
-
-                public function array(string $key, array $default = []): array
-                {
-                    return match ($key) {
-                        'recent_memories' => $this->recentMemories,
-                        default => $default
-                    };
-                }
-            };
+            $request = new \Laravel\Mcp\Request([
+                'clean_reply' => $cleanReply,
+                'thread_summary' => $threadSummary,
+                'attachments_excerpt' => $attachmentsExcerpt,
+                'recent_memories' => $recentMemories,
+            ]);
 
             $response = $actionInterpreter->handle($request);
 
-            return $response->getData(); // Get the JSON data from the response
+            return json_decode(json_encode($response), true);
 
         } catch (\Exception $e) {
             Log::error('MCP Action interpretation failed', [
