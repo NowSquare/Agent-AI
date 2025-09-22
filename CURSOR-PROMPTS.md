@@ -74,7 +74,7 @@ CONTEXT
   - Frontend: Blade + Tailwind 4.x + Flowbite (latest), Vite
   - LLM: Ollama (local) + optional remote providers
   - Security & docs: ClamAV (latest), spatie/pdf-to-text (latest)
-  - Email: Development uses **Mailpit** for BOTH send & receive (inbound webhook → `/webhooks/inbound-email` with shared secret). Production uses Postmark (outbound + inbound webhook).
+  - Email: Development uses **Postmark** for BOTH send & receive (inbound webhook → `/webhooks/inbound-email` with shared secret). Production uses Postmark (outbound + inbound webhook).
   - Self-hosting: Docker Compose (Windows/Linux/macOS). Local macOS often uses Laravel Herd.
 - Do NOT use `php artisan serve` (Herd serves https://<folder>.test).
 
@@ -93,7 +93,7 @@ CONVENTIONS
 
 OPERATING PROCEDURE (ALWAYS FOLLOW)
 1) READ ME FIRST
-   - Summarize @CURSOR-README.md in your own words (no code), calling out MVP features, roles, key workflows (inbound email → threading → LLM → actions/MCP → outbound; attachments scan/extract), and dev expectations (Herd/Docker, **Mailpit in dev**, Ollama local).
+   - Summarize @CURSOR-README.md in your own words (no code), calling out MVP features, roles, key workflows (inbound email → threading → LLM → actions/MCP → outbound; attachments scan/extract), and dev expectations (Herd/Docker, **Postmark in dev**, Ollama local).
 2) WORKSPACE SURVEY
    - Recursively scan the repo (paths & key files only; no full dumps). List presence/absence of:
      - composer.json, composer.lock
@@ -106,7 +106,7 @@ OPERATING PROCEDURE (ALWAYS FOLLOW)
 3) GAP ANALYSIS (WHAT’S MISSING vs CURSOR-README)
    - Domain: Threads, EmailMessages, Actions, Memories, Attachments (models+migrations+policies, ULID PKs).
    - Email Handling:
-     - **Dev inbound via Mailpit** → `/webhooks/inbound-email` (shared secret).
+     - **Dev inbound via Postmark** → `/webhooks/inbound-email` (shared secret).
      - **Prod inbound via Postmark** → same endpoint.
      - Threading resolver, clean reply extractor, outbound-in-thread.
    - LLM/MCP: LlmClient with fallback, MCP ToolRegistry, schema-driven tools (e.g., ProcessAttachmentTool).
@@ -117,7 +117,7 @@ OPERATING PROCEDURE (ALWAYS FOLLOW)
    - Queues/Scheduler: Horizon installed & gated, purge/TTL cron jobs.
    - Frontend: Blade/Flowbite pages for dashboard, threads, actions confirmation, attachments; wizards/forms; i18n support.
    - Quality: PHPUnit, PHPStan level, Pint; ESLint/Prettier; CI stub (optional).
-   - Env & dev: Ensure `.env.herd` and `.env.docker` include **AGENT_MAIL, INBOUND_EMAIL_DRIVER, INBOUND_WEBHOOK_SECRET, MAIL_* keys**, and match Mailpit defaults.
+   - Env & dev: Ensure `.env.herd` and `.env.docker` include **AGENT_MAIL, INBOUND_EMAIL_DRIVER, INBOUND_WEBHOOK_SECRET, MAIL_* keys**, and match Postmark defaults.
 4) RISK CHECKS
    - Version drifts (Laravel 12.x, Tailwind 4.x, Flowbite latest, Ollama model pin).
    - Missing env keys: `AGENT_MAIL`, `INBOUND_EMAIL_DRIVER`, `INBOUND_WEBHOOK_SECRET`, `LLM_PROVIDER`, `QUEUE_CONNECTION`.
@@ -128,7 +128,7 @@ OPERATING PROCEDURE (ALWAYS FOLLOW)
    - Each task: Title, Outcome/Acceptance Criteria (verifiable), exact file paths to create/modify, commands (artisan/npm/composer), dependencies.
    - If a file exists, “verify & extend” instead of “create”.
 6) TODAY’S PLAN (2–4 HOURS)
-   - Pick 5–10 tasks that unblock the rest (schema + inbound webhook + threading + first Blade page + Horizon + **Mailpit wiring**).
+   - Pick 5–10 tasks that unblock the rest (schema + inbound webhook + threading + first Blade page + Horizon + **Postmark wiring**).
    - Sequence them and restate acceptance criteria concisely.
 7) TESTING HOOKS
    - For each “today” task, propose 1–2 PHPUnit tests (Feature/Unit) to prove it works (names only, no code).
@@ -153,13 +153,13 @@ This prompt implements the plan from the previous response, generating shell com
 You are a senior Laravel 12 + Blade + Tailwind/Flowbite architect and Cursor power-user. Implement the ENTIRE project plan deterministically, with minimal cohesive diffs and exact shell commands. Local dev uses Laravel Herd (macOS) or Docker (Win/Linux/macOS); NEVER use `php artisan serve`.
 
 SOURCES OF TRUTH (IN THIS ORDER)
-1) @CURSOR-README.md — stack, conventions, workflows, routes, i18n rules, Mailpit in dev.
+1) @CURSOR-README.md — stack, conventions, workflows, routes, i18n rules, Postmark in dev.
 2) Current workspace — actual files take precedence over assumptions.
 3) The most recent planning response in this chat (TODAY’S PLAN/BACKLOG). If none, derive a concise plan from CURSOR-README + repo scan first, then execute it.
 
 ABSOLUTE CONVENTIONS (MUST FOLLOW)
 - PHP 8.4; Laravel 12.x; Horizon; Redis 7.x; PostgreSQL 17+ in dev (Herd/Docker). Do NOT switch to SQLite unless explicitly requested.
-- Email: Dev uses **Mailpit** for send+receive (SMTP 1025, UI 8025; inbound webhook → `/webhooks/inbound-email` with shared secret). Prod uses Postmark (outbound + inbound webhook).
+- Email: Dev uses **Postmark** for send+receive (SMTP 1025, UI 8025; inbound webhook → `/webhooks/inbound-email` with shared secret). Prod uses Postmark (outbound + inbound webhook).
 - DB columns snake_case; JSONB with array casts.
 - FormRequest; thin Controllers; Services/Jobs; Policies; i18n middleware.
 - Routes split: routes/web.php (UI, webhooks, signed links), routes/api.php (MCP/internal).
@@ -171,7 +171,7 @@ EXECUTION MODE
 - For EACH PHASE:
   1) One-line summary.
   2) Exact shell commands to run (composer/npm/artisan/migrations). Do NOT run them—just print.
-  3) Verification checklist (URLs, artisan outputs, tinker checks). Include Mailpit checks where relevant (UI 8025, inbound webhook 200 OK).
+  3) Verification checklist (URLs, artisan outputs, tinker checks). Include Postmark checks where relevant (UI 8025, inbound webhook 200 OK).
   4) One suggested `git commit` message for this phase and list of changed/added files.
 
 DEPENDENCIES & FILES (VERY IMPORTANT)
@@ -186,7 +186,7 @@ CONFLICT & DECISION RULES
 
 REQUIRED DELIVERABLES ACROSS PHASES
 - ENV & versions aligned (PHP ^8.4, Tailwind 4, Flowbite latest; ESLint/Prettier if JS-heavy).
-- `.env.example` includes DB/Redis/LLM/Postmark/Mailpit/Queue keys; config cache passes.
+- `.env.example` includes DB/Redis/LLM/Postmark/Queue keys; config cache passes.
 - Routing skeleton: web.php (incl. `/webhooks/inbound-email`, signed `/a/{action}`, `/attachments/{id}`), api.php (`/mcp/agent`).
 - Domain schema/models: threads, email_messages, actions, memories, attachments (ULID PKs, FKs, JSONB casts).
 - Policies; passwordless auth (magic links + codes, `/auth/challenge`, `/auth/verify`).
@@ -195,7 +195,7 @@ REQUIRED DELIVERABLES ACROSS PHASES
 - Attachments pipeline: scan (ClamAV) → extract (poppler/spatie) → summarize (LLM); signed downloads.
 - i18n middleware; language detection; `resources/lang/*`.
 - Blade pages: dashboard, threads/{id}, action confirmation, attachment download; Flowbite forms; shared layout.
-- Tests: Feature/Unit for inbound (Mailpit/Postmark payloads), threading, LLM fallback, MCP calls, attachments scan/extract, i18n detection, Horizon gate.
+- Tests: Feature/Unit for inbound (Postmark payloads), threading, LLM fallback, MCP calls, attachments scan/extract, i18n detection, Horizon gate.
 
 ⚠️ MIGRATION RULE (IMPORTANT)
 - Always **modify the existing migration files** when adding or changing columns/relationships.  
@@ -205,7 +205,7 @@ REQUIRED DELIVERABLES ACROSS PHASES
 
 FINAL OUTPUT
 - RUN COMMANDS — single ordered block of all shell commands to copy/paste.
-- VERIFICATION — concise checklist (URLs like `/horizon`, Mailpit UI 8025, webhook 200 OK; artisan outputs; tinker checks).
+- VERIFICATION — concise checklist (URLs like `/horizon`, webhook 200 OK; artisan outputs; tinker checks).
 - GIT COMMITS — one suggested commit per phase + file list per commit.
 - NEXT STEPS — short list for the next iteration.
 
