@@ -301,6 +301,65 @@ This README reflects the **current implementation** as of our development sessio
 
 ## Agent Coordination Flow with Laravel MCP
 
+Agent AI uses an intelligent **Coordinator + Specialized Agents** architecture with confidence-based processing. The system automatically routes requests based on complexity and confidence levels, ensuring optimal handling of each interaction.
+
+### Processing Paths
+
+#### 1. Simple Queries (Fast Path, ≥0.75 confidence)
+```
+User Email → LLM Analysis (ActionInterpretationTool) → Confidence Check →
+  → AgentRegistry (Best Match) → Single Agent Processing → Immediate Response
+
+Example: "What's a good pasta recipe?"
+1. LLM interprets as info_request (confidence: 0.92)
+2. AgentRegistry matches Chef Mario (keywords: recipe, pasta)
+3. Chef Mario generates authentic Italian recipe
+4. Single email response with thread continuity
+```
+
+#### 2. Complex Queries (Orchestration Path)
+```
+User Email → Complexity Detection → Multi-Agent Orchestrator →
+  → LLM Agent Planning → Task Dependencies → Coordinated Execution →
+  → Response Synthesis → Single Unified Response
+
+Example: "Plan an Italian anniversary dinner with wine pairings"
+1. Detected as complex (keywords: plan, multiple aspects)
+2. MultiAgentOrchestrator creates task plan:
+   - Chef Mario: Menu planning
+   - Sommelier: Wine pairings
+   - Event Planner: Timeline & atmosphere
+3. Tasks execute with dependencies
+4. Coordinator synthesizes one elegant response
+```
+
+#### 3. Medium Confidence (0.50-0.74)
+```
+User Email → LLM Analysis → Medium Confidence →
+  → Clarification Email → User Confirms/Adjusts →
+  → Normal Processing Path
+
+Example: "Can you help with the sauce?"
+1. LLM uncertain about specific sauce (confidence: 0.65)
+2. Sends clarification: "Are you asking about pasta sauce or..."
+3. User confirms → Routes to Chef Mario
+```
+
+#### 4. Low Confidence (<0.50)
+```
+User Email → LLM Analysis → Low Confidence →
+  → Options Email → User Selects →
+  → Normal Processing Path
+
+Example: "It needs more..."
+1. LLM cannot determine intent (confidence: 0.35)
+2. Sends options: "Did you mean:
+   a) Add more ingredients
+   b) Increase cooking time
+   c) Adjust seasoning"
+3. User selects → Clear action proceeds
+```
+
 ### Complete Email Processing Pipeline
 
 #### Phase 1: Email Ingestion & Analysis
@@ -361,20 +420,63 @@ This README reflects the **current implementation** as of our development sessio
 
 ### Agent System Architecture
 
-#### Agent Registry (`AgentRegistry`)
-- **Chef Mario**: Italian cuisine expert, 25+ years Milan experience
-  - Keywords: recipe, cooking, italian, pasta, pizza, chef, food
-  - Capabilities: info_request, culinary expertise
+#### Current Specialized Agents
+- **Chef Mario**: Italian cuisine expert (25+ years Milan experience)
+  - Expertise: recipes, techniques, ingredients, timing
+  - Keywords: cooking, pasta, pizza, Italian, food
   - Personality: passionate, authentic, traditional
+  - Capabilities: info_request, recipe_creation, ingredient_advice
+  - Memory scope: recipes, techniques, ingredient combinations
+  - Example tasks: Recipe creation, technique explanation, ingredient substitution
 
 - **Tech Support**: Technical specialist
-  - Keywords: technical, support, software, hardware, programming
-  - Capabilities: info_request, troubleshooting
-  - Personality: helpful, patient, methodical
+  - Expertise: troubleshooting, software, hardware, configuration
+  - Keywords: error, problem, install, configure, setup
+  - Personality: methodical, patient, thorough
+  - Capabilities: info_request, troubleshooting, configuration
+  - Memory scope: common issues, solutions, system requirements
+  - Example tasks: Error diagnosis, setup guidance, compatibility checks
 
-- **Dynamic Agents**: Created on-demand for complex tasks
-  - CoordinatorAgent: Multi-step planning and coordination
-  - Generated via LLM when specialized agents needed
+- **CoordinatorAgent**: Dynamic orchestrator
+  - Expertise: task breakdown, planning, synthesis
+  - Created on-demand for complex requests
+  - Manages multi-agent collaborations
+  - Capabilities: task_planning, dependency_management, synthesis
+  - Memory scope: task patterns, coordination strategies
+  - Example tasks: Multi-step planning, agent coordination, response synthesis
+
+#### Agent Implementation Details
+1. **Base Capabilities**
+   - Natural language understanding
+   - Context-aware responses
+   - Memory integration
+   - Confidence scoring
+   - Error recovery
+
+2. **Specialization System**
+   ```php
+   // Agent specialization structure
+   'capabilities_json' => [
+       'expertise' => ['italian_cooking', 'recipes'],
+       'keywords' => ['pasta', 'pizza', 'cooking'],
+       'personality' => 'passionate, authentic',
+       'experience' => '25 years Milan restaurants',
+       'languages' => ['en', 'it'],
+       'action_types' => ['info_request', 'recipe_create'],
+   ]
+   ```
+
+3. **Memory Integration**
+   - Scope-based recall (conversation, domain, global)
+   - TTL/decay for freshness
+   - Confidence-based supersession
+   - PII filtering
+
+4. **Response Generation**
+   - Personality-consistent tone
+   - Context-aware formatting
+   - Multi-step explanation
+   - Fallback mechanisms
 
 #### Coordinator Responsibilities
 - **Complexity Assessment**: Automatic detection of multi-step requests
