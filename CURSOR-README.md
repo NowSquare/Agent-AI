@@ -440,16 +440,14 @@ Use these fields to reliably control the follow-up loop.
 - Authorization checks preventing IDOR attacks
 - No external fetch - only internal Storage access
 
-### LLM Client (Planned)
+### LLM Client (Implemented)
 
-**Status**: Not yet implemented. Will provide provider failover and confidence calibration.
+**Status**: Implemented with gpt-oss:20b model and Ollama fallback.
 
 **Future Implementation:**
-- Multi-provider support (OpenAI, Anthropic, Ollama)
-- Automatic fallback from external to local LLM
-- Token caps and timeout handling
-- Confidence score calibration per provider
-- Structured JSON output validation
+- Multi-provider support (OpenAI, Anthropic) with automatic failover
+- Enhanced confidence score calibration and fallback logic
+- Dynamic token limit adjustment based on model capabilities
 
 ### i18n: Language Detection (Planned)
 
@@ -513,8 +511,8 @@ Use these fields to reliably control the follow-up loop.
 
 ### Performance
 
-* LLM: P50 < 2 s; P95 < 4 s; timeout 4 s.
-* Inbound → action ≤ 5 s P95 (without heavy extraction).
+* LLM: P50 < 30 s; P95 < 10 min; timeout 10 min (async processing).
+* Inbound → action ≤ 15 min P95 (with LLM interpretation).
 * PDF extraction async; summarization on-demand or after extract job.
 
 ### Security
@@ -863,7 +861,7 @@ volumes: { pg: {}, redis: {}, ollama: {} }
 return [
     'provider' => env('LLM_PROVIDER', 'openai'), // openai|anthropic|ollama
     'model' => env('LLM_MODEL', 'gpt-4o-mini'),
-    'timeout_ms' => 4000,
+    'timeout_ms' => 600000, // 10 minutes for async email processing
     'retry' => ['max' => 1, 'on' => [408, 429, 500, 502, 503, 504]],
     'calibration' => [
         'openai' => 1.00,
@@ -1248,7 +1246,7 @@ $result['confidence'] *= config("llm.calibration.$provider", 1.0);
 ## Prompt QA & Evaluation
 
 * **JSON validation**: every call → server-side `Validator`.
-* **Latency**: P50 < 2s, P95 < 4s; `timeout_ms=4000`, retry once on 5xx/timeout.
+* **Latency**: P50 < 30s, P95 < 10min; `timeout_ms=600000` (10min), retry once on 5xx/timeout.
 * **Golden set**: ≥100 examples per action; measure precision/recall; tune `temperature` and calibration.
 * **A/B testing**: keep `options_email_draft` variants per language short and consistent.
 
@@ -1841,14 +1839,16 @@ aws s3 cp attachments_$DATE.tar.gz s3://your-backup-bucket/
 - Postmark webhook integration with HMAC validation
 - RFC 5322 email threading via ThreadResolver service
 - ULID primary keys, JSONB storage, comprehensive relationships
-- Basic ProcessInboundEmail job structure
+- LLM client with gpt-oss:20b model and Ollama fallback
+- ProcessInboundEmail job with LLM interpretation and action generation
+- Email processing status tracking and async timeouts (10min LLM, 15min queue)
 
 🚧 **In Development**:
 - Passwordless authentication system
 - Blade/Flowbite UI foundation
+- MCP layer and tool execution
 
 📋 **Planned Features**:
-- LLM client with Ollama fallback and provider support
 - MCP layer for schema-driven tool calls
 - Action interpretation and clarification loops
 - Attachment processing pipeline (ClamAV, extraction, summarization)

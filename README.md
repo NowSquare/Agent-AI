@@ -9,6 +9,8 @@ Agent-AI is a Laravel-based application for building practical, privacy-respecti
 
 This README explains **how to run Agent-AI** locally with **Laravel Herd** (recommended on macOS), with **Docker** (Windows/Linux/macOS), or via **Artisan**. It also shows how to integrate **Laravel Boost** so Cursor can use Laravel-aware tools during development.
 
+**Current Status**: Email processing pipeline is active with LLM interpretation using gpt-oss:20b. Inbound emails are processed asynchronously (10-minute LLM timeout, 15-minute queue timeout) for comprehensive analysis and action generation.
+
 ---
 
 ## 🚀 Quick start
@@ -32,7 +34,7 @@ This README explains **how to run Agent-AI** locally with **Laravel Herd** (reco
 * **PostgreSQL** database (Herd or Docker)
 * **Redis** queues with **Laravel Horizon** dashboard
 * **Mail**: Postmark for all email (outbound + inbound webhooks)
-* **LLM**: Local Ollama or remote HTTP providers
+* **LLM**: Local Ollama (gpt-oss:20b) or remote HTTP providers
 * File scanning (ClamAV) & PDF text extraction (Spatie + poppler)
 * **Laravel Boost**: MCP server for AI-assisted development in Cursor
 
@@ -149,7 +151,7 @@ cp .env.docker .env
 
 ```bash
 docker compose up -d
-docker compose exec ollama ollama pull gpt-oss:20b
+docker compose exec ollama ollama pull gpt-oss:20b  # LLM model for email processing
 ```
 
 4. **Migrate**
