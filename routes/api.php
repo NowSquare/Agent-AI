@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\ActionController;
+use App\Http\Controllers\Api\MemoryController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -18,5 +19,14 @@ use Illuminate\Support\Facades\Route;
 // Action dispatching (internal API)
 Route::post('/actions/dispatch', [ActionController::class, 'dispatch'])->name('api.actions.dispatch');
 
-// TODO: MCP endpoints
-// Route::any('/mcp/agent', [McpController::class, 'handle'])->name('api.mcp.agent');
+// Memory management endpoints
+Route::prefix('memories')->name('api.memories.')->group(function () {
+    // Preview memories (dev-only or API token)
+    Route::get('/preview', [MemoryController::class, 'preview'])
+        ->name('preview');
+
+    // Forget memories (signed URL or API token)
+    Route::post('/forget', [MemoryController::class, 'forget'])
+        ->name('forget')
+        ->middleware('signed');
+});
