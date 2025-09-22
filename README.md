@@ -9,7 +9,7 @@ Agent-AI is a Laravel-based application for building practical, privacy-respecti
 
 This README explains **how to run Agent-AI** locally with **Laravel Herd** (recommended on macOS), with **Docker** (Windows/Linux/macOS), or via **Artisan**. It also shows how to integrate **Laravel Boost** so Cursor can use Laravel-aware tools during development.
 
-**Current Status**: Full email automation pipeline active with intelligent agent coordination. Inbound emails are processed asynchronously with LLM interpretation, specialized agent routing, and coordinated multi-agent responses. Features intelligent complexity detection, agent specialization (Italian Chef, Tech Support), and professional single-email responses with thread continuity.
+**Current Status**: Full email automation pipeline active with intelligent agent coordination and memory management. Inbound emails are processed asynchronously with LLM interpretation, specialized agent routing, and coordinated multi-agent responses. Features intelligent complexity detection, agent specialization (Italian Chef, Tech Support), professional single-email responses with thread continuity, and a robust memory system with TTL/decay for contextual learning.
 
 ---
 
@@ -116,11 +116,20 @@ php artisan tinker
 6. **Configure attachments** (optional, for production):
 
    ```ini
-   # Attachment processing
-   ATTACH_MAX_SIZE_MB=25
-   ATTACH_TOTAL_MAX_SIZE_MB=40
-   CLAMAV_HOST=127.0.0.1
-   CLAMAV_PORT=3310
+# Attachment processing
+ATTACH_MAX_SIZE_MB=25
+ATTACH_TOTAL_MAX_SIZE_MB=40
+CLAMAV_HOST=127.0.0.1
+CLAMAV_PORT=3310
+
+# Memory system configuration
+MEMORY_MIN_CONFIDENCE=0.60
+MEMORY_INCLUDE_THRESHOLD=0.45
+MEMORY_TTL_VOLATILE=30
+MEMORY_TTL_SEASONAL=120
+MEMORY_TTL_DURABLE=730
+MEMORY_DECAY_MULTIPLIER=0.5
+MEMORY_MAX_EXCERPT_CHARS=1200
    ```
 
    > Attachments are processed asynchronously on the `attachments` queue. Files are scanned with ClamAV, text extracted, and summarized by LLM for action context. Signed downloads expire in 15-60 minutes.

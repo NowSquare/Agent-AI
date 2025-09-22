@@ -294,7 +294,7 @@ This README reflects the **current implementation** as of our development sessio
 **📋 NOT YET IMPLEMENTED:**
 - Comprehensive testing suite
 - UI dashboard and thread views with attachment previews
-- Advanced memory management features
+- Advanced memory analytics and visualization
 
 ## Agent Coordination Flow with Laravel MCP
 
@@ -2095,6 +2095,10 @@ aws s3 cp attachments_$DATE.tar.gz s3://your-backup-bucket/
 - Email processing status tracking and async timeouts (10min LLM, 15min queue)
 - Action dispatching with signed links and confirmation flows
 - Agent Registry with intelligent routing (Chef Mario, Tech Support, dynamic agents)
+- Memory Gate with TTL/decay, confidence scoring, and PII redaction
+- Memory retrieval with scope-based relevance and recency decay
+- Memory pruning with configurable thresholds and TTL enforcement
+- Memory API endpoints for forget/preview with signed URLs
 
 🚧 **In Development**:
 - Passwordless authentication system
