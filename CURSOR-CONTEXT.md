@@ -8,7 +8,7 @@
 - Email: Postmark for send/receive (dev: SMTP 1025/UI 8025; inbound webhook to /webhooks/inbound-email with secret). Prod same.
 
 ## Conventions & Rules
-- DB: snake_case columns, ULID PKs, JSONB with array casts
+- DB: snake_case columns, ULID PKs, JSONB with array casts, version tracking with history
 - Architecture: FormRequest validation; thin Controllers; Services/Jobs for logic; Policies for authZ
 - Routes: web.php (UI/webhooks/signed), api.php (MCP/internal)
 - i18n: Middleware for detection; translations in Blade/emails
