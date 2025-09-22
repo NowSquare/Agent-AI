@@ -25,7 +25,7 @@ class LlmClient
     public function json(
         string $promptKey,
         array $vars = [],
-        int $maxOutputTokens = null
+        ?int $maxOutputTokens = null
     ): array {
         $prompt = $this->buildPrompt($promptKey, $vars);
         $maxOutputTokens = $maxOutputTokens ?: $this->config['caps']['output_tokens'];
@@ -43,11 +43,11 @@ class LlmClient
 
                 $result = $this->callProvider($provider, $prompt, $maxOutputTokens);
 
-                // Validate JSON response
-                $json = json_decode($result, true);
-                if (json_last_error() !== JSON_ERROR_NONE) {
-                    throw new \RuntimeException('Invalid JSON response: ' . json_last_error_msg());
-                }
+        // Validate JSON response
+        $json = json_decode($result, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new \RuntimeException('Invalid JSON response: ' . json_last_error_msg());
+        }
 
                 // Apply confidence calibration
                 if (isset($json['confidence'])) {
@@ -186,6 +186,7 @@ class LlmClient
      */
     private function callOllama(string $prompt, int $maxTokens): string
     {
+
         $response = Http::timeout($this->config['timeout_ms'] / 1000)
             ->post(config('services.ollama.url', 'http://localhost:11434') . '/api/generate', [
                 'model' => config('services.ollama.model', 'llama2'),
