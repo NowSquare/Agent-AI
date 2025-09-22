@@ -263,32 +263,15 @@ Postmark should call your ngrok URL with these credentials.
 
 ## 7) Agent Coordination System
 
-Agent-AI uses an intelligent **Coordinator + Specialized Agents** architecture:
+Agent-AI uses an intelligent **Coordinator + Specialized Agents** architecture that processes emails through specialized agents like Chef Mario (Italian cuisine) and Tech Support. The system automatically handles:
 
-### Simple Queries (Fast Path)
-```
-User Email → LLM Analysis → Single Best Agent → Immediate Response
-Example: "What's a pasta recipe?" → Chef Mario → Authentic Italian Recipe
-```
+- Email threading with RFC 5322
+- Language detection and i18n
+- Confidence-based processing
+- Multi-agent orchestration
+- Memory with TTL/decay
 
-### Complex Queries (Orchestration Path)
-```
-User Email → Complexity Detection → Multi-Agent Orchestrator →
-LLM Agent Planning → Coordinator Execution → Coordinated Single Response
-Example: "Plan anniversary dinner" → Multiple agents collaborate → Comprehensive plan
-```
-
-### Key Features
-- **Automatic Complexity Detection**: Keywords like "plan", "organize", "schedule" trigger orchestration
-- **Agent Specialization**: Domain experts with authentic personalities and expertise
-- **Single Response Guarantee**: Users get one comprehensive email, never multiple fragmented responses
-- **Thread Continuity**: All responses include thread IDs for conversation persistence
-- **Fallback Resilience**: Graceful degradation when LLM processing fails
-
-### Current Specialized Agents
-- **Chef Mario**: Italian cuisine expert with 25+ years Milan experience
-- **Tech Support**: Technical specialist with methodical troubleshooting
-- **CoordinatorAgent**: Dynamic agent for complex multi-step planning
+For detailed documentation of the agent system, including flow diagrams, implementation details, and current status, see [CURSOR-README.md](CURSOR-README.md#agent-coordination-flow-with-laravel-mcp).
 
 ---
 
