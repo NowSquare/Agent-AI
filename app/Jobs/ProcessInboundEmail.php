@@ -3,8 +3,11 @@
 namespace App\Jobs;
 
 use App\Models\Account;
+use App\Models\Action;
 use App\Models\EmailInboundPayload;
 use App\Models\EmailMessage;
+use App\Models\Memory;
+use App\Services\LlmClient;
 use App\Services\ReplyCleaner;
 use App\Services\ThreadResolver;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -29,7 +32,11 @@ class ProcessInboundEmail implements ShouldQueue
     /**
      * Execute the job.
      */
-    public function handle(ReplyCleaner $replyCleaner, ThreadResolver $threadResolver): void
+    public function handle(
+        ReplyCleaner $replyCleaner,
+        ThreadResolver $threadResolver,
+        LlmClient $llmClient
+    ): void
     {
         Log::info('Processing inbound email', ['payload_id' => $this->payloadId]);
 
@@ -144,11 +151,8 @@ class ProcessInboundEmail implements ShouldQueue
             'clean_reply_length' => strlen($cleanReply),
         ]);
 
-        // TODO: Next steps (Phase 2)
-        // 1. LLM interpretation of clean reply
-        // 2. Action creation based on interpretation
-        // 3. Memory storage
-        // 4. Outbound email responses
+        // Phase 2: LLM interpretation and action processing
+        $this->processWithLLM($llmClient, $emailMessage, $thread, $cleanReply, $account);
     }
 
     /**
@@ -245,6 +249,228 @@ class ProcessInboundEmail implements ShouldQueue
         Log::info('Attachments found', [
             'message_id' => $emailMessage->id,
             'count' => count($attachments),
+        ]);
+    }
+
+    /**
+     * Process email with LLM interpretation and action dispatch.
+     */
+    private function processWithLLM(
+        LlmClient $llmClient,
+        EmailMessage $emailMessage,
+        $thread,
+        string $cleanReply,
+        Account $account
+    ): void {
+        try {
+            // Detect language (fallback if library fails)
+            $locale = $this->detectLanguage($llmClient, $cleanReply);
+
+            // Get thread summary for context
+            $threadSummary = $this->getThreadSummary($thread);
+
+            // Get recent memories for context
+            $recentMemories = $this->getRecentMemories($account, $thread);
+
+            // Get attachments excerpt (placeholder for now)
+            $attachmentsExcerpt = ''; // TODO: Implement attachment text extraction
+
+            // Interpret action with LLM
+            $interpretation = $llmClient->json('action_interpret', [
+                'detected_locale' => $locale,
+                'thread_summary' => $threadSummary,
+                'clean_reply' => $cleanReply,
+                'attachments_excerpt' => $attachmentsExcerpt,
+                'recent_memories' => json_encode($recentMemories),
+            ]);
+
+            // Create action based on interpretation
+            $action = $this->createActionFromInterpretation(
+                $interpretation,
+                $emailMessage,
+                $thread,
+                $account,
+                $locale
+            );
+
+            // Extract and store memories
+            $this->extractMemories($llmClient, $emailMessage, $thread, $account, $cleanReply, $locale);
+
+            Log::info('LLM processing completed', [
+                'message_id' => $emailMessage->id,
+                'action_type' => $interpretation['action_type'] ?? null,
+                'confidence' => $interpretation['confidence'] ?? null,
+                'needs_clarification' => $interpretation['needs_clarification'] ?? false,
+            ]);
+
+        } catch (\Throwable $e) {
+            Log::error('LLM processing failed', [
+                'message_id' => $emailMessage->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            // TODO: Send fallback "options" email when LLM fails
+            // For now, just create a low-confidence action that will trigger options email
+            $this->createFallbackAction($emailMessage, $thread, $account);
+        }
+    }
+
+    /**
+     * Detect language from clean reply text.
+     */
+    private function detectLanguage(LlmClient $llmClient, string $text): string
+    {
+        // TODO: Use language detection library first
+        // For now, fallback to LLM detection
+
+        try {
+            $result = $llmClient->json('language_detect', [
+                'sample_text' => substr($text, 0, 500), // First 500 chars for detection
+            ]);
+
+            return $result['language'] ?? 'en_US';
+        } catch (\Throwable $e) {
+            Log::warning('Language detection failed, using default', ['error' => $e->getMessage()]);
+            return 'en_US';
+        }
+    }
+
+    /**
+     * Get thread summary for LLM context.
+     */
+    private function getThreadSummary($thread): string
+    {
+        // TODO: Implement proper thread summarization
+        // For now, return basic thread info
+        return "Thread: {$thread->subject}";
+    }
+
+    /**
+     * Get recent memories for context.
+     */
+    private function getRecentMemories(Account $account, $thread): array
+    {
+        // TODO: Implement memory retrieval with decay
+        // For now, return empty array
+        return [];
+    }
+
+    /**
+     * Create action from LLM interpretation.
+     */
+    private function createActionFromInterpretation(
+        array $interpretation,
+        EmailMessage $emailMessage,
+        $thread,
+        Account $account,
+        string $locale
+    ): Action {
+        $action = Action::create([
+            'account_id' => $account->id,
+            'thread_id' => $thread->id,
+            'email_message_id' => $emailMessage->id,
+            'type' => $interpretation['action_type'],
+            'payload_json' => $interpretation['parameters'] ?? [],
+            'scope_hint' => $interpretation['scope_hint'] ?? null,
+            'confidence' => $interpretation['confidence'] ?? 0.0,
+            'clarification_rounds' => 0,
+            'clarification_max' => 2,
+            'status' => 'pending',
+            'locale' => $locale,
+        ]);
+
+        // Handle clarification if needed
+        if (($interpretation['needs_clarification'] ?? false) && $interpretation['clarification_prompt']) {
+            // TODO: Send clarification email
+            $action->update([
+                'clarification_rounds' => 1,
+                'last_clarification_sent_at' => now(),
+            ]);
+        }
+
+        return $action;
+    }
+
+    /**
+     * Extract and store memories from the email.
+     */
+    private function extractMemories(
+        LlmClient $llmClient,
+        EmailMessage $emailMessage,
+        $thread,
+        Account $account,
+        string $cleanReply,
+        string $locale
+    ): void {
+        try {
+            $memoryResult = $llmClient->json('memory_extract', [
+                'detected_locale' => $locale,
+                'clean_reply' => $cleanReply,
+                'thread_summary' => $this->getThreadSummary($thread),
+                'attachments_excerpt' => '', // TODO: Implement
+            ]);
+
+            foreach ($memoryResult['items'] ?? [] as $item) {
+                Memory::create([
+                    'account_id' => $account->id,
+                    'scope' => $item['scope'],
+                    'scope_id' => match ($item['scope']) {
+                        'conversation' => $thread->id,
+                        'user' => null, // TODO: Get user ID
+                        'account' => $account->id,
+                    },
+                    'key' => $item['key'],
+                    'value_json' => $item['value'] ?? null,
+                    'confidence' => $item['confidence'] ?? 0.5,
+                    'ttl_category' => $item['ttl_category'] ?? 'volatile',
+                    'expires_at' => $this->calculateExpiry($item['ttl_category']),
+                    'provenance' => $item['provenance'] ?? "email_message_id:{$emailMessage->id}",
+                ]);
+            }
+
+        } catch (\Throwable $e) {
+            Log::warning('Memory extraction failed', [
+                'message_id' => $emailMessage->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Calculate memory expiry based on TTL category.
+     */
+    private function calculateExpiry(string $category): ?\Carbon\Carbon
+    {
+        return match ($category) {
+            'volatile' => now()->addDays(30),
+            'seasonal' => now()->addDays(120),
+            'durable' => now()->addDays(730),
+            'legal' => null, // No expiry
+            default => now()->addDays(30),
+        };
+    }
+
+    /**
+     * Create fallback action when LLM processing fails.
+     */
+    private function createFallbackAction(EmailMessage $emailMessage, $thread, Account $account): void
+    {
+        Action::create([
+            'account_id' => $account->id,
+            'thread_id' => $thread->id,
+            'email_message_id' => $emailMessage->id,
+            'type' => 'options_fallback',
+            'payload_json' => [],
+            'confidence' => 0.0,
+            'clarification_rounds' => 0,
+            'clarification_max' => 2,
+            'status' => 'pending',
+            'locale' => 'en_US',
+        ]);
+
+        Log::info('Created fallback action due to LLM failure', [
+            'message_id' => $emailMessage->id,
         ]);
     }
 }
