@@ -1524,7 +1524,7 @@ All domain tables use **ULID primary keys** with `HasUlids` trait. PostgreSQL **
 | `users` | Platform users | `display_name`, `locale`, `timezone`, `status` |
 | `user_identities` | Login identities (email/phone/OIDC) | `type`, `identifier`, `verified_at` |
 | `memberships` | User-account relationships | `role` |
-| `threads` | Email conversation containers | `subject`, `context_json` |
+| `threads` | Email conversation containers | `subject`, `context_json`, `version`, `version_history`, `last_activity_at` |
 | `email_messages` | Individual messages | `direction`, `message_id`, `headers_json` |
 | `actions` | User/system actions | `type`, `payload_json`, `status` |
 | `memories` | Versioned context data | `scope`, `key`, `value_json`, `confidence` |
