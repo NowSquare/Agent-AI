@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Mcp\Tools\ActionInterpretationTool;
 use App\Models\Account;
 use App\Models\Action;
 use App\Models\EmailInboundPayload;
@@ -14,12 +15,14 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
+use Laravel\Mcp\Request;
 
 class ProcessInboundEmail implements ShouldQueue
 {
     use Queueable;
 
     public int $tries = 3;
+
     public int $backoff = 30; // 30 seconds
 
     /**
@@ -35,9 +38,9 @@ class ProcessInboundEmail implements ShouldQueue
     public function handle(
         ReplyCleaner $replyCleaner,
         ThreadResolver $threadResolver,
-        LlmClient $llmClient
-    ): void
-    {
+        LlmClient $llmClient,
+        ActionInterpretationTool $actionInterpreter
+    ): void {
         Log::info('Processing inbound email', ['payload_id' => $this->payloadId]);
 
         // Retrieve and decrypt payload
@@ -48,6 +51,7 @@ class ProcessInboundEmail implements ShouldQueue
                 'payload_id' => $this->payloadId,
                 'error' => $e->getMessage(),
             ]);
+
             return;
         }
 
@@ -58,7 +62,7 @@ class ProcessInboundEmail implements ShouldQueue
         }
 
         // Ensure we have a string
-        if (!is_string($ciphertext)) {
+        if (! is_string($ciphertext)) {
             $ciphertext = (string) $ciphertext;
         }
 
@@ -74,8 +78,9 @@ class ProcessInboundEmail implements ShouldQueue
             throw $e;
         }
 
-        if (!$payload) {
+        if (! $payload) {
             Log::error('Failed to decrypt or decode payload', ['payload_id' => $this->payloadId]);
+
             return;
         }
 
@@ -88,6 +93,7 @@ class ProcessInboundEmail implements ShouldQueue
                 'payload_id' => $this->payloadId,
                 'subject' => $emailData['subject'] ?? 'N/A',
             ]);
+
             return;
         }
 
@@ -97,6 +103,7 @@ class ProcessInboundEmail implements ShouldQueue
                 'message_id' => $emailData['message_id'],
                 'payload_id' => $this->payloadId,
             ]);
+
             return;
         }
 
@@ -141,7 +148,7 @@ class ProcessInboundEmail implements ShouldQueue
         $emailMessage = EmailMessage::create($messageData);
 
         // Register attachments (if any)
-        if (!empty($emailData['attachments'])) {
+        if (! empty($emailData['attachments'])) {
             $this->registerAttachments($emailMessage, $emailData['attachments']);
         }
 
@@ -189,6 +196,7 @@ class ProcessInboundEmail implements ShouldQueue
         if (preg_match('/<([^>]+)>/', $address, $matches)) {
             return strtolower(trim($matches[1]));
         }
+
         return strtolower(trim($address));
     }
 
@@ -200,6 +208,7 @@ class ProcessInboundEmail implements ShouldQueue
         if (preg_match('/^([^<]+)</', $address, $matches)) {
             return trim($matches[1]);
         }
+
         return '';
     }
 
@@ -217,7 +226,9 @@ class ProcessInboundEmail implements ShouldQueue
 
         foreach ($parts as $part) {
             $part = trim($part);
-            if (empty($part)) continue;
+            if (empty($part)) {
+                continue;
+            }
 
             $result[] = [
                 'email' => $this->extractEmail($part),
@@ -238,6 +249,7 @@ class ProcessInboundEmail implements ShouldQueue
                 return $header['Value'] ?? null;
             }
         }
+
         return null;
     }
 
@@ -277,22 +289,21 @@ class ProcessInboundEmail implements ShouldQueue
             // Get attachments excerpt (placeholder for now)
             $attachmentsExcerpt = ''; // TODO: Implement attachment text extraction
 
-            // Interpret action with LLM
-            $interpretation = $llmClient->json('action_interpret', [
-                'detected_locale' => $locale,
-                'thread_summary' => $threadSummary,
-                'clean_reply' => $cleanReply,
-                'attachments_excerpt' => $attachmentsExcerpt,
-                'recent_memories' => json_encode($recentMemories),
-            ]);
+            // Interpret action using MCP tool
+            $interpretation = $this->interpretActionWithMCP(
+                $actionInterpreter,
+                $cleanReply,
+                $threadSummary,
+                $attachmentsExcerpt,
+                $recentMemories
+            );
 
-            // Create action based on interpretation
-            $action = $this->createActionFromInterpretation(
+            // Create action based on MCP interpretation
+            $action = $this->createActionFromMCPInterpretation(
                 $interpretation,
                 $emailMessage,
                 $thread,
-                $account,
-                $locale
+                $account
             );
 
             // Extract and store memories
@@ -339,13 +350,20 @@ class ProcessInboundEmail implements ShouldQueue
         // For now, fallback to LLM detection
 
         try {
-            $result = $llmClient->json('language_detect', [
-                'sample_text' => substr($text, 0, 500), // First 500 chars for detection
+            $result = $llmClient->call('language_detect', [
+                'sample_text' => substr($text, 0, 200), // Limit text length
             ]);
 
-            return $result['language'] ?? 'en_US';
+            // Extract language code from response (simple parsing)
+            $result = trim(strtolower($result));
+            if (in_array($result, ['en', 'nl', 'fr', 'de', 'it', 'es'])) {
+                return $result.'_US'; // Simple locale mapping
+            }
+
+            return 'en_US';
         } catch (\Throwable $e) {
             Log::warning('Language detection failed, using default', ['error' => $e->getMessage()]);
+
             return 'en_US';
         }
     }
@@ -463,6 +481,78 @@ class ProcessInboundEmail implements ShouldQueue
             'legal' => null, // No expiry
             default => now()->addDays(30),
         };
+    }
+
+    /**
+     * Interpret action using MCP ActionInterpretationTool.
+     */
+    private function interpretActionWithMCP(ActionInterpretationTool $actionInterpreter, string $cleanReply, string $threadSummary, string $attachmentsExcerpt, array $recentMemories): array
+    {
+        try {
+            // Create a mock Request object for the MCP tool
+            $request = new class($cleanReply, $threadSummary, $attachmentsExcerpt, $recentMemories) extends \Laravel\Mcp\Request
+            {
+                public function __construct(
+                    private string $cleanReply,
+                    private string $threadSummary,
+                    private string $attachmentsExcerpt,
+                    private array $recentMemories
+                ) {}
+
+                public function string(string $key, ?string $default = null): string
+                {
+                    return match ($key) {
+                        'clean_reply' => $this->cleanReply,
+                        'thread_summary' => $this->threadSummary,
+                        'attachments_excerpt' => $this->attachmentsExcerpt,
+                        default => $default ?? ''
+                    };
+                }
+
+                public function array(string $key, array $default = []): array
+                {
+                    return match ($key) {
+                        'recent_memories' => $this->recentMemories,
+                        default => $default
+                    };
+                }
+            };
+
+            $response = $actionInterpreter->handle($request);
+
+            return $response->getData(); // Get the JSON data from the response
+
+        } catch (\Exception $e) {
+            Log::error('MCP Action interpretation failed', [
+                'error' => $e->getMessage(),
+            ]);
+
+            // Return safe fallback
+            return [
+                'action_type' => 'info_request',
+                'parameters' => ['question' => $cleanReply],
+                'confidence' => 0.5,
+                'needs_clarification' => false,
+                'clarification_prompt' => null,
+            ];
+        }
+    }
+
+    /**
+     * Create action from MCP interpretation.
+     */
+    private function createActionFromMCPInterpretation(array $interpretation, EmailMessage $emailMessage, $thread, Account $account): Action
+    {
+        $actionType = $interpretation['action_type'] ?? 'info_request';
+        $parameters = $interpretation['parameters'] ?? ['question' => ''];
+
+        return Action::create([
+            'account_id' => $account->id,
+            'thread_id' => $thread->id,
+            'type' => $actionType,
+            'payload_json' => $parameters,
+            'status' => 'pending',
+        ]);
     }
 
     /**
