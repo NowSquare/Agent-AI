@@ -85,7 +85,7 @@ CONTEXT
   - Security & docs: ClamAV (latest), spatie/pdf-to-text (latest)
   - Email: Development uses **Postmark** for BOTH send & receive (inbound webhook → `/webhooks/inbound-email` with shared secret). Production uses Postmark (outbound + inbound webhook).
   - Self-hosting: Docker Compose (Windows/Linux/macOS). Local macOS often uses Laravel Herd.
-- Do NOT use `php artisan serve` (Herd serves https://<folder>.test).
+- Do NOT use `php artisan serve` (Herd serves http://<folder>.test).
 
 CONVENTIONS
 - DB columns snake_case (e.g., thread_id). JSON→frontend via array casts in models.
