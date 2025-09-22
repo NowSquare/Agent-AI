@@ -50,7 +50,7 @@ class Attachment extends Model
     }
 
     // Helper methods for status checks
-    public function isClean(): bool
+    public function hasCleanScan(): bool
     {
         return $this->scan_status === 'clean';
     }
@@ -77,7 +77,7 @@ class Attachment extends Model
 
     public function canDownload(): bool
     {
-        return $this->isClean() && ! empty($this->storage_path);
+        return $this->hasCleanScan() && ! empty($this->storage_path);
     }
 
     public function generateNonce(): string
