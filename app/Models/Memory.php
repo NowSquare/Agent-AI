@@ -80,6 +80,17 @@ class Memory extends Model
             ->where('expires_at', '<=', Carbon::now());
     }
 
+    /**
+     * Update usage tracking metrics.
+     */
+    public function touchUsage(): bool
+    {
+        return $this->update([
+            'last_used_at' => now(),
+            'usage_count' => $this->usage_count + 1,
+        ]);
+    }
+
     public function account(): BelongsTo
     {
         return $this->belongsTo(Account::class, 'scope_id')->when($this->scope === 'account');
