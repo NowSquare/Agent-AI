@@ -121,6 +121,7 @@ class ProcessInboundEmail implements ShouldQueue
         $messageData = [
             'thread_id' => $thread->id,
             'direction' => 'inbound',
+            'processing_status' => 'queued', // Job dispatched, ready for LLM processing
             'message_id' => $emailData['message_id'],
             'in_reply_to' => $emailData['in_reply_to'],
             'references' => $emailData['references'],
@@ -152,6 +153,7 @@ class ProcessInboundEmail implements ShouldQueue
         ]);
 
         // Phase 2: LLM interpretation and action processing
+        $emailMessage->update(['processing_status' => 'processing']);
         $this->processWithLLM($llmClient, $emailMessage, $thread, $cleanReply, $account);
     }
 
@@ -296,6 +298,12 @@ class ProcessInboundEmail implements ShouldQueue
             // Extract and store memories
             $this->extractMemories($llmClient, $emailMessage, $thread, $account, $cleanReply, $locale);
 
+            // Mark as successfully processed
+            $emailMessage->update([
+                'processing_status' => 'processed',
+                'processed_at' => now(),
+            ]);
+
             Log::info('LLM processing completed', [
                 'message_id' => $emailMessage->id,
                 'action_type' => $interpretation['action_type'] ?? null,
@@ -308,6 +316,12 @@ class ProcessInboundEmail implements ShouldQueue
                 'message_id' => $emailMessage->id,
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
+            ]);
+
+            // Mark as failed
+            $emailMessage->update([
+                'processing_status' => 'failed',
+                'processed_at' => now(),
             ]);
 
             // TODO: Send fallback "options" email when LLM fails
