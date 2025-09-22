@@ -10,10 +10,12 @@ use App\Models\EmailInboundPayload;
 use App\Models\EmailMessage;
 use App\Models\Memory;
 use App\Services\AttachmentService;
+use App\Services\LanguageDetector;
 use App\Services\LlmClient;
 use App\Services\MemoryService;
 use App\Services\ReplyCleaner;
 use App\Services\ThreadResolver;
+use App\Services\ThreadSummarizer;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Crypt;
@@ -475,26 +477,8 @@ class ProcessInboundEmail implements ShouldQueue
      */
     private function detectLanguage(LlmClient $llmClient, string $text): string
     {
-        // TODO: Use language detection library first
-        // For now, fallback to LLM detection
-
-        try {
-            $result = $llmClient->call('language_detect', [
-                'sample_text' => substr($text, 0, 200), // Limit text length
-            ]);
-
-            // Extract language code from response (simple parsing)
-            $result = trim(strtolower($result));
-            if (in_array($result, ['en', 'nl', 'fr', 'de', 'it', 'es'])) {
-                return $result.'_US'; // Simple locale mapping
-            }
-
-            return 'en_US';
-        } catch (\Throwable $e) {
-            Log::warning('Language detection failed, using default', ['error' => $e->getMessage()]);
-
-            return 'en_US';
-        }
+        $detector = app(LanguageDetector::class);
+        return $detector->detect($text);
     }
 
     /**
@@ -502,9 +486,10 @@ class ProcessInboundEmail implements ShouldQueue
      */
     private function getThreadSummary($thread): string
     {
-        // TODO: Implement proper thread summarization
-        // For now, return basic thread info
-        return "Thread: {$thread->subject}";
+        $summarizer = app(ThreadSummarizer::class);
+        $summary = $summarizer->getSummary($thread);
+        
+        return $summary['summary'] ?? "Thread: {$thread->subject}";
     }
 
     /**
