@@ -39,11 +39,37 @@ This README explains **how to run Agent-AI** locally with **Laravel Herd** (reco
 * **LLM Integration**: Local Ollama (gpt-oss:20b) with fallback mechanisms
 * **Agent System**: Intelligent coordination with specialized agents (Italian Chef, Tech Support, etc.)
 * **Smart Routing**: Automatic complexity detection for single-agent vs multi-agent processing
+* **Clarification Loop**: Confidence-based user confirmation for medium/low confidence interpretations
 * **Thread Continuity**: Reply-to headers with thread IDs for conversation persistence
 * File scanning (ClamAV) & PDF text extraction (Spatie + poppler)
 * **Laravel Boost**: MCP server for AI-assisted development in Cursor
 
+## 🔄 Clarification Loop
+
+The system uses confidence thresholds to ensure accurate action interpretation:
+
+- **≥0.75 High Confidence**: Auto-execute immediately
+- **0.50–0.74 Medium Confidence**: Send clarification email with Confirm/Cancel buttons
+- **<0.50 Low Confidence**: Send options email with 2–4 clickable choices
+
+### Signed Links & Security
+- All clarification links are signed and expire in 72 hours
+- Links include action IDs for secure, idempotent processing
+- CSRF protection and authentication not required (public links)
+
+### Testing Locally
+```bash
+# Run clarification tests
+php artisan test --filter=Clarification
+
+# Check action states in database
+php artisan tinker
+>>> \App\Models\Action::whereIn('status', ['awaiting_confirmation', 'awaiting_input'])->get()
+```
+
 ---
+
+
 
 ## 2) Postmark setup
 

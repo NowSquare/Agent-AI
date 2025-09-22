@@ -422,6 +422,46 @@ Task: pending → processing → completed/failed
 - Email delivery failures → Comprehensive logging, retry logic
 - Thread continuity → Reply-to headers maintain conversation context
 
+## 🔄 Clarification Loop Implementation
+
+### Confidence Thresholds
+- **≥0.75 High Confidence**: Auto-dispatch action immediately
+- **0.50–0.74 Medium Confidence**: Send clarification email with Confirm/Cancel buttons
+- **<0.50 Low Confidence**: Send options email with 2–4 clickable choices
+
+### Email Templates
+- **Clarification Email** (`resources/views/emails/clarification.blade.php`):
+  - Shows interpreted action summary
+  - Confirm/Cancel buttons with signed URLs (72h expiry)
+  - Reply-to includes thread ID for continuity
+
+- **Options Email** (`resources/views/emails/options.blade.php`):
+  - Contextual options based on original request
+  - Signed links for each option (72h expiry)
+  - Fallback reply link for manual clarification
+
+### Signed Link Security
+- All links use `URL::signedRoute()` with 72-hour expiry
+- CSRF protection not required (public endpoints)
+- Action status prevents double-processing
+- Expired links show `action.expired` view
+
+### Database Changes
+- Actions get new statuses: `awaiting_confirmation`, `awaiting_input`
+- `meta_json` tracks: `clarification_sent_at`, `options_sent_at`
+- Idempotent job execution prevents duplicate emails
+
+### Jobs & Controllers
+- **`SendClarificationEmail`**: Queued job with idempotence checks
+- **`SendOptionsEmail`**: Queued job with contextual options
+- **`ActionConfirmationController`**: Extended with `cancel` and `chooseOption` methods
+- Routes: `/a/{action}/cancel`, `/a/{action}/choose/{key}`
+
+### Testing Coverage
+- **Feature Tests**: Medium confidence, low confidence options, expired URLs
+- **Idempotence Tests**: Multiple job dispatches don't send duplicate emails
+- **Integration Test**: End-to-end flow from email to final response
+
 ## System Architecture
 
 ### High-level Architecture Diagram
