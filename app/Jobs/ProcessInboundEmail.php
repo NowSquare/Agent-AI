@@ -473,14 +473,15 @@ class ProcessInboundEmail implements ShouldQueue
         Action::create([
             'account_id' => $account->id,
             'thread_id' => $thread->id,
-            'email_message_id' => $emailMessage->id,
             'type' => 'options_fallback',
-            'payload_json' => [],
-            'confidence' => 0.0,
+            'payload_json' => [
+                'email_message_id' => $emailMessage->id, // Store in payload instead
+                'confidence' => 0.0,
+                'locale' => 'en_US',
+            ],
             'clarification_rounds' => 0,
             'clarification_max' => 2,
             'status' => 'pending',
-            'locale' => 'en_US',
         ]);
 
         Log::info('Created fallback action due to LLM failure', [
