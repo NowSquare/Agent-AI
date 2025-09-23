@@ -44,13 +44,18 @@
 
         <!-- Remember Me -->
         <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <input type="checkbox" name="remember" id="remember"
-                    class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-600 dark:border-slate-700 dark:bg-slate-800 dark:focus:ring-offset-slate-800">
-                <label for="remember" class="text-sm text-slate-600 dark:text-slate-400">
+            <label class="relative flex items-start">
+                <div class="flex h-5 items-center">
+                    <input type="checkbox" name="remember" id="remember"
+                        class="h-4 w-4 appearance-none rounded border border-slate-300 bg-white transition checked:border-sky-600 checked:bg-sky-600 hover:border-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-2 dark:border-slate-600 dark:bg-slate-700 dark:checked:border-sky-500 dark:checked:bg-sky-500 dark:hover:border-slate-500 dark:focus:ring-offset-slate-900">
+                    <svg class="pointer-events-none absolute h-4 w-4 text-white opacity-0 transition [input:checked+&]:opacity-100" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12.207 4.793a1 1 0 0 1 0 1.414l-5 5a1 1 0 0 1-1.414 0l-2-2a1 1 0 0 1 1.414-1.414L6.5 9.086l4.293-4.293a1 1 0 0 1 1.414 0z" fill="currentColor"/>
+                    </svg>
+                </div>
+                <span class="ml-2 select-none text-sm text-slate-600 dark:text-slate-400">
                     {{ __('auth.challenge.remember_me') }}
-                </label>
-            </div>
+                </span>
+            </label>
         </div>
 
         <!-- Submit Button -->
