@@ -1,6 +1,6 @@
-# Agent‑AI
+# Agent-AI
 
-A grounded, email‑first agent that turns messy inbox threads into clear actions and transparent results.
+**Email your AI employee. It remembers, coordinates agents with tools, and gets work done.**
 
 ## Table of Contents
 - Why this matters
@@ -15,21 +15,21 @@ A grounded, email‑first agent that turns messy inbox threads into clear action
 - License
 
 ## Why this matters
-Email is where work really happens—but context is scattered, follow‑ups get lost, and no one trusts “AI” without seeing how it thinks.
-
-Agent‑AI brings an agent into your inbox without ceremony: it grounds answers in your emails, attachments, and memories, then shows the full trace of every step it took.
+Work starts in email—quotes, questions, decisions, approvals. But context is scattered, and generic chatbots don’t know your business. Agent-AI is a personal assistant you can simply email. It builds long-term memory from your conversations and documents, then replies with grounded, practical help you can trust.
 
 ## What it does (Feature Highlights)
-- **Email‑first agent orchestration**: interpret, plan, and respond inside your existing threads.
-- **Grounded answers via pgvector**: search your emails, attachments, and memories for facts before responding.
-- **Transparent Activity (full trace)**: every step is logged—role, model, tokens, latency, and JSON I/O—so you can audit the process.
-- **Passwordless login from a contact**: email first, then log in; your user is created from your contact automatically.
-- **Local‑first models (Ollama) with optional cloud**: run entirely local by default; flip roles to cloud if you need to.
+- **Email-native assistant** — Send questions, tasks, and documents by email. Agent-AI replies in your thread.
+- **Multi-agent orchestration (with tools)** — Specialized agents collaborate (e.g., extract, research, plan, draft, review) and call tools when needed.
+- **Compounding memory** — A growing knowledge base from your emails and attachments that improves answers over time.
+- **Grounded responses via pgvector** — Searches your own data (emails, attachments, memories) before it speaks.
+- **Transparent activity** — Full step-by-step trace: role, model, tokens, latency, and JSON I/O, so you see how decisions were made.
+- **Passwordless login from a contact** — Email first; on your first login a user is created and linked to your contact automatically.
+- **Local-first models (Ollama), optional cloud** — Run privately on your machine by default, flip certain roles to cloud if desired.
 
-> Note: On the very first inbound contact, an Account is auto‑created from `APP_NAME`. Single‑tenant by default, future‑proof for multi‑tenant.
+> Note: On the first inbound contact, an Account is auto-created from `APP_NAME`. Single-tenant by default, future-proof for multi-tenant.
 
-## How it works (Architecture at a glance)
-SEND EMAIL → Contact created (Account auto‑created from `APP_NAME` if none) → Thread attached → First login creates User and `contact_link` → Activity shows full Agent Steps trace.
+## How it works (architecture at a glance)
+Send an email → a **Contact** is created (and an Account from `APP_NAME` if none exists) → the message is attached to a **Thread**. When you first log in with that email, a **User** is created and linked to the Contact. From there, a **Coordinator** routes your request through **multiple agents** that can call **tools** (MCP) when needed. The system retrieves relevant context via **pgvector** and answers using the LLM routing policy (CLASSIFY → retrieval → GROUNDED | SYNTH). The **Activity** view shows the full trace for your threads.
 
 LLM routing is explicit:
 - CLASSIFY → cheap/fast intent & complexity detection.
