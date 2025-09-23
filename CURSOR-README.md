@@ -774,6 +774,93 @@ Use these fields to reliably control the follow-up loop.
 - Authorization checks preventing IDOR attacks
 - No external fetch - only internal Storage access
 
+### Authentication & User Management System
+
+**Status**: Core system implemented with passwordless authentication and contact-user relationships.
+
+**Architecture**:
+
+1. **Core Entities**:
+   - **Contact**: Email participant (created from inbound emails)
+     ```php
+     contacts: ulid, email, name, meta_json, created_at, updated_at
+     ```
+   - **User**: Authenticated web user (created upon first login)
+     ```php
+     users: ulid, email, display_name, locale, timezone, status
+     ```
+   - **ContactLink**: Maps contacts to authenticated users
+     ```php
+     contact_links: contact_id, user_id, status (linked|blocked)
+     ```
+
+2. **Authentication Flow**:
+   ```mermaid
+   graph TD
+     A[Email Participant] -->|Sends Email| B[System]
+     B -->|Creates| C[Contact Record]
+     
+     A -->|Visits Website| D[/auth/challenge]
+     D -->|Enter Email| E[Send Code]
+     E -->|Verify Code| F[/auth/verify]
+     F -->|Success| G[Create/Find User]
+     G -->|Link| H[ContactLink Record]
+     H -->|Redirect| I[Dashboard]
+   ```
+
+3. **Components**:
+   - `ChallengeController`: Handles initial login request
+   - `VerifyController`: Verifies the 6-digit code
+   - `LoginController`: Processes magic link login
+   - `AuthService`: Core authentication logic
+   - `ContactLinkService`: Manages contact-user relationships
+
+4. **Features**:
+   - Passwordless authentication (email codes)
+   - Magic link login support
+   - Multiple emails per user (through ContactLinks)
+   - Shared inbox support (multiple users per contact)
+   - Rate limiting on auth endpoints
+   - Session-based authentication
+   - Remember-me functionality
+   - Automatic contact linking
+
+5. **Security**:
+   - Rate limiting: 5/15min per email for challenges
+   - Code expiry: 15 minutes
+   - Magic links: 60-minute expiry with nonce
+   - Session security: HTTP-only cookies
+   - CSRF protection on all forms
+   - No password storage/management needed
+
+6. **User Dashboard**:
+   - View all threads from linked contacts
+   - Manage contact relationships
+   - Update profile (name, locale, timezone)
+   - View action history
+   - Access attachments
+   - Manage API tokens (future)
+
+7. **Implementation Details**:
+   ```php
+   // Rate Limiting
+   'auth.challenge' => '5,15' // 5 attempts per 15 minutes
+   'auth.verify' => '10,15'   // 10 attempts per 15 minutes
+
+   // Session Config
+   'session.lifetime' => 120  // 2 hours
+   'session.expire_on_close' => false
+   'session.secure' => true   // HTTPS only
+   ```
+
+8. **Future Enhancements**:
+   - OAuth provider support
+   - Account recovery flow
+   - Multi-factor authentication
+   - Team/organization support
+   - Role-based access control
+   - API token management
+
 ### LLM Client & Laravel MCP Framework (Implemented)
 
 **Status**: Fully implemented with Laravel MCP framework for structured, error-resistant LLM interactions.
@@ -815,6 +902,49 @@ Use these fields to reliably control the follow-up loop.
 - MCP resource integration for external data sources
 - Enhanced confidence score calibration and fallback logic
 - Dynamic token limit adjustment based on model capabilities
+
+### i18n: Internationalization System
+
+**Status**: Fully implemented with language detection, translations, and email templates.
+
+**Translation Conventions**:
+1. **File Structure**:
+   ```
+   resources/lang/
+   ├── en/
+   │   ├── auth.php    - Authentication messages
+   │   ├── emails.php  - Email template text
+   │   └── messages.php - General UI text
+   └── nl/
+       ├── auth.php    - Dutch authentication
+       ├── emails.php  - Dutch email templates
+       └── messages.php - Dutch UI text
+   ```
+
+2. **String Format**:
+   - Use double quotes for all keys and values
+   - No escaping needed for apostrophes
+   - Example:
+     ```php
+     return [
+         "auth" => [
+             "title" => "Your Login Code",
+             "message" => "Don't forget your code!",
+         ],
+     ];
+     ```
+
+3. **Organization**:
+   - Hierarchical structure with dot notation
+   - Group by feature (auth, emails, etc.)
+   - Consistent keys across languages
+   - Clear, descriptive key names
+
+4. **Supported Languages**:
+   - English (en_US) - Default
+   - Dutch (nl_NL)
+   - French (fr_FR) - Planned
+   - German (de_DE) - Planned
 
 ### i18n: Language Detection System
 
