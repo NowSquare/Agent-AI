@@ -5,6 +5,14 @@ return [
         'email_required' => 'Please enter your email address.',
         'email_invalid' => 'Please enter a valid email address.',
         'email_max' => 'Email address is too long.',
+        'code_required' => 'Please enter your verification code.',
+        'code_size' => 'Verification code must be 6 digits.',
+        'code_numeric' => 'Verification code must contain only numbers.',
+    ],
+    'verify' => [
+        'invalid_code' => 'Invalid verification code.',
+        'success' => 'Successfully logged in.',
+        'rate_limited' => 'Too many attempts. Please try again in :minutes minutes.',
     ],
     'challenge' => [
         'title' => 'Your Login Code',

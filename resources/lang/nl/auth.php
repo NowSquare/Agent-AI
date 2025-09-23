@@ -5,6 +5,14 @@ return [
         'email_required' => 'Vul uw e-mailadres in.',
         'email_invalid' => 'Vul een geldig e-mailadres in.',
         'email_max' => 'E-mailadres is te lang.',
+        'code_required' => 'Vul uw verificatiecode in.',
+        'code_size' => 'Verificatiecode moet 6 cijfers zijn.',
+        'code_numeric' => 'Verificatiecode mag alleen cijfers bevatten.',
+    ],
+    'verify' => [
+        'invalid_code' => 'Ongeldige verificatiecode.',
+        'success' => 'Succesvol ingelogd.',
+        'rate_limited' => 'Te veel pogingen. Probeer het over :minutes minuten opnieuw.',
     ],
     'challenge' => [
         'title' => 'Uw Inlogcode',

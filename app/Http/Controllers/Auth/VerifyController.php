@@ -2,57 +2,68 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Http\Controllers\Controller as BaseController;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\VerifyRequest;
 use App\Services\AuthService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 
-class VerifyController extends BaseController
+class VerifyController extends Controller
 {
-    public function __construct(
-        private AuthService $authService
-    ) {}
+    private AuthService $auth;
 
-    public function __invoke(Request $request): JsonResponse
+    public function __construct(AuthService $auth)
     {
-        $request->validate([
-            'challenge_id' => 'required|string|exists:auth_challenges,id',
-            'code' => 'required|string|size:6|regex:/^\d{6}$/',
-        ]);
+        $this->auth = $auth;
+    }
 
-        $challengeId = $request->input('challenge_id');
+    /**
+     * Handle a login verification request.
+     */
+    public function __invoke(VerifyRequest $request): JsonResponse
+    {
+        $email = Str::lower($request->input('email'));
         $code = $request->input('code');
+        $remember = $request->boolean('remember', false);
 
-        // Rate limiting: 10 per 15 minutes per identifier
-        $identifierKey = 'auth-verify:challenge:' . $challengeId;
+        // Rate limiting key includes both email and IP for better security
+        $key = Str::transliterate($email . '|' . $request->ip());
 
-        if (RateLimiter::tooManyAttempts($identifierKey, 10)) {
-            throw ValidationException::withMessages([
-                'code' => 'Too many verification attempts. Please try again later.',
-            ]);
+        // Check rate limit: 10 attempts per 15 minutes
+        $limiter = RateLimiter::attempt(
+            key: "auth-verify:{$key}",
+            maxAttempts: 10,
+            callback: function () use ($email, $code, $remember) {
+                // Verify challenge and authenticate user
+                $user = $this->auth->verifyChallenge($email, $code, $remember);
+
+                if (!$user) {
+                    return response()->json([
+                        'message' => __('auth.verify.invalid_code'),
+                    ], 422);
+                }
+
+                // Log the user in
+                Auth::login($user, $remember);
+
+                return [
+                    'message' => __('auth.verify.success'),
+                    'redirect' => route('dashboard'),
+                ];
+            },
+            decaySeconds: 15 * 60 // 15 minutes
+        );
+
+        if (!$limiter) {
+            return response()->json([
+                'message' => __('auth.verify.rate_limited', [
+                    'minutes' => ceil(RateLimiter::availableIn("auth-verify:{$key}") / 60),
+                ]),
+            ], 429);
         }
 
-        RateLimiter::increment($identifierKey, 15 * 60); // 15 minutes
-
-        $challenge = $this->authService->verifyChallenge($challengeId, $code);
-
-        if (!$challenge) {
-            throw ValidationException::withMessages([
-                'code' => 'Invalid or expired code.',
-            ]);
-        }
-
-        // Log the user in
-        $user = $challenge->userIdentity->user;
-        Auth::login($user);
-
-        return response()->json([
-            'authenticated' => true,
-            'user_id' => $user->id,
-            'message' => 'Successfully authenticated.',
-        ]);
+        return response()->json($limiter);
     }
 }
