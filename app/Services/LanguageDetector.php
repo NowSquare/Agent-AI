@@ -18,6 +18,14 @@ class LanguageDetector
     }
 
     /**
+     * Set the language detector instance (for testing).
+     */
+    public function setDetector(Language $detector): void
+    {
+        $this->detector = $detector;
+    }
+
+    /**
      * Detect language from text with library and LLM fallback.
      */
     public function detect(string $text, bool $useLlmFallback = true): string
@@ -34,21 +42,40 @@ class LanguageDetector
 
         try {
             // Use language detection library first
-            $result = $this->detector->detect($text)->close();
+            $result = $this->detector->detect($text);
             
-            if (!empty($result)) {
-                $lang = array_key_first($result);
-                $confidence = $result[$lang];
+            \Log::debug('Language detection result', [
+                'text' => $text,
+                'result' => $result->close(),
+                'detector_class' => get_class($this->detector),
+                'detector_methods' => get_class_methods($this->detector),
+                'detector_languages' => $this->detector->getLanguages(),
+            ]);
+
+            $scores = (array) $result->close();
+            if (!empty($scores)) {
+                $lang = array_key_first($scores);
+                $confidence = $scores[$lang];
                 
-                if ($confidence > 0.8) {
+                \Log::debug('Language detection confidence', [
+                    'lang' => $lang,
+                    'confidence' => $confidence,
+                    'text' => $text,
+                    'result' => $scores,
+                    'mapped_locale' => $this->mapToLocale($lang),
+                ]);
+
+                $minConfidence = config('language.detection.min_confidence', 0.8);
+                if ($confidence > $minConfidence) {
                     $locale = $this->mapToLocale($lang);
-                    Cache::put($cacheKey, $locale, now()->addHours(24));
+                    $cacheTtl = config('language.detection.cache_ttl', 24);
+                    Cache::put($cacheKey, $locale, now()->addHours($cacheTtl));
                     return $locale;
                 }
             }
 
             // If library fails or low confidence, try LLM
-            if ($useLlmFallback) {
+            if ($useLlmFallback && config('language.detection.use_llm_fallback', true)) {
                 return $this->detectWithLlm($text);
             }
 
@@ -76,8 +103,19 @@ class LanguageDetector
                 'sample_text' => substr($text, 0, 200), // Limit sample size
             ]);
 
+            \Log::debug('LLM language detection result', [
+                'text' => substr($text, 0, 200),
+                'result' => $result,
+            ]);
+
             if (isset($result['language']) && isset($result['confidence'])) {
                 $locale = $this->mapToLocale($result['language']);
+                
+                \Log::debug('LLM language detection confidence', [
+                    'language' => $result['language'],
+                    'confidence' => $result['confidence'],
+                    'locale' => $locale,
+                ]);
                 
                 if ($result['confidence'] > 0.8) {
                     Cache::put('lang_detect:'.md5($text), $locale, now()->addHours(24));
@@ -98,28 +136,21 @@ class LanguageDetector
      */
     private function mapToLocale(string $lang): string
     {
-        // Normalize to lowercase
-        $lang = strtolower($lang);
+        // Normalize to lowercase and replace hyphens with underscores
+        $lang = str_replace('-', '_', strtolower($lang));
 
-        // Direct mappings for supported locales
-        $localeMap = [
-            'en' => 'en_US',
-            'nl' => 'nl_NL',
-            'fr' => 'fr_FR',
-            'de' => 'de_DE',
-            'it' => 'it_IT',
-            'es' => 'es_ES',
-        ];
+        // Get supported locales from config
+        $supported = config('language.supported_locales', []);
 
         // Handle both ISO codes and already mapped locales
-        if (isset($localeMap[$lang])) {
-            return $localeMap[$lang];
+        if (isset($supported[$lang])) {
+            return $supported[$lang];
         }
 
         // If it's already a valid locale format, verify and return
         if (preg_match('/^[a-z]{2}_[A-Z]{2}$/', $lang)) {
             $parts = explode('_', $lang);
-            if (isset($localeMap[$parts[0]])) {
+            if (isset($supported[$parts[0]])) {
                 return $lang;
             }
         }
