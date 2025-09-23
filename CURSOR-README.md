@@ -273,8 +273,12 @@ Agent-AI/
       - app.js
       - bootstrap.js
     - lang/
-      - en/...
-      - nl/...
+      - en/
+        - emails.php
+        - messages.php
+      - nl/
+        - emails.php
+        - messages.php
     - views/
       - action/ [3 files: *.php]
       - auth/ [2 files: *.php]
