@@ -816,15 +816,68 @@ Use these fields to reliably control the follow-up loop.
 - Enhanced confidence score calibration and fallback logic
 - Dynamic token limit adjustment based on model capabilities
 
-### i18n: Language Detection (Planned)
+### i18n: Language Detection System
 
-**Status**: Not yet implemented. Will use on-prem language detection library.
+**Status**: Implemented with configurable detection sources and fallback. Content-based detection needs further testing.
 
-**Future Implementation:**
-- Language detection on clean reply text
-- Supported locales: en_US, nl_NL, fr_FR, de_DE
-- Fallback to en_US for unsupported languages
-- Language-specific email templates and UI strings
+**Architecture**:
+
+1. **Configuration** (`config/language.php`):
+   - Supported locales mapping (ISO codes to full locales)
+   - Detection settings (confidence threshold, cache TTL)
+   - Detection source priority (URL, session, header, content)
+   - LLM fallback settings
+
+2. **Components**:
+   - `LanguageDetector` service: Core detection using library + LLM fallback
+   - `DetectLanguage` middleware: Request-level locale handling
+
+3. **Detection Flow**:
+   ```
+   Request → DetectLanguage Middleware
+   ↓
+   Check sources in configured priority:
+   1. URL parameter (?lang=)
+   2. Session storage
+   3. Accept-Language header
+   4. Content-based detection (experimental):
+      → LanguageDetector service
+      → Language detection library
+      → LLM fallback if needed
+   ↓
+   Set App locale + Content-Language header
+   ```
+
+4. **Features**:
+   - Configurable locale mapping via `config/language.php`
+   - Confidence-based detection with thresholds
+   - 24-hour detection caching
+   - Graceful fallback chain
+   - LLM backup for complex cases
+   - Session persistence
+   - Content-Language headers
+   - Comprehensive test coverage for URL/session/header detection
+
+5. **Supported Locales**:
+   - English (en_US)
+   - Dutch (nl_NL)
+   - French (fr_FR)
+   - German (de_DE)
+   - Easily extensible via config
+
+6. **Adding New Locales**:
+   ```php
+   // config/language.php
+   'supported_locales' => [
+       'es' => 'es_ES',     // Add Spanish
+       'es_es' => 'es_ES',  // With full locale
+   ]
+   ```
+
+7. **Known Issues**:
+   - Content-based language detection needs further testing
+   - Service container binding issues with middleware in tests
+   - See `tests/Feature/DetectLanguageTest.php` for details
 
 ### Attachments Processing (Implemented)
 
