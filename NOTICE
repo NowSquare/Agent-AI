@@ -1,0 +1,25 @@
+Agent AI
+Copyright (c) 2025 NowSquare and contributors.
+
+This product is licensed under the Apache License, Version 2.0.
+You must include this NOTICE with any redistributions.
+
+Project attribution:
+- Website/Repo: https://github.com/NowSquare/Agent-AI 
+- Primary author: NowSquare
+- Contributors: see Git history
+
+Third-party notices (summary):
+- Laravel — MIT
+- Tailwind CSS — MIT
+- Flowbite — MIT
+- Lucide Icons — ISC
+- spatie/pdf-to-text — MIT
+- symfony/* — MIT
+- nunomaduro/collision — MIT
+- phpunit/phpunit — BSD-3-Clause
+- pgvector — (license: see upstream)
+- Any other bundled assets/libraries … (license: see upstream)
+For exact terms, see the upstream projects and their LICENSE files.
+
+End of NOTICE.

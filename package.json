@@ -1,6 +1,8 @@
 {
     "$schema": "https://json.schemastore.org/package.json",
     "private": true,
+    "name": "agent-ai",
+    "license": "Apache-2.0",
     "type": "module",
     "scripts": {
         "build": "vite build",
