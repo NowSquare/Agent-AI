@@ -61,7 +61,7 @@
                     <div class="absolute inset-0 -rotate-45 scale-x-150 bg-gradient-to-t from-slate-50/75 via-slate-100 to-slate-50 dark:from-slate-800/75 dark:via-slate-700 dark:to-slate-800"></div>
                 </div>
                 <!-- Decorative dots -->
-                <div aria-hidden="true" class="pointer-events-none absolute left-4 bottom-4 h-24 w-24">
+                <div aria-hidden="true" class="pointer-events-none absolute left-4 bottom-4 h-24 w-24 -z-10">
                     <div class="absolute h-1.5 w-1.5 rounded-full bg-slate-200 dark:bg-slate-700"></div>
                     <div class="absolute left-6 top-6 h-1.5 w-1.5 rounded-full bg-slate-200 dark:bg-slate-700"></div>
                     <div class="absolute left-12 h-1.5 w-1.5 rounded-full bg-slate-200 dark:bg-slate-700"></div>

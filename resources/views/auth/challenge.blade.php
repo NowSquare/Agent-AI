@@ -20,7 +20,7 @@
 @endsection
 
 @section('content')
-    <form id="challengeForm" class="space-y-6" action="{{ route('auth.challenge') }}" method="POST">
+    <form id="challengeForm" class="relative z-10 space-y-6" action="{{ route('auth.challenge') }}" method="POST">
         @csrf
 
         <!-- Email Input -->
