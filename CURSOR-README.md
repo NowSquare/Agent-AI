@@ -187,12 +187,26 @@ This project avoids heavy infra. The following refinements improve reliability a
 Agent-AI/
   - app/
     - Console/
-      - Commands/ [1 file: *.php]
+      - Commands/
+        - EmbeddingsBackfill.php    # php artisan embeddings:backfill
+        - LlmRoutingDryRun.php      # php artisan llm:routing-dry-run
+        - PruneMemories.php
       - Kernel.php
     - Http/
-      - Controllers/ [11 files: *.php]
-      - Middleware/ [1 file: *.php]
-      - Requests/ [3 files: *.php]
+      - Controllers/
+        - ActivityController.php    # Activity UI listing/detail
+        - AttachmentDownloadController.php
+        - DashboardController.php
+        - ActionConfirmationController.php
+        - Auth/
+          - ChallengeController.php
+          - LoginController.php
+          - VerifyController.php
+        - Api/ [3 files: *.php]
+        - Webhook/
+          - PostmarkInboundController.php
+      - Middleware/ [2 files: *.php]
+      - Requests/ [5 files: *.php]
       - Resources/ [3 files: *.php]
     # Core Business Logic - Listed Explicitly
     - Jobs/
@@ -209,6 +223,7 @@ Agent-AI/
       - ActionOptionsMail.php
       - ActionResponseMail.php
       - AuthChallengeEmail.php
+      - AuthMagicLinkEmail.php
     - Mcp/
       - Prompts/ [2 files: *.php]
       - Servers/ [1 file: *.php]
@@ -238,6 +253,7 @@ Agent-AI/
       - ThreadMetadata.php
       - User.php
       - UserIdentity.php
+      - AgentStep.php
     - Providers/
       - AppServiceProvider.php
       - HorizonServiceProvider.php
@@ -248,10 +264,15 @@ Agent-AI/
       - AgentRegistry.php
       - AttachmentService.php
       - AuthService.php
+      - ContactLinkService.php
       - Coordinator.php
+      - Embeddings.php
+      - EnsureDefaultAccount.php
+      - GroundingService.php
       - LanguageDetector.php
       - LlmClient.php
       - MemoryService.php
+      - ModelRouter.php
       - MultiAgentOrchestrator.php
       - ReplyCleaner.php
       - ThreadResolver.php
@@ -262,7 +283,6 @@ Agent-AI/
   - artisan
   - bootstrap/
     - app.php
-    - cache/...
     - providers.php
   - composer.json
   - composer.lock
@@ -275,7 +295,8 @@ Agent-AI/
     - database.php
     - filesystems.php
     - horizon.php
-    - llm.php
+    - language.php
+    - llm.php                  # Routing roles + embeddings block
     - logging.php
     - mail.php
     - memory.php
@@ -291,21 +312,20 @@ Agent-AI/
   # Database
   - database/
     - factories/ [5 files: *.php]
-    - migrations/ [32 files: *.php]
+    - migrations/ [32+ files: *.php]
+      - 2025_09_21_011500_create_agent_steps_table.php   # Trace store
+      - pgvector enabled; embedding cols on email_messages/attachment_extractions/memories
     - seeders/ [1 file: *.php]
-    - PostgreSQL **pgvector** enabled; embedding columns on email_messages, attachment_extractions, memories; `agent_steps` table for AgentOps.
   # Docker
   - docker/
     - entrypoint.sh
   - docker-compose.yml
   - Dockerfile
-  # Frontend
-  - node_modules/...
+  # Frontend / Public
   - package.json
   - package-lock.json
   - phpunit.xml
   - public/
-    - build/...
     - favicon.ico
     - index.php
     - robots.txt
@@ -317,51 +337,73 @@ Agent-AI/
       - app.js
       - bootstrap.js
     - lang/
-      - en/
-        - emails.php
-        - messages.php
-      - nl/
-        - emails.php
-        - messages.php
+      - en/ [3 files: *.php]
+      - nl/ [3 files: *.php]
     - views/
       - action/ [3 files: *.php]
+      - activity/
+        - index.blade.php
+        - show.blade.php
       - auth/ [2 files: *.php]
       - components/ [1 file: *.php]
       - dashboard.blade.php
-      - emails/ [5 files: *.php]
-        - layouts/
-          - base.blade.php
-        - action-response.blade.php
-        - auth-challenge.blade.php
-        - clarification.blade.php
-        - options.blade.php
-      - layouts/ [1 file: *.php]
+      - emails/ [7 files: *.php]
+      - layouts/ [2 files: *.php]
       - threads/ [1 file: *.php]
       - welcome.blade.php
   # Routes
   - routes/
     - api.php
     - console.php
-    - web.php
-  # Storage & Logs
+    - web.php                 # /activity list/detail routes
+  # Storage & Logs (trimmed)
   - storage/
     - app/...
     - framework/...
-    - logs/
-      - browser.log
-      - laravel.log
+    - logs/...
   # Tests
   - tests/
-    - Feature/ [8 files: *.php]
-    - Unit/ [1 file: *.php]
+    - Feature/ [14+ files: *.php]
+      - GroundedAnswerTest.php
+      - SynthAnswerTest.php
+    - Unit/ [3+ files: *.php]
+      - ModelRouterTest.php
+      - GroundingServiceTest.php
+      - EmbeddingsTest.php
     - TestCase.php
-  # Dependencies
-  - vendor/...
   - vite.config.js
 
 
 
 Note: File extension counts do not include files ignored by .gitignore.
+
+### Developer Guide (Read Me First)
+- **Data Flow (Email → Contact → User)**
+  - Inbound email creates/updates a Contact and attaches it to a Thread. On first-ever contact, an Account is auto-created from `APP_NAME`.
+  - First web login with the same email: if no User, create User, link via `contact_links`, send challenge; after verification the user sees their Dashboard and Activity.
+  - Users see all their Threads (via linked contacts) and the full Agent Steps trace.
+- **LLM Routing (CLASSIFY → Retrieval → GROUNDED | SYNTH)**
+  - Defaults: GROUNDED=`gpt-oss:20b`, SYNTH=`gpt-oss:120b`, CLASSIFY=`mistral-small3.2:24b` (tune in `.env`).
+  - Thresholds: `LLM_GROUNDING_HIT_MIN`, `LLM_SYNTH_COMPLEXITY_TOKENS`. See `config/llm.php` and `.env` comments.
+- **Grounding with pgvector**
+  - Embeddings on `email_messages.body_embedding`, `attachment_extractions.text_embedding`, `memories.content_embedding`.
+  - Cosine KNN retrieval; snippets carry provenance. Backfill embeddings with `php artisan embeddings:backfill`.
+- **Agent Steps (Traceability)**
+  - Every LLM/tool call is logged in `agent_steps` (role, provider, model, tokens, latency, confidence, JSON I/O with basic scrubbing).
+  - Activity UI (`/activity`) shows a user’s own steps; admins see all within their account.
+- **Conventions & Hygiene**
+  - Keep controllers thin; put logic in Services/Jobs; validate with Form Requests.
+  - Migrations: edit existing files; keep `php artisan migrate:fresh` green.
+  - Blade + Flowbite UI; i18n-ready copy; tests for new services/routes (unit + feature).
+- **Tuning & Troubleshooting**
+  - Too many SYNTH routes → lower `LLM_SYNTH_COMPLEXITY_TOKENS` or improve grounding.
+  - No matches → run embeddings backfill; check `EMBEDDINGS_DIM` and local model tags.
+  - Missing model tags → switch provider/model per role in `.env` or pull tags in Ollama.
+
+Small maintenance checklist:
+- After adding/moving files: update this tree, explicit lists, and [N files] counts.
+- When adding a new subsystem: add a one-liner here and a note in the Developer Guide.
+- Verify examples and env defaults still match `config/llm.php`.
 
 ## What's Actually Built (Current State)
 
