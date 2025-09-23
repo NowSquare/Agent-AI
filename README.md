@@ -1,6 +1,6 @@
 # Agent-AI
 
-Agent-AI is a Laravel-based application for building practical, privacy-respecting agent workflows:
+Agent-AI is a Laravel-based application for building practical, privacy-respecting agent workflows: This build adds lightweight reliability features: grounded retrieval via **pgvector**, **AgentOps** logs/evaluation, simple **model selection**, and internal **multi-agent delegation**—all without extra services.
 
 * Ingest emails & attachments
 * Trigger background jobs and tasks
@@ -43,6 +43,10 @@ This README explains **how to run Agent-AI** locally with **Laravel Herd** (reco
 * **Thread Continuity**: Reply-to headers with thread IDs for conversation persistence
 * File scanning (ClamAV) & PDF text extraction (Spatie + poppler)
 * **Laravel Boost**: MCP server for AI-assisted development in Cursor
+* **Grounded retrieval (pgvector)** in PostgreSQL for facts from threads, attachments, and memories (no external vector DB).
+* **AgentOps logs & evaluation** (`agent_steps` table) for tracing LLM/tool calls, tokens, latency, confidence.
+* **Simple dynamic model selection** (small model for classification, larger for synthesis; choice recorded in logs).
+* **Internal multi-agent delegation** (agents can route to other agents via the Coordinator).
 
 ## 🔄 Clarification Loop
 
@@ -155,6 +159,7 @@ cp .env.herd .env
 
 3. **Create the database**
    Use TablePlus/Herd to create `agent_ai` on `127.0.0.1:5432` with user `root`.
+   PostgreSQL must have the `pgvector` extension enabled; see CURSOR-README for schema notes.
 
 4. **Migrate**
 
@@ -272,6 +277,14 @@ Agent-AI uses an intelligent **Coordinator + Specialized Agents** architecture t
 - Memory with TTL/decay
 
 For detailed documentation of the agent system, including flow diagrams, implementation details, and current status, see [CURSOR-README.md](CURSOR-README.md#agent-coordination-flow-with-laravel-mcp).
+
+### Lightweight Refinements (Small-Business Friendly)
+These refinements improve trust and debuggability without adding infra.
+- **pgvector grounding**: embed email bodies, extracted attachment text, and stable memories; use KNN to fetch top-k context for answers.
+- **AgentOps logs**: each LLM/tool call writes to `agent_steps` with tokens, latency, confidence, and (optionally) chosen model.
+- **Model selection**: fast model for short classification/routing; larger model for synthesis/planning.
+- **Internal delegation**: Coordinator can route tasks between specialized agents when complexity demands it.
+> See technical details in [CURSOR-README.md → Lightweight Refinements](CURSOR-README.md#lightweight-refinements-small-business-friendly).
 
 ---
 
