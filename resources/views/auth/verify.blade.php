@@ -1,127 +1,142 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Agent AI - Verify Code</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50">
-    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-md w-full space-y-8">
-            <div>
-                <h1 class="text-center text-3xl font-extrabold text-gray-900">Agent AI</h1>
-                <h2 class="mt-6 text-center text-2xl font-bold text-gray-900">
-                    Enter your login code
-                </h2>
-                <p class="mt-2 text-center text-sm text-gray-600">
-                    We sent a 6-digit code to your email
-                </p>
+@extends('layouts.auth')
+
+@section('title', __('auth.verify.title'))
+
+@section('header', config('app.name'))
+
+@section('subheader')
+    {{ __('auth.verify.subtitle') }}
+@endsection
+
+@section('content')
+    <form id="verifyForm" class="space-y-6" action="{{ route('auth.verify') }}" method="POST">
+        @csrf
+
+        <!-- Hidden email field -->
+        <input type="hidden" name="email" value="{{ $email }}">
+
+        <!-- Code Input -->
+        <div>
+            <label class="block text-sm font-medium text-center text-gray-700 dark:text-gray-300 mb-4">
+                {{ __('auth.verify.code_label') }}
+            </label>
+
+            <div data-code-input
+                 data-name="code"
+                 data-length="6"
+                 data-auto-submit="false"
+                 class="mb-4">
             </div>
 
-            <form id="verifyForm" class="mt-8 space-y-6">
-                @csrf
-                <input type="hidden" id="challengeId" name="challenge_id" value="{{ request('challenge_id') }}">
+            @error('code')
+                <p class="mt-2 text-sm text-center text-red-600 dark:text-red-400">{{ $message }}</p>
+            @enderror
+        </div>
 
-                <div>
-                    <label for="code" class="sr-only">Verification Code</label>
-                    <input
-                        id="code"
-                        name="code"
-                        type="text"
-                        maxlength="6"
-                        pattern="\d{6}"
-                        required
-                        class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 text-center text-2xl tracking-widest focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10"
-                        placeholder="000000"
-                    >
-                </div>
+        <!-- Remember Me -->
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <input type="checkbox" name="remember" id="remember"
+                    class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-700 rounded">
+                <label for="remember" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">
+                    {{ __('auth.verify.remember_me') }}
+                </label>
+            </div>
+        </div>
 
-                <div>
-                    <button
-                        id="submitBtn"
-                        type="submit"
-                        class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                    >
-                        <span id="btnText">Verify Code</span>
-                    </button>
-                </div>
+        <!-- Submit Button -->
+        <div>
+            <button type="submit" id="submitButton"
+                class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
+                <span class="inline-flex items-center">
+                    <i data-lucide="log-in" class="mr-2 h-5 w-5"></i>
+                    {{ __('auth.verify.sign_in') }}
+                </span>
+            </button>
+        </div>
 
-                <div class="text-center">
-                    <button
-                        type="button"
-                        onclick="window.location.href='/auth/challenge'"
-                        class="text-sm text-indigo-600 hover:text-indigo-500"
-                    >
-                        Didn't receive code? Try again
-                    </button>
-                </div>
+        <!-- Resend Code -->
+        <div class="text-center">
+            <button type="button" onclick="resendCode()"
+                class="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-500 dark:hover:text-primary-300">
+                {{ __('auth.verify.resend_code') }}
+            </button>
+        </div>
+    </form>
 
-                @if ($errors->any())
-                    <div class="rounded-md bg-red-50 p-4">
-                        <div class="text-sm text-red-700">
-                            <ul>
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    </div>
-                @endif
-            </form>
+    <!-- Loading State -->
+    <div id="loadingState" class="hidden mt-4 text-center">
+        <div class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-gray-800 dark:text-gray-200 transition ease-in-out duration-150 cursor-not-allowed">
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-800 dark:text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            {{ __('auth.verify.verifying_code') }}
         </div>
     </div>
+@endsection
 
-    <script>
-        // Auto-focus the code input
-        document.getElementById('code').focus();
+@section('footer')
+    <p class="text-sm text-gray-500 dark:text-gray-400">
+        {{ __('auth.verify.help_text') }}
+    </p>
+@endsection
 
-        document.getElementById('verifyForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
+@push('scripts')
+<script>
+    const form = document.getElementById('verifyForm');
+    const codeInput = document.querySelector('[data-code-input]');
 
-            const submitBtn = document.getElementById('submitBtn');
-            const btnText = document.getElementById('btnText');
-            const challengeId = document.getElementById('challengeId').value;
-            const code = document.getElementById('code').value;
+    // Show loading state on submit
+    form.addEventListener('submit', () => {
+        document.getElementById('submitButton').classList.add('opacity-50', 'cursor-not-allowed');
+        document.getElementById('loadingState').classList.remove('hidden');
+    });
 
-            if (!challengeId) {
-                alert('Missing challenge ID. Please go back and try again.');
-                return;
+    // Handle server-side validation errors
+    @if ($errors->has('code'))
+        codeInput.setError();
+    @endif
+
+    // Resend code function
+    async function resendCode() {
+        const email = document.querySelector('input[name="email"]').value;
+        const button = document.querySelector('button[onclick="resendCode()"]');
+        
+        // Disable button
+        button.disabled = true;
+        button.classList.add('opacity-50', 'cursor-not-allowed');
+        
+        try {
+            const response = await fetch('{{ route("auth.challenge") }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                },
+                body: JSON.stringify({ email }),
+            });
+
+            if (response.ok) {
+                // Show success message
+                button.textContent = '{{ __("auth.verify.code_sent") }}';
+                setTimeout(() => {
+                    button.textContent = '{{ __("auth.verify.resend_code") }}';
+                    button.disabled = false;
+                    button.classList.remove('opacity-50', 'cursor-not-allowed');
+                }, 5000);
+            } else {
+                throw new Error('Failed to resend code');
             }
-
-            // Disable button and show loading
-            submitBtn.disabled = true;
-            btnText.textContent = 'Verifying...';
-
-            try {
-                const response = await fetch('/auth/verify', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-                    },
-                    body: JSON.stringify({
-                        challenge_id: challengeId,
-                        code: code
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    // Redirect to dashboard
-                    window.location.href = '/dashboard';
-                } else {
-                    throw new Error(data.message || 'Invalid code');
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            } finally {
-                submitBtn.disabled = false;
-                btnText.textContent = 'Verify Code';
-            }
-        });
-    </script>
-</body>
-</html>
+        } catch (error) {
+            console.error('Error:', error);
+            button.textContent = '{{ __("auth.verify.resend_failed") }}';
+            setTimeout(() => {
+                button.textContent = '{{ __("auth.verify.resend_code") }}';
+                button.disabled = false;
+                button.classList.remove('opacity-50', 'cursor-not-allowed');
+            }, 5000);
+        }
+    }
+</script>
+@endpush
