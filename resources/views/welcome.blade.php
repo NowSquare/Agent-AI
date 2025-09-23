@@ -15,6 +15,11 @@
     <title>{{ config('app.name', 'Agent AI') }}</title>
     <meta name="theme-color" content="#0ea5e9">
     @vite(['resources/css/app.css','resources/js/app.js'])
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            lucide.createIcons();
+        });
+    </script>
 </head>
 <body class="bg-slate-50 text-slate-900 antialiased selection:bg-sky-100">
 
@@ -101,8 +106,14 @@
         </section>
 
         <!-- Fine print -->
-        <footer class="mt-16 text-xs leading-6 text-slate-500">
-            {{ __('Emails to our agents may be processed automatically to route and respond to your request. Only essential cookies are used.') }}
+        <footer class="mt-16 flex items-center justify-between text-xs leading-6">
+            <p class="text-slate-500">
+                {{ __('Emails to our agents may be processed automatically to route and respond to your request. Only essential cookies are used.') }}
+            </p>
+            <a href="{{ route('auth.challenge.form') }}" class="text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 flex items-center gap-1.5">
+                <i data-lucide="log-in" class="h-3.5 w-3.5"></i>
+                {{ __('Already have access?') }}
+            </a>
         </footer>
     </main>
 </body>
