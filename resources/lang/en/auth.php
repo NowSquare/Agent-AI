@@ -29,5 +29,9 @@ return [
         'button' => 'Log In',
         'expiry_notice' => 'This link will expire in :minutes minutes.',
         'security_notice' => 'If you did not request this link, please ignore this email.',
+        'alternative_text' => 'If the button doesn't work, copy and paste this link into your browser:',
+        'expired' => 'This login link has expired. Please request a new one.',
+        'invalid' => 'This login link is invalid or has already been used.',
+        'success' => 'Successfully logged in.',
     ],
 ];

@@ -29,5 +29,9 @@ return [
         'button' => 'Inloggen',
         'expiry_notice' => 'Deze link verloopt over :minutes minuten.',
         'security_notice' => 'Als u deze link niet heeft aangevraagd, kunt u deze e-mail negeren.',
+        'alternative_text' => 'Als de knop niet werkt, kopieer en plak deze link in uw browser:',
+        'expired' => 'Deze inloglink is verlopen. Vraag een nieuwe aan.',
+        'invalid' => 'Deze inloglink is ongeldig of is al gebruikt.',
+        'success' => 'Succesvol ingelogd.',
     ],
 ];
