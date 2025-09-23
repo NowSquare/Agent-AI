@@ -101,6 +101,17 @@ class Embeddings
         $literal = '['.implode(',', array_map(fn($v) => is_finite($v) ? (string) $v : '0', $vec)).']';
         DB::statement("UPDATE {$table} SET {$column} = ?::vector WHERE {$pkColumn} = ?", [$literal, $pk]);
     }
+
+    /**
+     * Assert vector matches configured dimension; throws InvalidArgumentException otherwise.
+     */
+    public function assertCorrectDimension(array $vector): void
+    {
+        $dim = (int) ($this->config['dim'] ?? config('llm.embeddings.dim', 1024));
+        if (count($vector) !== $dim) {
+            throw new \InvalidArgumentException("Embedding dimension mismatch. Expected {$dim}, got ".count($vector));
+        }
+    }
 }
 
 
