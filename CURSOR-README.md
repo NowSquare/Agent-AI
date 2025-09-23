@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Agent AI is an email-centered automation system built on Laravel 12. It links incoming emails to threads, interprets free text with a Large Language Model (LLM), and executes actions via signed links or controlled tool calls. Tool calls run through a **custom MCP layer** (Model Context Protocol) that enforces JSON schemas and exposes SSRF-safe tools. The system supports **attachments** (txt, md, csv, pdf, etc.) including virus scanning, extraction, and summarization. Passwordless login, Flowbite/Tailwind UI, and a future-proof data model reduce friction. An LLM is always available; when intent is unclear, the system asks follow-up questions until intent is clear (maximum 2 rounds). Redis/Horizon deliver asynchronous reliability. PostgreSQL guarantees integrity and versioned “memories” with TTL/decay. Postmark handles inbound/outbound email with robust RFC threading. The design is self-hostable with Docker.
+Agent AI is an email-centered automation system built on Laravel 12. It links incoming emails to threads, interprets free text with a Large Language Model (LLM), and executes actions via signed links or controlled tool calls. Tool calls run through a **custom MCP layer** (Model Context Protocol) that enforces JSON schemas and exposes SSRF-safe tools. The system supports **attachments** (txt, md, csv, pdf, etc.) including virus scanning, extraction, and summarization. Passwordless login, Flowbite/Tailwind UI, and a future-proof data model reduce friction. An LLM is always available; when intent is unclear, the system asks follow-up questions until intent is clear (maximum 2 rounds). Redis/Horizon deliver asynchronous reliability. PostgreSQL guarantees integrity and versioned “memories” with TTL/decay. Postmark handles inbound/outbound email with robust RFC threading. The design is self-hostable with Docker. We add lightweight reliability features: **grounded retrieval via pgvector**, **AgentOps logs/evaluation**, **simple dynamic model selection**, and **internal multi-agent delegation**, optimized for small-business deployments without extra services.
 
 ## Project Overview
 
@@ -23,6 +23,7 @@ Agent AI is an email-centered automation system built on Laravel 12. It links in
 * Queues via Redis; Horizon for monitoring.
 * Docker Compose for self-hosting.
 * **Attachments**: storage, virus scan, extraction, and LLM context.
+* Grounding via **pgvector**: embedding search over threads, attachments, and memories for fact retrieval; no external vector service.
 
 ### Key Stakeholders
 
@@ -31,6 +32,34 @@ Agent AI is an email-centered automation system built on Laravel 12. It links in
 * DevOps: containers, secrets, monitoring, backups.
 * Compliance/Legal: DPIA, data processing agreement.
 * End Users: email recipients and web confirmers.
+
+## Lightweight Refinements (Small-Business Friendly)
+
+This project avoids heavy infra. The following refinements improve reliability and trust without new services.
+
+### 1) Grounding with pgvector
+- Use `pgvector` in PostgreSQL.
+- Embed email bodies, attachment text, and memories.
+- Store vectors in existing tables (`email_messages`, `attachment_extractions`, `memories`).
+- KNN search for top-k context; tag snippets with provenance.
+
+### 2) AgentOps Logs & Evaluation
+- New `agent_steps` table with: agent, step_type, input/output JSON, tokens, latency, confidence, timestamps.
+- Log every LLM/tool call for traceability.
+
+### 3) Simple Dynamic Model Selection
+- Small model for classification/short tasks.
+- Large model for synthesis/planning.
+- Record chosen model in `agent_steps`.
+
+### 4) Internal Multi-Agent Delegation
+- Agents may invoke other agents through the Coordinator (no external protocol).
+- Record delegations as `agent_steps` with step_type="route".
+
+### 5) Evaluation Checklist
+- Golden-path tests of email→action flows.
+- Grounding hit-rate monitoring.
+- Non-regression tests with cached prompts.
 
 ### Assumptions
 
@@ -58,6 +87,7 @@ Agent AI is an email-centered automation system built on Laravel 12. It links in
 - MCP layer (ToolRegistry, McpController, tool schemas)
 - Action interpretation and clarification loop
 - Memory gate with TTL/decay
+- Add **pgvector grounding**, **AgentOps logs**, **simple model routing**, **internal delegation**, plus an evaluation checklist.
 
 **✅ COMPLETED: Phase 3 - Attachments Pipeline**
 - Full attachment pipeline: MIME/size limits, ClamAV scan, text extraction, LLM summarization
@@ -250,6 +280,7 @@ Agent-AI/
     - factories/ [5 files: *.php]
     - migrations/ [32 files: *.php]
     - seeders/ [1 file: *.php]
+    - PostgreSQL **pgvector** enabled; embedding columns on email_messages, attachment_extractions, memories; `agent_steps` table for AgentOps.
   # Docker
   - docker/
     - entrypoint.sh
@@ -715,12 +746,17 @@ flowchart LR
 ### Acceptance Criteria
 
 * Story 1: Signed link with 15–60 min expiry; second click is idempotent; confirmation in the same thread.
-* Story 2: Multilingual interpretation; when confidence < 0.75, max 2 clarification rounds; otherwise options email.
+* Story 2: Multilingual interpretation; when confidence < 0.75, max 2 clarification rounds; otherwise options email. When grounding hits, replies include evidence from retrieved snippets.
 * Story 3: On click or reply ≥ 0.75: user + identity + membership are created; login email sent.
 * Story 4: Memories have TTL/decay; supersede; admin can export/purge; provenance visible.
 * Story 5: Horizon visible; logs show provider, model, latency, tokens, confidence, outcome.
 * Story 6: Language detected; UI/emails in detected language; EN fallback; `Content-Language` set.
 * **Story 7: Attachments ≤ 25MB each (default), safe MIME whitelist, mandatory ClamAV scan, extraction and summary available to the LLM, signed downloads.**
+
+**Grounding/Evaluation**
+- Top-k retrieval used for all answers.
+- Log every LLM/tool call in `agent_steps`.
+- Model choice recorded per call.
 
 ## Technical Implementation
 
