@@ -2,10 +2,21 @@
 
 @section('title', __('auth.challenge.title'))
 
-@section('header', config('app.name'))
+@section('header')
+    <div class="flex items-center justify-center gap-3">
+        <div class="inline-flex h-12 w-12 items-center justify-center rounded-full bg-sky-100 dark:bg-sky-900">
+            <i data-lucide="mail" class="h-6 w-6 text-sky-700 dark:text-sky-300"></i>
+        </div>
+        <h1 class="text-2xl font-semibold tracking-tight text-slate-900 dark:text-white">
+            {{ __('auth.challenge.title') }}
+        </h1>
+    </div>
+@endsection
 
 @section('subheader')
-    {{ __('auth.challenge.subtitle') }}
+    <p class="mt-3 text-slate-600 dark:text-slate-400">
+        {{ __('auth.challenge.subtitle') }}
+    </p>
 @endsection
 
 @section('content')
@@ -15,12 +26,12 @@
         <!-- Email Input -->
         <div>
             <label for="email" class="sr-only">{{ __('auth.challenge.email_label') }}</label>
-            <div class="mt-1 relative rounded-md shadow-sm">
-                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <i data-lucide="mail" class="h-5 w-5 text-gray-400"></i>
+            <div class="relative">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <i data-lucide="at-sign" class="h-5 w-5 text-slate-400 dark:text-slate-500"></i>
                 </div>
                 <input type="email" name="email" id="email" required
-                    class="block w-full pl-10 sm:text-sm border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md focus:ring-primary-500 focus:border-primary-500 @error('email') border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500 @enderror"
+                    class="block w-full rounded-xl border-0 py-3 pl-10 text-slate-900 shadow-sm ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:ring-2 focus:ring-inset focus:ring-sky-600 dark:bg-slate-800 dark:text-white dark:ring-slate-700 dark:placeholder:text-slate-500 dark:focus:ring-sky-500 sm:text-sm @error('email') ring-red-300 dark:ring-red-500 text-red-900 dark:text-red-400 placeholder:text-red-300 dark:placeholder:text-red-500 focus:ring-red-500 dark:focus:ring-red-500 @enderror"
                     placeholder="{{ __('auth.challenge.email_placeholder') }}"
                     value="{{ old('email') }}"
                     autocomplete="email"
@@ -33,10 +44,10 @@
 
         <!-- Remember Me -->
         <div class="flex items-center justify-between">
-            <div class="flex items-center">
+            <div class="flex items-center gap-2">
                 <input type="checkbox" name="remember" id="remember"
-                    class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-700 rounded">
-                <label for="remember" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">
+                    class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-600 dark:border-slate-700 dark:bg-slate-800 dark:focus:ring-offset-slate-800">
+                <label for="remember" class="text-sm text-slate-600 dark:text-slate-400">
                     {{ __('auth.challenge.remember_me') }}
                 </label>
             </div>
@@ -45,19 +56,19 @@
         <!-- Submit Button -->
         <div>
             <button type="submit" id="submitButton"
-                class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
-                <span class="inline-flex items-center">
-                    <i data-lucide="arrow-right" class="mr-2 h-5 w-5"></i>
-                    {{ __('auth.challenge.continue') }}
+                class="relative w-full rounded-xl bg-slate-900 py-3 text-sm font-semibold text-white shadow-sm hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 dark:bg-sky-600 dark:hover:bg-sky-500 dark:focus-visible:outline-sky-600">
+                <span class="absolute inset-y-0 left-0 flex items-center pl-3">
+                    <i data-lucide="arrow-right" class="h-5 w-5"></i>
                 </span>
+                <span>{{ __('auth.challenge.continue') }}</span>
             </button>
         </div>
     </form>
 
     <!-- Loading State -->
-    <div id="loadingState" class="hidden mt-4 text-center">
-        <div class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-gray-800 dark:text-gray-200 transition ease-in-out duration-150 cursor-not-allowed">
-            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-800 dark:text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+    <div id="loadingState" class="hidden">
+        <div class="mt-4 flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+            <svg class="h-5 w-5 animate-spin text-sky-600 dark:text-sky-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
@@ -67,7 +78,7 @@
 @endsection
 
 @section('footer')
-    <p class="text-sm text-gray-500 dark:text-gray-400">
+    <p class="text-sm text-slate-500 dark:text-slate-400">
         {{ __('auth.challenge.help_text') }}
     </p>
 @endsection

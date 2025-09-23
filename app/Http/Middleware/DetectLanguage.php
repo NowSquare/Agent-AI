@@ -23,13 +23,6 @@ class DetectLanguage
     public function handle(Request $request, Closure $next): Response
     {
         $locale = $this->determineLocale($request);
-        \Log::debug('Detected locale', [
-            'locale' => $locale,
-            'text' => $request->input('text'),
-            'content' => $request->getContent(),
-            'isJson' => $request->isJson(),
-        ]);
-
         App::setLocale($locale);
 
         // Add Content-Language header to response
@@ -120,20 +113,7 @@ class DetectLanguage
             return null;
         }
 
-        \Log::debug('Attempting language detection', [
-            'text' => $text,
-            'isJson' => $request->isJson(),
-            'content' => $request->getContent(),
-            'input' => $request->input(),
-        ]);
-
-        $locale = $this->detector->detect($text);
-        \Log::debug('Language detection result', [
-            'text' => $text,
-            'locale' => $locale,
-        ]);
-
-        return $locale;
+        return $this->detector->detect($text);
     }
 
     /**
