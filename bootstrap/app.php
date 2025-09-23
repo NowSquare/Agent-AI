@@ -12,7 +12,12 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
+            \App\Http\Middleware\DetectLanguage::class,
             \App\Http\Middleware\VerifyCsrfToken::class,
+        ]);
+
+        $middleware->alias([
+            'detect_language' => \App\Http\Middleware\DetectLanguage::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
