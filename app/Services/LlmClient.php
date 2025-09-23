@@ -81,7 +81,11 @@ class LlmClient
         $prompt = $this->buildPrompt($promptKey, $vars);
         $maxOutputTokens = $maxOutputTokens ?: $this->config['caps']['output_tokens'];
 
-        $providers = $this->getProviderPriority();
+        // Allow per-call provider/model override (for routing)
+        $requestedProvider = $vars['provider'] ?? null;
+        $requestedModel    = $vars['model'] ?? null;
+
+        $providers = $requestedProvider ? [$requestedProvider] : $this->getProviderPriority();
         $lastError = null;
 
         foreach ($providers as $provider) {
@@ -92,7 +96,8 @@ class LlmClient
                     'input_tokens' => $this->estimateTokens($prompt),
                 ]);
 
-                $result = $this->callProvider($provider, $prompt, $maxOutputTokens);
+                $model = $requestedModel ?: $this->config['model'] ?? null;
+                $result = $this->callProvider($provider, $prompt, $maxOutputTokens, $model);
 
                 // Validate JSON response
                 $json = json_decode($result, true);
@@ -161,7 +166,8 @@ class LlmClient
      */
     private function getProviderPriority(): array
     {
-        $provider = $this->config['provider'];
+        // Default to local-first provider if not explicitly configured at root
+        $provider = $this->config['provider'] ?? 'ollama';
         $providers = [$provider];
 
         // Add Ollama as fallback if not already primary
@@ -175,12 +181,12 @@ class LlmClient
     /**
      * Call specific LLM provider.
      */
-    private function callProvider(string $provider, string $prompt, int $maxTokens): string
+    private function callProvider(string $provider, string $prompt, int $maxTokens, ?string $model = null): string
     {
         return match ($provider) {
-            'openai' => $this->callOpenAI($prompt, $maxTokens),
-            'anthropic' => $this->callAnthropic($prompt, $maxTokens),
-            'ollama' => $this->callOllama($prompt, $maxTokens),
+            'openai' => $this->callOpenAI($prompt, $maxTokens, $model),
+            'anthropic' => $this->callAnthropic($prompt, $maxTokens, $model),
+            'ollama' => $this->callOllama($prompt, $maxTokens, $model),
             default => throw new \InvalidArgumentException("Unsupported provider: {$provider}"),
         };
     }
@@ -188,12 +194,12 @@ class LlmClient
     /**
      * Call OpenAI API.
      */
-    private function callOpenAI(string $prompt, int $maxTokens): string
+    private function callOpenAI(string $prompt, int $maxTokens, ?string $model): string
     {
         $response = Http::timeout($this->config['timeout_ms'] / 1000)
-            ->withToken(config('services.openai.api_key'))
-            ->post('https://api.openai.com/v1/chat/completions', [
-                'model' => $this->config['model'],
+            ->withToken(config('llm.providers.openai.api_key'))
+            ->post(rtrim(config('llm.providers.openai.base_url', 'https://api.openai.com/v1'), '/').'/chat/completions', [
+                'model' => $model ?: $this->config['model'],
                 'messages' => [
                     ['role' => 'user', 'content' => $prompt],
                 ],
@@ -213,12 +219,12 @@ class LlmClient
     /**
      * Call Anthropic API.
      */
-    private function callAnthropic(string $prompt, int $maxTokens): string
+    private function callAnthropic(string $prompt, int $maxTokens, ?string $model): string
     {
         $response = Http::timeout($this->config['timeout_ms'] / 1000)
-            ->withToken(config('services.anthropic.api_key'))
-            ->post('https://api.anthropic.com/v1/messages', [
-                'model' => $this->config['model'],
+            ->withToken(config('llm.providers.anthropic.api_key'))
+            ->post(rtrim(config('llm.providers.anthropic.base_url', 'https://api.anthropic.com'), '/').'/v1/messages', [
+                'model' => $model ?: $this->config['model'],
                 'max_tokens' => $maxTokens,
                 'messages' => [
                     ['role' => 'user', 'content' => $prompt],
@@ -237,12 +243,12 @@ class LlmClient
     /**
      * Call Ollama API (local).
      */
-    private function callOllama(string $prompt, int $maxTokens): string
+    private function callOllama(string $prompt, int $maxTokens, ?string $model): string
     {
-
+        $base = rtrim(config('llm.providers.ollama.base_url', 'http://localhost:11434'), '/');
         $response = Http::timeout($this->config['timeout_ms'] / 1000)
-            ->post(config('services.ollama.url', 'http://localhost:11434').'/api/generate', [
-                'model' => config('services.ollama.model', 'llama2'),
+            ->post($base.'/api/generate', [
+                'model' => $model ?: 'llama3.1:8b',
                 'prompt' => $prompt,
                 'stream' => false,
                 'options' => [
