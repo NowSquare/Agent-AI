@@ -106,7 +106,7 @@ class DetectLanguage
 
     private function detectFromContent(Request $request): ?string
     {
-        if (!$request->isJson() && !$request->isXml() && !$request->has('text')) {
+        if (!$request->isJson() && !$request->has('text')) {
             return null;
         }
 
