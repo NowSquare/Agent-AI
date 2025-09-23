@@ -1,14 +1,26 @@
-{{-- Options Email Template --}}
-Hello,
+@extends('emails.layouts.base')
 
-We're not completely sure what you meant by your request. Here are some options to help clarify:
+@section('title', __('emails.options.title'))
 
-@foreach($options as $option)
-[{{ $option['label'] }}]({{ $option['url'] }})
-@endforeach
+@section('header', __('emails.options.header'))
+@section('subheader', __('emails.options.subheader'))
 
-Or reply to this email to clarify your request further: {{ $replyUrl }}
+@section('content')
+    <p>{{ __('emails.options.intro') }}</p>
 
----
-This is an automated message from Agent AI.
-Choose an option above or reply to provide more details.
+    <div class="flex flex-col items-center gap-4 mt-4">
+        @foreach($options as $option)
+            <a href="{{ $option['url'] }}" class="button" style="width: 100%; max-width: 300px;">
+                {{ $option['label'] }}
+            </a>
+        @endforeach
+    </div>
+
+    <p class="text-center mt-4" style="color: var(--text-secondary);">
+        {{ __('emails.options.reply_notice') }}
+    </p>
+@endsection
+
+@section('footer')
+    <p>{{ __('emails.options.help_message') }}</p>
+@endsection

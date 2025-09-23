@@ -141,145 +141,179 @@ Agent AI is an email-centered automation system built on Laravel 12. It links in
 
 ### Project Structure (Complete Directory Tree)
 
-```
-├── app/
-│   ├── Http/
-│   │   ├── Controllers/
-│   │   │   └── Webhook/
-│   │   │       └── PostmarkInboundController.php
-│   │   └── Middleware/
-│   ├── Jobs/
-│   │   └── ProcessInboundEmail.php
-│   ├── Models/
-│   │   ├── Account.php
-│   │   ├── Action.php
-│   │   ├── Agent.php
-│   │   ├── ApiToken.php
-│   │   ├── Attachment.php
-│   │   ├── AttachmentExtraction.php
-│   │   ├── AuthChallenge.php
-│   │   ├── AvailabilityPoll.php
-│   │   ├── AvailabilityVote.php
-│   │   ├── Contact.php
-│   │   ├── ContactLink.php
-│   │   ├── EmailInboundPayload.php
-│   │   ├── EmailMessage.php
-│   │   ├── Event.php
-│   │   ├── EventParticipant.php
-│   │   ├── Memory.php
-│   │   ├── Membership.php
-│   │   ├── Task.php
-│   │   ├── Thread.php
-│   │   ├── User.php
-│   │   ├── UserIdentity.php
-│   │   └── [21 total models]
-│   └── Services/
-│       └── ThreadResolver.php
-├── bootstrap/
-│   ├── app.php
-│   └── cache/
-├── config/
-│   ├── app.php
-│   ├── auth.php
-│   ├── cache.php
-│   ├── database.php
-│   ├── filesystems.php
-│   ├── llm.php
-│   ├── logging.php
-│   ├── mail.php
-│   ├── mcps.php
-│   ├── prompts.php
-│   ├── queue.php
-│   ├── services.php
-│   └── session.php
-├── database/
-│   ├── factories/
-│   │   ├── UserFactory.php
-│   │   └── ThreadFactory.php
-│   ├── migrations/
-│   │   └── [all migration files from Appendix I]
-│   └── seeders/
-│       ├── DatabaseSeeder.php
-│       └── AccountSeeder.php
-├── public/
-│   ├── index.php
-│   └── [assets]
-├── resources/
-│   ├── css/
-│   │   └── app.css
-│   ├── js/
-│   │   ├── app.js
-│   │   └── bootstrap.js
-│   └── lang/
-│       ├── en_US/
-│       │   ├── actions.php
-│       │   ├── auth.php
-│       │   ├── messages.php
-│       │   └── validation.php
-│       └── nl_NL/
-│           ├── actions.php
-│           ├── auth.php
-│           ├── messages.php
-│           └── validation.php
-├── routes/
-│   ├── api.php
-│   ├── channels.php
-│   ├── console.php
-│   └── web.php
-├── storage/
-│   ├── app/
-│   │   └── attachments/
-│   ├── framework/
-│   │   ├── cache/
-│   │   ├── sessions/
-│   │   ├── testing/
-│   │   └── views/
-│   └── logs/
-├── tests/
-│   ├── Feature/
-│   │   ├── Api/
-│   │   │   ├── ActionDispatchTest.php
-│   │   │   └── WebhookTest.php
-│   │   ├── Auth/
-│   │   │   ├── ChallengeTest.php
-│   │   │   └── PasswordlessLoginTest.php
-│   │   └── Mcp/
-│   │       └── ToolExecutionTest.php
-│   ├── Unit/
-│   │   ├── Jobs/
-│   │   │   ├── ProcessInboundEmailTest.php
-│   │   │   └── ScanAttachmentTest.php
-│   │   ├── Services/
-│   │   │   ├── AttachmentServiceTest.php
-│   │   │   ├── LlmClientTest.php
-│   │   │   └── ThreadResolverTest.php
-│   │   └── Mcp/
-│   │       └── ToolRegistryTest.php
-│   └── TestCase.php
-├── docker/
-│   ├── Dockerfile
-│   ├── docker-compose.yml
-│   └── nginx.conf
-├── .env.example
-├── .vscode/
-│   ├── extensions.json
-│   └── tasks.json
-├── artisan
-├── composer.json
-├── composer.lock
-├── package.json
-├── package-lock.json
-├── tailwind.config.js
-├── postcss.config.js
-├── phpstan.neon
-├── pint.json
-├── .eslintrc.js
-├── .prettierrc
-├── docker-compose.yml
-├── README.md
-├── .gitignore
-└── .gitattributes
-```
+Agent-AI/
+  - app/
+    - Console/
+      - Commands/ [1 file: *.php]
+      - Kernel.php
+    - Http/
+      - Controllers/ [11 files: *.php]
+      - Middleware/ [1 file: *.php]
+      - Requests/ [3 files: *.php]
+      - Resources/ [3 files: *.php]
+    # Core Business Logic - Listed Explicitly
+    - Jobs/
+      - ExtractAttachmentText.php
+      - ProcessInboundEmail.php
+      - ProcessWebhookPayload.php
+      - ScanAttachment.php
+      - SendActionResponse.php
+      - SendClarificationEmail.php
+      - SendOptionsEmail.php
+      - SummarizeAttachment.php
+    - Mail/
+      - ActionClarificationMail.php
+      - ActionOptionsMail.php
+      - ActionResponseMail.php
+      - AuthChallengeEmail.php
+    - Mcp/
+      - Prompts/ [2 files: *.php]
+      - Servers/ [1 file: *.php]
+      - Tools/ [3 files: *.php]
+    # Domain Models - Listed Explicitly
+    - Models/
+      - Account.php
+      - Action.php
+      - Agent.php
+      - AgentSpecialization.php
+      - ApiToken.php
+      - Attachment.php
+      - AttachmentExtraction.php
+      - AuthChallenge.php
+      - AvailabilityPoll.php
+      - AvailabilityVote.php
+      - Contact.php
+      - ContactLink.php
+      - EmailInboundPayload.php
+      - EmailMessage.php
+      - Event.php
+      - EventParticipant.php
+      - Membership.php
+      - Memory.php
+      - Task.php
+      - Thread.php
+      - ThreadMetadata.php
+      - User.php
+      - UserIdentity.php
+    - Providers/
+      - AppServiceProvider.php
+      - HorizonServiceProvider.php
+    # Core Services - Listed Explicitly
+    - Services/
+      - ActionDispatcher.php
+      - AgentProcessor.php
+      - AgentRegistry.php
+      - AttachmentService.php
+      - AuthService.php
+      - Coordinator.php
+      - LanguageDetector.php
+      - LlmClient.php
+      - MemoryService.php
+      - MultiAgentOrchestrator.php
+      - ReplyCleaner.php
+      - ThreadResolver.php
+      - ThreadSummarizer.php
+    - View/
+      - Components/ [1 file: *.php]
+  # Framework & Config
+  - artisan
+  - bootstrap/
+    - app.php
+    - cache/...
+    - providers.php
+  - composer.json
+  - composer.lock
+  # Configuration - Listed Explicitly
+  - config/
+    - app.php
+    - attachments.php
+    - auth.php
+    - cache.php
+    - database.php
+    - filesystems.php
+    - horizon.php
+    - llm.php
+    - logging.php
+    - mail.php
+    - memory.php
+    - prompts.php
+    - queue.php
+    - services.php
+    - session.php
+  # Documentation
+  - CLAUDE.md
+  - CURSOR-PROMPTS.md
+  - CURSOR-README.md
+  - README.md
+  # Database
+  - database/
+    - factories/ [5 files: *.php]
+    - migrations/ [32 files: *.php]
+    - seeders/ [1 file: *.php]
+  # Docker
+  - docker/
+    - entrypoint.sh
+  - docker-compose.yml
+  - Dockerfile
+  # Frontend
+  - node_modules/...
+  - package.json
+  - package-lock.json
+  - phpunit.xml
+  - public/
+    - build/...
+    - favicon.ico
+    - index.php
+    - robots.txt
+  # Resources
+  - resources/
+    - css/
+      - app.css
+    - js/
+      - app.js
+      - bootstrap.js
+    - lang/
+      - en/...
+      - nl/...
+    - views/
+      - action/ [3 files: *.php]
+      - auth/ [2 files: *.php]
+      - components/ [1 file: *.php]
+      - dashboard.blade.php
+      - emails/ [5 files: *.php]
+        - layouts/
+          - base.blade.php
+        - action-response.blade.php
+        - auth-challenge.blade.php
+        - clarification.blade.php
+        - options.blade.php
+      - layouts/ [1 file: *.php]
+      - threads/ [1 file: *.php]
+      - welcome.blade.php
+  # Routes
+  - routes/
+    - api.php
+    - console.php
+    - web.php
+  # Storage & Logs
+  - storage/
+    - app/...
+    - framework/...
+    - logs/
+      - browser.log
+      - laravel.log
+  # Tests
+  - tests/
+    - Feature/ [8 files: *.php]
+    - Unit/ [1 file: *.php]
+    - TestCase.php
+  # Dependencies
+  - vendor/...
+  - vite.config.js
+
+
+
+Note: File extension counts do not include files ignored by .gitignore.
 
 ## What's Actually Built (Current State)
 

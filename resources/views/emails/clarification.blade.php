@@ -1,15 +1,34 @@
-{{-- Clarification Email Template --}}
-Hello,
+@extends('emails.layouts.base')
 
-We interpreted your request as: {{ $summary }}
+@section('title', __('emails.clarification.title'))
 
-Please confirm if this is correct:
+@section('header', __('emails.clarification.header'))
+@section('subheader', __('emails.clarification.subheader'))
 
-[Confirm Request]({{ $confirmUrl }})
-[Cancel Request]({{ $cancelUrl }})
+@section('content')
+    <div class="mb-4">
+        <p>{{ __('emails.clarification.interpretation') }}</p>
+        
+        <div style="background: var(--bg-secondary); padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0; color: var(--text-primary);">{{ $summary }}</p>
+        </div>
+    </div>
 
-If this doesn't match what you intended, simply reply to this email to clarify.
+    <div class="flex flex-col items-center gap-4">
+        <a href="{{ $confirmUrl }}" class="button">
+            {{ __('emails.clarification.confirm_button') }}
+        </a>
+        
+        <a href="{{ $cancelUrl }}" class="button button-secondary">
+            {{ __('emails.clarification.cancel_button') }}
+        </a>
+    </div>
 
----
-This is an automated message from Agent AI.
-Your response helps us provide better assistance.
+    <p class="text-center mt-4" style="color: var(--text-secondary);">
+        {{ __('emails.clarification.reply_notice') }}
+    </p>
+@endsection
+
+@section('footer')
+    <p>{{ __('emails.clarification.help_message') }}</p>
+@endsection

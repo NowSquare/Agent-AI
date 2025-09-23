@@ -1,44 +1,34 @@
-{{-- Agent AI Login Code --}}
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Agent AI Login Code</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background: #f8f9fa; padding: 20px; text-align: center; border-radius: 8px; margin-bottom: 20px; }
-        .code { font-size: 32px; font-weight: bold; color: #007bff; text-align: center; margin: 20px 0; }
-        .button { display: inline-block; padding: 12px 24px; background: #007bff; color: white; text-decoration: none; border-radius: 6px; margin: 10px 0; }
-        .footer { margin-top: 30px; font-size: 14px; color: #666; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h1>Agent AI</h1>
-            <p>Your login code</p>
-        </div>
+@extends('emails.layouts.base')
 
-        <p>Hello!</p>
+@section('title', __('emails.auth.title'))
 
-        <p>Use this code to sign in to Agent AI:</p>
+@section('header', __('emails.auth.header'))
+@section('subheader', __('emails.auth.subheader'))
 
-        <div class="code">{{ $code }}</div>
+@section('content')
+    <p>{{ __('emails.auth.greeting') }}</p>
 
-        <p>Or click the link below to sign in automatically:</p>
+    <p>{{ __('emails.auth.code_instructions') }}</p>
 
-        <p style="text-align: center;">
-            <a href="{{ $magicLink }}" class="button">Sign In to Agent AI</a>
-        </p>
-
-        <p>This code will expire at {{ $expiresAt->format('g:i A T') }}.</p>
-
-        <div class="footer">
-            <p>If you didn't request this code, you can safely ignore this email.</p>
-            <p>Questions? Contact support at <a href="mailto:support@example.com">support@example.com</a></p>
+    <div class="text-center">
+        <div style="font-size: 32px; font-weight: 600; color: var(--accent-color); letter-spacing: 0.1em; margin: 24px 0;">
+            {{ $code }}
         </div>
     </div>
-</body>
-</html>
+
+    <p class="text-center">{{ __('emails.auth.magic_link_instructions') }}</p>
+
+    <div class="flex justify-center mt-4 mb-4">
+        <a href="{{ $magicLink }}" class="button">
+            {{ __('emails.auth.sign_in_button') }}
+        </a>
+    </div>
+
+    <p class="text-center" style="color: var(--text-secondary);">
+        {{ __('emails.auth.expires_at', ['time' => $expiresAt->format('g:i A T')]) }}
+    </p>
+@endsection
+
+@section('footer')
+    <p>{{ __('emails.auth.security_notice') }}</p>
+@endsection
