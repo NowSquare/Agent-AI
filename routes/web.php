@@ -11,7 +11,7 @@ use Laravel\Mcp\Facades\Mcp;
 
 Route::get('/', function () {
     return view('welcome');
-});
+})->name('welcome');
 
 // Authentication
 Route::get('/auth/challenge', function () {
