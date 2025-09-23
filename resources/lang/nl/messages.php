@@ -17,4 +17,5 @@ return [
     "Run workflows with local Ollama or your preferred provider—auditable, reversible, and under your control." => "Draai workflows met lokale Ollama of je gewenste provider—controleerbaar, omkeerbaar en onder jouw controle.",
     "Emails to our agents may be processed automatically to route and respond to your request. Only essential cookies are used." => "E-mails naar onze agents kunnen automatisch worden verwerkt om je verzoek te routeren en te beantwoorden. Alleen essentiële cookies worden gebruikt.",
     "Already have access?" => "Al toegang?",
+    "Back to home" => "Terug naar home",
 ];

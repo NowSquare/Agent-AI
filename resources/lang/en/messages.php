@@ -17,4 +17,5 @@ return [
     "Run workflows with local Ollama or your preferred provider—auditable, reversible, and under your control." => "Run workflows with local Ollama or your preferred provider—auditable, reversible, and under your control.",
     "Emails to our agents may be processed automatically to route and respond to your request. Only essential cookies are used." => "Emails to our agents may be processed automatically to route and respond to your request. Only essential cookies are used.",
     "Already have access?" => "Already have access?",
+    "Back to home" => "Back to home",
 ];
