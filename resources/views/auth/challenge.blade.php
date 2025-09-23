@@ -1,114 +1,82 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Agent AI - Sign In</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50">
-    <div class="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div class="max-w-md w-full space-y-8">
-            <div>
-                <h1 class="text-center text-3xl font-extrabold text-gray-900">Agent AI</h1>
-                <h2 class="mt-6 text-center text-2xl font-bold text-gray-900">
-                    Sign in to your account
-                </h2>
-                <p class="mt-2 text-center text-sm text-gray-600">
-                    We'll send you a login code via email
-                </p>
+@extends('layouts.auth')
+
+@section('title', __('auth.challenge.title'))
+
+@section('header', config('app.name'))
+
+@section('subheader')
+    {{ __('auth.challenge.subtitle') }}
+@endsection
+
+@section('content')
+    <form id="challengeForm" class="space-y-6" action="{{ route('auth.challenge') }}" method="POST">
+        @csrf
+
+        <!-- Email Input -->
+        <div>
+            <label for="email" class="sr-only">{{ __('auth.challenge.email_label') }}</label>
+            <div class="mt-1 relative rounded-md shadow-sm">
+                <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <i data-lucide="mail" class="h-5 w-5 text-gray-400"></i>
+                </div>
+                <input type="email" name="email" id="email" required
+                    class="block w-full pl-10 sm:text-sm border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-white rounded-md focus:ring-primary-500 focus:border-primary-500 @error('email') border-red-300 text-red-900 placeholder-red-300 focus:ring-red-500 focus:border-red-500 @enderror"
+                    placeholder="{{ __('auth.challenge.email_placeholder') }}"
+                    value="{{ old('email') }}"
+                    autocomplete="email"
+                    autofocus>
             </div>
+            @error('email')
+                <p class="mt-2 text-sm text-red-600 dark:text-red-400">{{ $message }}</p>
+            @enderror
+        </div>
 
-            <form id="challengeForm" class="mt-8 space-y-6">
-                @csrf
-                <div>
-                    <label for="identifier" class="sr-only">Email address</label>
-                    <input
-                        id="identifier"
-                        name="identifier"
-                        type="email"
-                        required
-                        class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                        placeholder="Email address"
-                    >
-                </div>
-
-                <div>
-                    <button
-                        id="submitBtn"
-                        type="submit"
-                        class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-                    >
-                        <span id="btnText">Send Login Code</span>
-                    </button>
-                </div>
-
-                @if ($errors->any())
-                    <div class="rounded-md bg-red-50 p-4">
-                        <div class="text-sm text-red-700">
-                            <ul>
-                                @foreach ($errors->all() as $error)
-                                    <li>{{ $error }}</li>
-                                @endforeach
-                            </ul>
-                        </div>
-                    </div>
-                @endif
-            </form>
-
-            <!-- Success Message -->
-            <div id="successMessage" class="hidden rounded-md bg-green-50 p-4">
-                <div class="text-sm text-green-700">
-                    Check your email for a login code!
-                </div>
+        <!-- Remember Me -->
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <input type="checkbox" name="remember" id="remember"
+                    class="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 dark:border-gray-700 rounded">
+                <label for="remember" class="ml-2 block text-sm text-gray-900 dark:text-gray-300">
+                    {{ __('auth.challenge.remember_me') }}
+                </label>
             </div>
         </div>
+
+        <!-- Submit Button -->
+        <div>
+            <button type="submit" id="submitButton"
+                class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors duration-200">
+                <span class="inline-flex items-center">
+                    <i data-lucide="arrow-right" class="mr-2 h-5 w-5"></i>
+                    {{ __('auth.challenge.continue') }}
+                </span>
+            </button>
+        </div>
+    </form>
+
+    <!-- Loading State -->
+    <div id="loadingState" class="hidden mt-4 text-center">
+        <div class="inline-flex items-center px-4 py-2 font-semibold leading-6 text-sm text-gray-800 dark:text-gray-200 transition ease-in-out duration-150 cursor-not-allowed">
+            <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-gray-800 dark:text-gray-200" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            {{ __('auth.challenge.sending_code') }}
+        </div>
     </div>
+@endsection
 
-    <script>
-        document.getElementById('challengeForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
+@section('footer')
+    <p class="text-sm text-gray-500 dark:text-gray-400">
+        {{ __('auth.challenge.help_text') }}
+    </p>
+@endsection
 
-            const submitBtn = document.getElementById('submitBtn');
-            const btnText = document.getElementById('btnText');
-            const identifier = document.getElementById('identifier').value;
-            const successMessage = document.getElementById('successMessage');
-
-            // Disable button and show loading
-            submitBtn.disabled = true;
-            btnText.textContent = 'Sending...';
-
-            try {
-                const response = await fetch('/auth/challenge', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || ''
-                    },
-                    body: JSON.stringify({
-                        identifier: identifier
-                    })
-                });
-
-                const data = await response.json();
-
-                if (response.ok) {
-                    successMessage.classList.remove('hidden');
-                    // Optionally redirect to verify page with challenge_id
-                    setTimeout(() => {
-                        window.location.href = `/auth/verify?challenge_id=${data.challenge_id}`;
-                    }, 2000);
-                } else {
-                    throw new Error(data.message || 'Something went wrong');
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            } finally {
-                submitBtn.disabled = false;
-                btnText.textContent = 'Send Login Code';
-            }
-        });
-    </script>
-</body>
-</html>
+@push('scripts')
+<script>
+    document.getElementById('challengeForm').addEventListener('submit', function() {
+        document.getElementById('submitButton').classList.add('opacity-50', 'cursor-not-allowed');
+        document.getElementById('loadingState').classList.remove('hidden');
+    });
+</script>
+@endpush
