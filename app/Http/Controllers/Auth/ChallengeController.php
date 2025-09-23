@@ -2,71 +2,56 @@
 
 namespace App\Http\Controllers\Auth;
 
-use App\Http\Controllers\Controller as BaseController;
-use App\Models\AuthChallenge;
-use App\Models\User;
-use App\Models\UserIdentity;
+use App\Http\Controllers\Controller;
+use App\Http\Requests\Auth\ChallengeRequest;
 use App\Services\AuthService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\RateLimiter;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 
-class ChallengeController extends BaseController
+class ChallengeController extends Controller
 {
-    public function __construct(
-        private AuthService $authService
-    ) {}
+    private AuthService $auth;
 
-    public function __invoke(Request $request): JsonResponse
+    public function __construct(AuthService $auth)
     {
-        $request->validate([
-            'identifier' => 'required|email|max:255',
-        ]);
+        $this->auth = $auth;
+    }
 
-        $identifier = strtolower($request->input('identifier'));
-
-        // Rate limiting: 5 per 15 minutes per identifier, 20/hour per IP
-        $identifierKey = 'auth-challenge:identifier:' . $identifier;
-        $ipKey = 'auth-challenge:ip:' . $request->ip();
-
-        if (RateLimiter::tooManyAttempts($identifierKey, 5)) {
-            throw ValidationException::withMessages([
-                'identifier' => 'Too many attempts. Please try again later.',
-            ]);
+    /**
+     * Handle an authentication challenge request.
+     */
+    public function __invoke(ChallengeRequest $request): JsonResponse
+    {
+        $email = Str::lower($request->input('email'));
+        
+        // Rate limiting key includes both email and IP for better security
+        $key = Str::transliterate($email . '|' . $request->ip());
+        
+        // Check rate limit: 5 attempts per 15 minutes
+        $limiter = RateLimiter::attempt(
+            key: "auth-challenge:{$key}",
+            maxAttempts: 5,
+            callback: function () use ($email) {
+                // Create and send challenge
+                $challenge = $this->auth->createChallenge($email);
+                
+                return [
+                    'message' => __('auth.challenge.sent'),
+                    'expires_in' => $challenge->expires_at->diffInMinutes(now()),
+                ];
+            },
+            decaySeconds: 15 * 60 // 15 minutes
+        );
+        
+        if (! $limiter) {
+            return response()->json([
+                'message' => __('auth.challenge.rate_limited', [
+                    'minutes' => ceil(RateLimiter::availableIn("auth-challenge:{$key}") / 60),
+                ]),
+            ], 429);
         }
-
-        if (RateLimiter::tooManyAttempts($ipKey, 20)) {
-            throw ValidationException::withMessages([
-                'identifier' => 'Too many attempts from this IP. Please try again later.',
-            ]);
-        }
-
-        RateLimiter::increment($identifierKey, 15 * 60); // 15 minutes
-        RateLimiter::increment($ipKey, 60 * 60); // 1 hour
-
-        // Create or find user identity
-        $userIdentity = UserIdentity::firstOrCreate([
-            'type' => 'email',
-            'identifier' => $identifier,
-        ], [
-            'user_id' => User::firstOrCreate([
-                'email' => $identifier,
-            ], [
-                'name' => explode('@', $identifier)[0], // Simple name extraction
-                'display_name' => explode('@', $identifier)[0],
-                'locale' => 'en_US',
-                'timezone' => 'Europe/Amsterdam',
-                'status' => 'active',
-            ])->id,
-        ]);
-
-        // Create auth challenge
-        $challenge = $this->authService->createChallenge($userIdentity);
-
-        return response()->json([
-            'challenge_id' => $challenge->id,
-            'message' => 'Check your email for a login code.',
-        ]);
+        
+        return response()->json($limiter);
     }
 }

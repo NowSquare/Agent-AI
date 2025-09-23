@@ -1,6 +1,11 @@
 <?php
 
 return [
+    'validation' => [
+        'email_required' => 'Please enter your email address.',
+        'email_invalid' => 'Please enter a valid email address.',
+        'email_max' => 'Email address is too long.',
+    ],
     'challenge' => [
         'title' => 'Your Login Code',
         'preview' => 'Here is your 6-digit login code for Agent AI',

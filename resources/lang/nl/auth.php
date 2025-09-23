@@ -1,6 +1,11 @@
 <?php
 
 return [
+    'validation' => [
+        'email_required' => 'Vul uw e-mailadres in.',
+        'email_invalid' => 'Vul een geldig e-mailadres in.',
+        'email_max' => 'E-mailadres is te lang.',
+    ],
     'challenge' => [
         'title' => 'Uw Inlogcode',
         'preview' => 'Hier is uw 6-cijferige inlogcode voor Agent AI',
