@@ -51,13 +51,13 @@ return [
             ],
             'GROUNDED' => [
                 'provider'  => env('LLM_GROUNDED_PROVIDER', 'ollama'),
-                'model'     => env('LLM_GROUNDED_MODEL', 'qwen3:14b'),
+                'model'     => env('LLM_GROUNDED_MODEL', 'gpt-oss:20b'),
                 'tools'     => (bool) env('LLM_GROUNDED_TOOLS', true),
                 'reasoning' => (bool) env('LLM_GROUNDED_REASONING', false),
             ],
             'SYNTH' => [
                 'provider'  => env('LLM_SYNTH_PROVIDER', 'ollama'),
-                'model'     => env('LLM_SYNTH_MODEL', 'deepseek-v3.1:32b'),
+                'model'     => env('LLM_SYNTH_MODEL', 'gpt-oss:120b'),
                 'tools'     => (bool) env('LLM_SYNTH_TOOLS', true),
                 'reasoning' => (bool) env('LLM_SYNTH_REASONING', true),
             ],
@@ -87,8 +87,8 @@ return [
         'ollama' => [
             'base_url' => env('OLLAMA_BASE_URL', 'http://localhost:11434'),
             'chat_models' => [
-                // Good local defaults (tune per hardware)
-                'qwen3:14b', 'mistral-small3.2:24b', 'qwen2.5:14b', 'deepseek-v3.1:32b', 'llama3.1:8b',
+                // Local-first examples; adjust based on what you have pulled in Ollama
+                'mistral-small3.2:24b', 'qwen3:14b', 'qwen2.5:14b', 'gpt-oss:20b', 'gpt-oss:120b', 'llama4', 'llama3.1:8b',
             ],
             'embedding_models' => [
                 // Pick one and set EMBEDDINGS_DIM accordingly
