@@ -1,4 +1,4 @@
-# Agent-AI
+# Agent AI
 
 **Email your AI employee. It remembers, coordinates agents with tools, and gets work done.**
 
@@ -15,10 +15,10 @@
 - License
 
 ## Why this matters
-Work starts in email—quotes, questions, decisions, approvals. But context is scattered, and generic chatbots don’t know your business. Agent-AI is a personal assistant you can simply email. It builds long-term memory from your conversations and documents, then replies with grounded, practical help you can trust.
+Work starts in email—quotes, questions, decisions, approvals. But context is scattered, and generic chatbots don’t know your business. Agent AI is a personal assistant you can simply email. It builds long-term memory from your conversations and documents, then replies with grounded, practical help you can trust.
 
 ## What it does (Feature Highlights)
-- **Email-native assistant** — Send questions, tasks, and documents by email. Agent-AI replies in your thread.
+- **Email-native assistant** — Send questions, tasks, and documents by email. Agent AI replies in your thread.
 - **Multi-agent orchestration (with tools)** — Specialized agents collaborate (e.g., extract, research, plan, draft, review) and call tools when needed.
 - **Compounding memory** — A growing knowledge base from your emails and attachments that improves answers over time.
 - **Grounded responses via pgvector** — Searches your own data (emails, attachments, memories) before it speaks.
