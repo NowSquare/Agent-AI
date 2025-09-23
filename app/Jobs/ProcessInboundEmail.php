@@ -114,10 +114,19 @@ class ProcessInboundEmail implements ShouldQueue
             return;
         }
 
-        // Get or create account (for now, use default account)
-        $account = Account::firstOrCreate([
-            'name' => 'Default Account',
-        ]);
+        // Ensure default account (single-tenant bootstrap)
+        $account = \App\Services\EnsureDefaultAccount::run();
+
+        // Ensure Contact for sender (normalize email)
+        $senderEmail = strtolower(trim($emailData['from_email'] ?? ''));
+        if ($senderEmail !== '') {
+            \App\Models\Contact::firstOrCreate([
+                'account_id' => $account->id,
+                'email' => $senderEmail,
+            ], [
+                'name' => $emailData['from_name'] ?? null,
+            ]);
+        }
 
         // Clean reply text
         $cleanReply = $replyCleaner->clean($emailData['text_body'] ?? '', $emailData['html_body'] ?? '');

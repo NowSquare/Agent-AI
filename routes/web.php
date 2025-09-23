@@ -29,6 +29,12 @@ Route::get('/login/{token}', [LoginController::class, 'magicLink'])->name('login
 // Dashboard (protected)
 Route::middleware('auth')->get('/dashboard', DashboardController::class)->name('dashboard');
 
+// Activity (protected)
+Route::middleware('auth')->group(function () {
+    Route::get('/activity', [\App\Http\Controllers\ActivityController::class, 'index'])->name('activity.index');
+    Route::get('/activity/{id}', [\App\Http\Controllers\ActivityController::class, 'show'])->name('activity.show');
+});
+
 // Signed action links (public, no auth required)
 Route::get('/a/{action}', [App\Http\Controllers\ActionConfirmationController::class, 'show'])->name('action.confirm.show');
 Route::post('/a/{action}', [App\Http\Controllers\ActionConfirmationController::class, 'confirm'])->name('action.confirm');

@@ -112,6 +112,24 @@ class AgentProcessor
                 'tools'    => $modelCfg['tools'],
                 'reasoning'=> $modelCfg['reasoning'],
             ]);
+
+            // Log agent step
+            \App\Models\AgentStep::create([
+                'account_id' => $task->thread?->account_id,
+                'thread_id' => $task->thread_id,
+                'action_id' => null,
+                'role' => $role,
+                'provider' => $modelCfg['provider'],
+                'model' => $modelCfg['model'],
+                'step_type' => 'chat',
+                'input_json' => ['prompt' => mb_substr($prompt, 0, 4000)],
+                'output_json' => ['response' => $llmResponse['response'] ?? null],
+                'tokens_input' => 0,
+                'tokens_output' => 0,
+                'tokens_total' => 0,
+                'latency_ms' => 0,
+                'confidence' => $llmResponse['confidence'] ?? null,
+            ]);
         } catch (\Exception $e) {
             Log::warning('Agent LLM JSON parsing failed, using fallback response', [
                 'agent_id' => $agent->id,
