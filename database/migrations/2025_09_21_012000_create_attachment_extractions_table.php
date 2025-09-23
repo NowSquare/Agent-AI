@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -26,6 +27,12 @@ return new class extends Migration
             $table->timestampsTz();
             $table->index('attachment_id');
         });
+
+        // pgvector embedding column and optional IVFFlat index
+        $dim = (int) (config('llm.embeddings.dim', 1536));
+        DB::statement("ALTER TABLE attachment_extractions ADD COLUMN IF NOT EXISTS text_embedding vector($dim)");
+        DB::statement('CREATE INDEX IF NOT EXISTS attachment_extractions_text_embedding_idx 
+  ON attachment_extractions USING ivfflat (text_embedding vector_cosine_ops) WITH (lists = 100)');
     }
 
     /**
@@ -33,6 +40,9 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // Drop embedding index/column if present
+        DB::statement('DROP INDEX IF EXISTS attachment_extractions_text_embedding_idx');
+        DB::statement('ALTER TABLE attachment_extractions DROP COLUMN IF EXISTS text_embedding');
         Schema::dropIfExists('attachment_extractions');
     }
 };

@@ -45,7 +45,11 @@ return new class extends Migration
             $table->index(['last_used_at', 'usage_count']);
         });
 
-        // Note: GIN index on jsonb requires additional PostgreSQL extensions, added later if needed
+        // pgvector embedding column and optional IVFFlat index
+        $dim = (int) (config('llm.embeddings.dim', 1536));
+        DB::statement("ALTER TABLE memories ADD COLUMN IF NOT EXISTS content_embedding vector($dim)");
+        DB::statement('CREATE INDEX IF NOT EXISTS memories_content_embedding_idx 
+  ON memories USING ivfflat (content_embedding vector_cosine_ops) WITH (lists = 100)');
     }
 
     /**
@@ -53,6 +57,9 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // Drop embedding index/column if present
+        DB::statement('DROP INDEX IF EXISTS memories_content_embedding_idx');
+        DB::statement('ALTER TABLE memories DROP COLUMN IF EXISTS content_embedding');
         Schema::dropIfExists('memories');
     }
 };
