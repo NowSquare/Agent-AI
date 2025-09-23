@@ -154,6 +154,13 @@ class ProcessInboundEmail implements ShouldQueue
 
         $emailMessage = EmailMessage::create($messageData);
 
+        // Create and store embedding for the email body (if present)
+        if (!empty($emailMessage->body_text)) {
+            $embedSvc = app(\App\Services\Embeddings::class);
+            $vec = $embedSvc->embedText($emailMessage->body_text);
+            $embedSvc->storeEmailBodyEmbedding($emailMessage->id, $vec);
+        }
+
         // Register attachments (if any)
         if (! empty($emailData['attachments'])) {
             $this->registerAttachments($emailMessage, $emailData['attachments'], $attachmentService);

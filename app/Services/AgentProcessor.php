@@ -13,6 +13,8 @@ class AgentProcessor
     public function __construct(
         private LlmClient $llmClient,
         private MemoryService $memoryService,
+        private GroundingService $grounding,
+        private ModelRouter $router,
     ) {}
 
     /**
@@ -83,10 +85,32 @@ class AgentProcessor
         // Build the agent prompt
         $prompt = $this->buildAgentPrompt($agent, $input);
 
+        // Routing: tokens + grounding
+        $tokensIn = strlen($prompt) / 4; // rough estimate
+        $results = $this->grounding->retrieveTopK($input['action_payload']['question'] ?? ($input['user_query'] ?? ''), 8);
+        $hitRate = $this->grounding->hitRate($results);
+        $topSim  = $this->grounding->topSimilarity($results);
+        $role    = $this->router->chooseRole((int) $tokensIn, $hitRate, $topSim);
+        $modelCfg= $this->router->resolveProviderModel($role);
+
+        // If GROUNDED, prepend retrieved snippets
+        if ($role === 'GROUNDED' && !empty($results)) {
+            $ctx = "\n\nContext (retrieved):\n";
+            foreach (array_slice($results, 0, 6) as $r) {
+                $ctx .= "- [{$r['src']}:{$r['id']}] {$r['text']}\n";
+            }
+            $prompt .= $ctx;
+        }
+
         // Make LLM call with agent-specific configuration
         try {
             $llmResponse = $this->llmClient->json('agent_response', [
                 'prompt' => $prompt,
+                'role'   => $role,
+                'provider' => $modelCfg['provider'],
+                'model'    => $modelCfg['model'],
+                'tools'    => $modelCfg['tools'],
+                'reasoning'=> $modelCfg['reasoning'],
             ]);
         } catch (\Exception $e) {
             Log::warning('Agent LLM JSON parsing failed, using fallback response', [
@@ -108,7 +132,7 @@ class AgentProcessor
             'agent_id' => $agent->id,
             'agent_name' => $agent->name,
             'processing_time' => now()->diffInSeconds($task->started_at),
-            'model_used' => 'gpt-oss:20b', // TODO: Make configurable per agent
+            'model_used' => $modelCfg['model'],
         ];
     }
 

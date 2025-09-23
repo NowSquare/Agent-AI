@@ -42,6 +42,7 @@ This project avoids heavy infra. The following refinements improve reliability a
 - Embed email bodies, attachment text, and memories.
 - Store vectors in existing tables (`email_messages`, `attachment_extractions`, `memories`).
 - KNN search for top-k context; tag snippets with provenance.
+ - Routing: CLASSIFY → run KNN over embeddings → if hit-rate ≥ threshold, answer via GROUNDED; else SYNTH.
 
 ### 2) AgentOps Logs & Evaluation
 - New `agent_steps` table with: agent, step_type, input/output JSON, tokens, latency, confidence, timestamps.
@@ -49,7 +50,8 @@ This project avoids heavy infra. The following refinements improve reliability a
 
 ### 3) Simple Dynamic Model Selection
 - Small model for classification/short tasks.
-- Large model for synthesis/planning.
+- GROUNDED default model: `gpt-oss:20b` (local-first), configurable via .env.
+- SYNTH default model: `gpt-oss:120b` (heavier reasoning), configurable via .env.
 - Record chosen model in `agent_steps`.
 
 ### 4) Internal Multi-Agent Delegation
@@ -88,6 +90,7 @@ This project avoids heavy infra. The following refinements improve reliability a
 - Action interpretation and clarification loop
 - Memory gate with TTL/decay
 - Add **pgvector grounding**, **AgentOps logs**, **simple model routing**, **internal delegation**, plus an evaluation checklist.
+ - LLM routing: CLASSIFY → (pgvector retrieval) → GROUNDED or SYNTH, with config-driven thresholds and role bindings.
 
 **✅ COMPLETED: Phase 3 - Attachments Pipeline**
 - Full attachment pipeline: MIME/size limits, ClamAV scan, text extraction, LLM summarization
@@ -933,7 +936,7 @@ Use these fields to reliably control the follow-up loop.
 - **Dependency injection** for clean, testable code
 
 **Future Enhancements:**
-- Multi-provider support (OpenAI, Anthropic) with automatic failover
+- Multi-provider support (OpenAI, Anthropic) with automatic failover and role-based routing (CLASSIFY/GROUNDED/SYNTH)
 - Tool chaining for complex multi-step operations
 - MCP resource integration for external data sources
 - Enhanced confidence score calibration and fallback logic
