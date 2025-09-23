@@ -86,10 +86,18 @@
                     <!-- Language Selector -->
                     <div class="relative inline-block text-left">
                         <select onchange="window.location.href = '?lang=' + this.value" class="block w-full pl-3 pr-10 py-2 text-xs bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-primary-500 focus:border-primary-500">
-                            @foreach(array_unique(config('language.supported_locales')) as $code => $locale)
-                                <option value="{{ $code }}" {{ app()->getLocale() === $code ? 'selected' : '' }}>
-                                    {{ strtoupper(substr($code, 0, 2)) }}
-                                </option>
+                            @php
+                                $locales = config('language.supported_locales', [
+                                    'en' => 'en_US',
+                                    'nl' => 'nl_NL',
+                                ]);
+                            @endphp
+                            @foreach($locales as $code => $locale)
+                                @if(in_array($code, ['en', 'nl']))
+                                    <option value="{{ $code }}" {{ app()->getLocale() === $code ? 'selected' : '' }}>
+                                        {{ strtoupper($code) }}
+                                    </option>
+                                @endif
                             @endforeach
                         </select>
                     </div>
