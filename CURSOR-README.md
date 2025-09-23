@@ -63,6 +63,16 @@ This project avoids heavy infra. The following refinements improve reliability a
 - Grounding hit-rate monitoring.
 - Non-regression tests with cached prompts.
 
+### Tuning & Troubleshooting (Quick Guide)
+- Tuning Playbook:
+  - If answers hallucinate → lower `LLM_GROUNDING_HIT_MIN` or improve the embeddings model.
+  - If everything routes to SYNTH → decrease `LLM_SYNTH_COMPLEXITY_TOKENS` or improve retrieval (`k`↑).
+  - If latency too high → pick a smaller GROUNDED model or reduce `k`; consider disabling reasoning for GROUNDED.
+- Troubleshooting:
+  - Vector dim mismatch → check `EMBEDDINGS_DIM` vs actual model; re-run migrations and `php artisan embeddings:backfill`.
+  - Missing model tags → change role provider/model or pull tags in Ollama.
+  - No matches in retrieval → verify embeddings present; run `php artisan embeddings:backfill`; inspect stopwords/cleanup.
+
 ### Assumptions
 
 * Postmark is available.
