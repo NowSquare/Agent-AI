@@ -1,9 +1,9 @@
 import './bootstrap';
 import CodeInput from './components/CodeInput';
-import * as lucide from 'lucide';
+import { createIcons, icons } from 'lucide';
 
 // Initialize Lucide icons
-window.lucide = lucide;
+createIcons({ icons });
 
 // Initialize code input
 document.addEventListener('DOMContentLoaded', () => {

@@ -15,11 +15,6 @@
     <title>{{ config('app.name', 'Agent AI') }}</title>
     <meta name="theme-color" content="#0ea5e9">
     @vite(['resources/css/app.css','resources/js/app.js'])
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            lucide.createIcons();
-        });
-    </script>
 </head>
 <body class="bg-slate-50 text-slate-900 antialiased selection:bg-sky-100">
 
