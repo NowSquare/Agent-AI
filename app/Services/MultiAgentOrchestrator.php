@@ -15,6 +15,9 @@ class MultiAgentOrchestrator
         private LlmClient $llmClient,
         private AgentRegistry $agentRegistry,
         private AgentProcessor $agentProcessor,
+        private Planner $planner,
+        private DebateCoordinator $debate,
+        private MemoryCurator $curator,
     ) {}
 
     /**
@@ -26,13 +29,40 @@ class MultiAgentOrchestrator
             'action_id' => $action->id,
         ]);
 
-        // Step 1: Define agents and tasks using LLM
-        $orchestrationPlan = $this->defineAgentsAndTasks($action, $thread);
+        // Create or update AgentRun blackboard
+        $run = \App\Models\AgentRun::create([
+            'account_id' => $account->id,
+            'thread_id' => $thread->id,
+            'state' => [
+                'phase' => 'init',
+                'plan' => null,
+                'candidates' => [],
+                'votes' => [],
+            ],
+            'round_no' => 0,
+        ]);
 
-        Log::info('MultiAgentOrchestrator: Generated orchestration plan', [
+        // Step 1: Plan (Planner role)
+        $plan = $this->planner->plan($action, $thread);
+        $run->update(['state->plan' => $plan, 'state->phase' => 'planned']);
+        \App\Models\AgentStep::create([
+            'account_id' => $account->id,
+            'thread_id' => $thread->id,
             'action_id' => $action->id,
-            'agent_count' => count($orchestrationPlan['agents'] ?? []),
-            'task_count' => count($orchestrationPlan['tasks'] ?? []),
+            'role' => 'CLASSIFY', // keep routing taxonomy
+            'provider' => 'internal',
+            'model' => 'planner',
+            'step_type' => 'route',
+            'input_json' => ['question' => $action->payload_json['question'] ?? ''],
+            'output_json' => ['plan' => $plan],
+            'latency_ms' => 0,
+            'agent_role' => 'Planner',
+            'round_no' => 0,
+        ]);
+
+        Log::info('MultiAgentOrchestrator: Plan created', [
+            'action_id' => $action->id,
+            'task_count' => count($plan['tasks'] ?? []),
         ]);
 
         // Step 2: Check if user confirmation is needed
@@ -41,8 +71,46 @@ class MultiAgentOrchestrator
             return; // Wait for user response
         }
 
-        // Step 3: Execute the orchestration plan
-        $this->executeOrchestrationPlan($action, $thread, $account, $orchestrationPlan);
+        // Step 2: Allocate → Work (dispatch workers by capability)
+        $candidates = $this->dispatchWorkers($action, $thread, $account, $plan);
+
+        // Step 3: Debate (Critic rounds = 2) → Decide (Arbiter)
+        $decision = $this->debate->runKRounds($candidates, evidence: [] , rounds: 2);
+        $winner = $decision['winner'];
+
+        // Log Arbiter decision
+        if ($winner) {
+            \App\Models\AgentStep::create([
+                'account_id' => $account->id,
+                'thread_id' => $thread->id,
+                'action_id' => $action->id,
+                'role' => 'SYNTH',
+                'provider' => 'internal',
+                'model' => 'arbiter',
+                'step_type' => 'route',
+                'input_json' => ['candidates' => array_map(fn($c) => ['id'=>$c['id'],'score'=>$c['score']], $candidates)],
+                'output_json' => ['winner_id' => $winner['id'] ?? null, 'votes' => $decision['votes']],
+                'latency_ms' => 0,
+                'agent_role' => 'Arbiter',
+                'round_no' => count($decision['votes']),
+                'vote_score' => isset($winner['score']) ? round((float)$winner['score'], 2) : null,
+                'decision_reason' => $decision['reasons'][array_key_last($decision['reasons'])] ?? null,
+            ]);
+        }
+
+        // Step 4: Curate memory of the outcome
+        $finalAnswer = (string)($winner['text'] ?? '');
+        $this->curator->persistOutcome($run->id, $thread, $account, $finalAnswer, provenanceIds: []);
+
+        // Mark action as completed with final answer
+        $action->update([
+            'status' => 'completed',
+            'completed_at' => now(),
+            'payload_json' => array_merge($action->payload_json, [
+                'final_response' => $finalAnswer,
+                'processing_type' => 'multi_agent_protocol',
+            ]),
+        ]);
     }
 
     /**
@@ -426,6 +494,57 @@ Return a JSON structure with:
             'synthesized_from_agents' => count($results),
             'response_length' => strlen($finalResponse),
         ]);
+    }
+
+    /**
+     * Allocate and execute workers based on plan; return candidate drafts.
+     */
+    private function dispatchWorkers(Action $action, Thread $thread, Account $account, array $plan): array
+    {
+        $candidates = [];
+
+        foreach ($plan['tasks'] as $taskDef) {
+            $agent = $this->agentRegistry->findBestAgentForAction($account, $action->toArray(), [
+                'thread_summary' => $thread->context_json['summary'] ?? '',
+            ]);
+
+            $task = \App\Models\Task::create([
+                'account_id' => $account->id,
+                'thread_id' => $thread->id,
+                'agent_id' => $agent->id,
+                'status' => 'pending',
+                'input_json' => [
+                    'action_id' => $action->id,
+                    'action_type' => $action->type,
+                    'action_payload' => $action->payload_json,
+                    'thread_context' => [
+                        'thread_id' => $thread->id,
+                        'account_id' => $account->id,
+                        'subject' => $thread->subject,
+                        'summary' => $thread->context_json['summary'] ?? '',
+                        'recent_messages' => [],
+                    ],
+                    'agent_instructions' => [
+                        'role' => $agent->role,
+                        'task' => $taskDef['description'],
+                    ],
+                    'round_no' => 1,
+                ],
+            ]);
+
+            $this->agentProcessor->processTask($task);
+
+            $candidates[] = [
+                'id' => (string)$task->id,
+                'text' => (string)($task->result_json['response'] ?? ''),
+                'score' => (float)($task->result_json['confidence'] ?? 0.0),
+                'evidence' => [],
+            ];
+
+            // Log worker step explicitly (already logged in AgentProcessor, but include coalition/round fields if needed)
+        }
+
+        return $candidates;
     }
 
     /**
