@@ -30,6 +30,32 @@
       <h2 class="font-semibold mb-2">Output</h2>
       <pre class="text-xs whitespace-pre-wrap">{{ json_encode($step->output_json, JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES) }}</pre>
     </div>
+    @php $planReport = $step->output_json['report'] ?? null; $inputPlan = $step->input_json['plan'] ?? null; @endphp
+    @if($planReport)
+    <div class="bg-white dark:bg-gray-900 shadow rounded p-4 md:col-span-2">
+      <h2 class="font-semibold mb-2">Plan</h2>
+      <div class="text-sm mb-2">
+        @if(($planReport['valid'] ?? false))
+          <span class="text-green-600">Valid ✓</span>
+        @else
+          <span class="text-red-600">Invalid ✗</span>
+          <span class="ml-2">Step {{ $planReport['failing_step'] ?? '—' }} failed: {{ $planReport['error'] ?? '—' }}</span>
+          @if(!empty($planReport['hint']))<div class="mt-1 text-gray-600">Hint: {{ $planReport['hint'] }}</div>@endif
+        @endif
+      </div>
+      @if(!empty($inputPlan['steps']))
+      <ol class="text-sm list-decimal pl-5 space-y-1">
+        @foreach($inputPlan['steps'] as $k => $st)
+          <li>
+            <code>S{{ $k }}</code>
+            → <code>{{ $st['action']['name'] ?? 'Action' }}</code>
+            → <code>S{{ $k+1 }}</code>
+          </li>
+        @endforeach
+      </ol>
+      @endif
+    </div>
+    @endif
     @if(($step->agent_role === 'Critic' || $step->agent_role === 'Arbiter') && is_array($step->output_json))
     <div class="bg-white dark:bg-gray-900 shadow rounded p-4 md:col-span-2">
       <h2 class="font-semibold mb-2">Votes</h2>

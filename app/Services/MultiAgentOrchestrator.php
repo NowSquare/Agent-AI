@@ -102,6 +102,53 @@ class MultiAgentOrchestrator
         // Step 2: Allocate → Work (dispatch workers by capability / utility scoring)
         $candidates = $this->dispatchWorkers($action, $thread, $account, $plan);
 
+        // Optional validation+repair pass using symbolic plan emitted by Planner/Workers
+        $planValidator = app(\App\Services\PlanValidator::class);
+        $initialFacts = $this->extractInitialFacts($action, $thread);
+
+        // Prefer a candidate that carries a plan; fall back to Planner plan
+        $symbolicPlan = $plan['plan'] ?? null;
+        foreach ($candidates as $c) {
+            if (!empty($c['plan'])) { $symbolicPlan = $c['plan']; break; }
+        }
+        if ($symbolicPlan) {
+            $report = $planValidator->validate($symbolicPlan, $initialFacts);
+            \App\Models\AgentStep::create([
+                'account_id' => $account->id,
+                'thread_id' => $thread->id,
+                'action_id' => $action->id,
+                'role' => 'CLASSIFY',
+                'provider' => 'internal',
+                'model' => 'plan-validator',
+                'step_type' => 'route',
+                'input_json' => ['plan' => $symbolicPlan, 'initial_facts' => $initialFacts],
+                'output_json' => ['report' => $report],
+                'latency_ms' => 0,
+                'agent_role' => 'Critic',
+                'round_no' => 0,
+            ]);
+
+            if (!$report['valid']) {
+                // Feed repair hint to debate (one iteration) and re-pick
+                $decision = $this->debate->runKRounds($candidates, evidence: [['type'=>'plan_hint','hint'=>$report['hint']]], rounds: 1);
+                $winner = $decision['winner'];
+                if (!empty($winner['plan'])) {
+                    $symbolicPlan = $winner['plan'];
+                    $report = $planValidator->validate($symbolicPlan, $initialFacts);
+                }
+            }
+
+            // Gate SendReply on valid plan; else fallback to clarification/options path
+            if (isset($symbolicPlan['steps'])) {
+                $allowsSend = $report['valid'] === true;
+                // Append gating info to action payload for downstream use
+                $action->update(['payload_json' => array_merge($action->payload_json ?? [], [
+                    'plan_report' => $report,
+                    'plan_valid' => $allowsSend,
+                ])]);
+            }
+        }
+
         // Step 3: Debate (Critic rounds = 2) → Decide (Arbiter)
         $decision = $this->debate->runKRounds($candidates, evidence: [] , rounds: 2);
         $winner = $decision['winner'];
@@ -139,6 +186,25 @@ class MultiAgentOrchestrator
                 'processing_type' => 'multi_agent_protocol',
             ]),
         ]);
+    }
+
+    /**
+     * Summary: Extract initial facts from action/thread for planning.
+     */
+    private function extractInitialFacts(Action $action, Thread $thread): array
+    {
+        return [
+            'received' => true,
+            'has_attachment' => $thread->emailMessages()->with('attachments')->get()->pluck('attachments')->flatten()->isNotEmpty(),
+            'clamav_ready' => true, // assuming daemon available per config
+            'scanned' => false,
+            'extracted' => false,
+            'text_available' => false,
+            'summary_ready' => false,
+            'classified' => true, // classify already done upstream
+            'retrieval_done' => false,
+            'confidence' => (float) ($action->payload_json['confidence'] ?? 0.5),
+        ];
     }
 
     /**
