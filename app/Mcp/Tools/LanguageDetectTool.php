@@ -45,6 +45,29 @@ class LanguageDetectTool extends Tool
             'sample_text' => $sampleText,
         ]);
 
+        // Normalize common variants from different models
+        if (! isset($result['language'])) {
+            if (isset($result['lang'])) {
+                $result['language'] = $result['lang'];
+                unset($result['lang']);
+            } elseif (isset($result['code'])) {
+                $result['language'] = $result['code'];
+            } elseif (isset($result['language_code'])) {
+                $result['language'] = $result['language_code'];
+            }
+        }
+
+        // Map friendly names like "English" to locale code
+        if (isset($result['language']) && strlen((string) $result['language']) > 10) {
+            $mapped = app(\App\Services\LanguageDetector::class)->detect((string) $sampleText, useLlmFallback: false);
+            $result['language'] = strtolower(explode('_', $mapped)[0]);
+        }
+
+        // Default confidence if missing
+        if (! isset($result['confidence'])) {
+            $result['confidence'] = 0.9;
+        }
+
         $validator = Validator::make($result, LanguageDetectSchema::rules());
         if ($validator->fails()) {
             throw new ValidationException($validator);

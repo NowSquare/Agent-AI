@@ -46,6 +46,17 @@ class ThreadSummarizeTool extends Tool
             'key_memories' => $keyMemories,
         ]);
 
+        // Some models may return capitalized keys; normalize
+        if (isset($result['Summary']) && ! isset($result['summary'])) {
+            $result['summary'] = $result['Summary'];
+        }
+        if (isset($result['entities']) && ! isset($result['key_entities'])) {
+            $result['key_entities'] = $result['entities'];
+        }
+        if (isset($result['questions']) && ! isset($result['open_questions'])) {
+            $result['open_questions'] = $result['questions'];
+        }
+
         $validator = Validator::make($result, ThreadSummarizeSchema::rules());
         if ($validator->fails()) {
             throw new ValidationException($validator);
