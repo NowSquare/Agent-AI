@@ -779,6 +779,7 @@ flowchart LR
 * **Coordinator**: Intelligent complexity detection, agent selection, orchestration management.
 * **Agent Registry**: Manages specialized agents (Chef Mario, Tech Support), intelligent matching by expertise and keywords.
 * **Multi-Agent Orchestrator**: Handles complex requests with LLM agent planning, task dependency management, coordinated execution.
+  - Confirmation-gate undefined variable issue fixed; orchestration completes with Planner/Critic/Arbiter steps logged and plan validation visible in Activity.
 * **Agent Processor**: Executes agent tasks with personality-driven prompts, contextual responses, fallback handling.
 * **Action Dispatcher**: Routes processed actions to response generation and email delivery.
 * **Attachment Pipeline**: ClamAV scan, MIME/size checks, extraction (txt/md/csv direct; pdf via pdf-to-text), signed downloads.
@@ -876,7 +877,7 @@ Use these fields to reliably control the follow-up loop.
 
 ### MCP Layer (Planned)
 
-**Status**: Implemented for key JSON tasks. We now expose MCP tools with server-side schema validation for:
+**Status**: Implemented for key JSON tasks. We now expose MCP tools with server-side schema validation and use model-side tool-calling (function calling) when available, with fallback to strict JSON mode:
   - `LanguageDetectTool` → returns `{ language, confidence }`
   - `ThreadSummarizeTool` → returns `{ summary, key_entities[], open_questions[] }`
   - `MemoryExtractTool` → returns `{ items: [{ key, value, scope, ttl_category, confidence, provenance? }] }`
@@ -887,6 +888,10 @@ Use these fields to reliably control the follow-up loop.
 - JSON schema validation for tool parameters
 - Authorization checks preventing IDOR attacks
 - No external fetch - only internal Storage access
+
+Notes:
+- Reasoning-oriented models (e.g., `gpt-oss:20b`) may emit invalid/empty JSON if tool-calling is disabled; enabling tool-calling greatly improves structured outputs.
+- `LanguageDetectTool` normalizes outputs (language names → codes; string confidence → numeric) and validates via `LanguageDetectSchema`.
 
 ### Authentication & User Management System
 
@@ -1009,6 +1014,24 @@ Use these fields to reliably control the follow-up loop.
 - **Tool-level fallbacks** when LLM calls fail
 - **Structured JSON** eliminates text parsing errors
 - **Dependency injection** for clean, testable code
+
+**Operational Details:**
+- Structured prompts use model-side tool-calling when enabled for the role; otherwise strict JSON mode is used.
+- Logs include provider, model, and a truncated raw preview of responses for debugging. Deeply nested arrays in debug may show "Over 9 levels deep, aborting normalization" — this is Monolog depth truncation, not a model error.
+
+**Model Guidance:**
+- Recommended defaults: GROUNDED = `qwen2.5:14b` for JSON-heavy tasks (`language_detect`, `thread_summarize`, `memory_extract`); SYNTH = `gpt-oss:120b`.
+- `gpt-oss:20b` can emit empty/invalid JSON unless tool-calling is used; prefer tool-calling or switch GROUNDED to `qwen2.5:14b`.
+
+**Configuration Notes (.env):**
+- `LLM_GROUNDED_MODEL=qwen2.5:14b` (recommended), `LLM_SYNTH_MODEL=gpt-oss:120b`
+- Enable/disable tool-calling per role via `LLM_*_TOOLS=true|false`; adjust reasoning via `LLM_*_REASONING=true|false`
+- Timeouts: `LLM_TIMEOUT_MS` (and optionally a higher reasoning timeout)
+- After changes: `php artisan optimize:clear`
+
+**Prompt→Role Mapping:**
+- `language_detect`, `thread_summarize`, `memory_extract` → GROUNDED
+- `action_interpret` → CLASSIFY
 
 **Future Enhancements:**
 - Multi-provider support (OpenAI, Anthropic) with automatic failover and role-based routing (CLASSIFY/GROUNDED/SYNTH)
