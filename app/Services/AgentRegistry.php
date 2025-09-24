@@ -9,6 +9,57 @@ use Illuminate\Support\Collection;
 class AgentRegistry
 {
     /**
+     * Compute capability match score [0,1] based on task keywords vs agent capability tags.
+     */
+    private function capabilityMatchScore(Agent $agent, array $task): float
+    {
+        $caps = $agent->capabilities_json ?? [];
+        $tags = array_map('strtolower', array_merge(
+            $caps['keywords'] ?? [],
+            $caps['domains'] ?? [],
+            $caps['expertise'] ?? [],
+            $caps['action_types'] ?? []
+        ));
+
+        $taskText = strtolower(($task['description'] ?? '') . ' ' . ($task['question'] ?? ''));
+        $hits = 0; $total = max(1, count($tags));
+        foreach ($tags as $t) { if ($t && str_contains($taskText, $t)) { $hits++; } }
+        return min(1.0, $hits / $total);
+    }
+
+    /**
+     * Score a bid (utility) for an agent on a given task.
+     * utility = w_cap * capability_match + w_cost * (1/cost_hint_norm) + w_rel * reliability
+     */
+    public function scoreBid(Agent $agent, array $task): float
+    {
+        $w = config('agents.scoring.weights');
+        $cap = $this->capabilityMatchScore($agent, $task);
+        $costHint = max(1, (int)($agent->cost_hint ?? 100));
+        $costNorm = min(1.0, 1000 / $costHint); // cheaper => closer to 1
+        $rel = max(0.0, min(1.0, (float)($agent->reliability ?? 0.8)));
+
+        $utility = ($w['capability_match'] * $cap)
+                 + ($w['expected_cost']   * $costNorm)
+                 + ($w['reliability']     * $rel);
+        return round($utility, 4);
+    }
+
+    /**
+     * Update rolling reliability using a simple moving average.
+     * $won = 1.0 for winner, 0.0 for loss; $samples caps the window implicitly.
+     */
+    public function updateReliability(Agent $agent, float $won): void
+    {
+        $n = (int)($agent->reliability_samples ?? 0);
+        $r = (float)($agent->reliability ?? 0.8);
+        $newR = (($r * $n) + $won) / max(1, $n + 1);
+        $agent->update([
+            'reliability' => round(max(0.0, min(1.0, $newR))),
+            'reliability_samples' => $n + 1,
+        ]);
+    }
+    /**
      * Get all available agents for an account.
      */
     public function getAvailableAgents(Account $account): Collection
@@ -76,6 +127,23 @@ class AgentRegistry
         }
 
         return $score;
+    }
+
+    /**
+     * Rank agents for a concrete subtask and return the top-K by utility.
+     * Each item: ['agent' => Agent, 'utility' => float]
+     */
+    public function topKForTask(Account $account, array $task, int $k): array
+    {
+        $agents = $this->getAvailableAgents($account);
+        $ranked = $agents->map(function (Agent $agent) use ($task) {
+            return [
+                'agent' => $agent,
+                'utility' => $this->scoreBid($agent, $task),
+            ];
+        })->sortByDesc('utility')->take($k)->values()->all();
+
+        return $ranked;
     }
 
     /**

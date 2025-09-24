@@ -7,6 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * Agent represents a specialized worker or role with capabilities.
+ *
+ * New fields (Phase 2):
+ * - cost_hint: rough token/time cost used for allocation scoring
+ * - reliability: rolling success ratio in [0,1]
+ * - reliability_samples: sample count for the moving average
+ */
 class Agent extends Model
 {
     use HasUlids;
@@ -16,12 +24,18 @@ class Agent extends Model
         'name',
         'role',
         'capabilities_json',
+        'cost_hint',
+        'reliability',
+        'reliability_samples',
     ];
 
     protected function casts(): array
     {
         return [
             'capabilities_json' => 'array',
+            'cost_hint' => 'integer',
+            'reliability' => 'float',
+            'reliability_samples' => 'integer',
         ];
     }
 
