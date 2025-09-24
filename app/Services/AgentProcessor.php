@@ -129,6 +129,8 @@ class AgentProcessor
                 'tokens_total' => 0,
                 'latency_ms' => 0,
                 'confidence' => $llmResponse['confidence'] ?? null,
+                'agent_role' => 'Worker',
+                'round_no' => (int)($input['round_no'] ?? 0),
             ]);
         } catch (\Exception $e) {
             Log::warning('Agent LLM JSON parsing failed, using fallback response', [
