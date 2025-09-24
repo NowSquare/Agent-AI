@@ -2614,14 +2614,14 @@ Plan shape:
 Action rules (tiny and editable): Each action has preconditions (what must be true before) and effects (what becomes true after). These are simple strings like `scanned=true` or `confidence>=0.75` defined in `config/actions.php`.
 
 Validator: The PlanValidator walks each step:
-- If a precondition is missing (e.g., trying to ExtractText before ScanAttachment), it stops and returns a clear hint like “Add ScanAttachment before ExtractText.”
+- If a precondition is missing (e.g., trying to ExtractText before ScanAttachment), it stops and returns a clear hint like "Add ScanAttachment before ExtractText."
 - If all checks pass, the plan is marked Valid ✓.
 
 Auto‑repair and debate: If a plan is invalid, the system first tries a simple fix (insert the missing step). If needed, the debate loop prefers candidates that include a proper plan and tries again once.
 
-Gating replies: The final “SendReply” is only allowed when the plan is valid. If not valid, the system sends an Options or Clarification email instead.
+Gating replies: The final "SendReply" is only allowed when the plan is valid. If not valid, the system sends an Options or Clarification email instead.
 
-Where you see this: In Activity → a “Plan” panel shows Valid/Invalid, the first failing step, a human hint, and a compact list of steps.
+Where you see this: In Activity → a "Plan" panel shows Valid/Invalid, the first failing step, a human hint, and a compact list of steps.
 
 ## How to extend the action schema (Plain)
 Goal: Add a new action in a safe, predictable way so plans can use it.
@@ -2629,7 +2629,7 @@ Goal: Add a new action in a safe, predictable way so plans can use it.
 1) Pick a clear action name
 - Keep it short and specific, like `DetectLanguage` or `OptionsEmail`.
 
-2) Define preconditions (“pre”) and effects (“eff”)
+2) Define preconditions ("pre") and effects ("eff")
 - Preconditions: What must be true before this action runs.
 - Effects: What becomes true after it runs.
 - Use simple strings: `key=value`, numeric compares like `confidence>=0.75`, increments like `confidence+=0.1`.
@@ -2653,3 +2653,29 @@ Goal: Add a new action in a safe, predictable way so plans can use it.
 6) When to use it
 - Planner/Workers can include your action in their plan steps.
 - The validator will check that the plan orders steps correctly and suggest fixes if not.
+
+## Run the demo (Plain)
+This creates a realistic thread from a local fixture (one email + two PDFs), runs the multi‑agent + plan validation flow, and tells you what to check.
+
+Commands:
+```bash
+php artisan scenario:run
+```
+What happens:
+- Resets the database, seeds, and simulates an inbound email using `tests/fixtures/inbound_postmark.json`.
+- Runs the normal processing (Planner → Workers → Critic → Arbiter) with plan validation and auto‑repair.
+- Prints a short checklist at the end.
+
+Optional: run just the inbound simulation
+```bash
+php artisan inbound:simulate --file=tests/fixtures/inbound_postmark.json
+```
+You will see output like:
+- `thread_id=... contact_email=alice@example.com`
+
+What to check in the UI (Plain):
+- Activity → latest thread shows Planner, Workers, Critic, Arbiter steps.
+- Plan panel: Valid ✓ (or first failing step + hint after auto‑repair).
+- Debate ran K rounds; winner selected; near‑top kept as minority when close.
+- A typed Decision memory saved with provenance.
+- Log in as `alice@example.com` to see only this thread and its full trace.
