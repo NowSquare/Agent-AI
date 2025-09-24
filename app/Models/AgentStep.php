@@ -1,7 +1,7 @@
 <?php
 /**
  * Store one step in the activity trace (who did what, when, and how long).
- * ELI16: Think of this like a flight log—each line is one move an AI made.
+ * Plain: Think of this like a flight log—each line is one move an AI made.
  * How this fits in:
  * - Saved whenever a model/tool is called or a decision is logged.
  * - Activity UI reads this table to show the full trace.

@@ -2558,7 +2558,7 @@ aws s3 cp attachments_$DATE.tar.gz s3://your-backup-bucket/
 
 **Development Status**: Phase 1A (Database/Models) complete. Ready for Phase 1B (Auth/UI) and Phase 2 (LLM/MCP).
 
-# Agent-AI — How it Works (ELI16)
+# Agent-AI — How it Works (Plain)
 
 ## Big picture
 
@@ -2579,7 +2579,7 @@ Behind the scenes, multiple small "agents" cooperate with simple rules. Some pla
 You → Email → Thread → Plan → Work → Debate → Decide → Memory → Reply
 ```
 
-## Key ideas (ELI16)
+## Key ideas (Plain)
 - Agent: a small specialist that does one job (plan, write, check, decide).
 - Tool: a safe function the agent can call (e.g., summarize attachment).
 - Retrieval: finding relevant bits from your past emails/files.

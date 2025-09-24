@@ -1,7 +1,7 @@
 <?php
 /**
  * Settings for the multi-agent system.
- * ELI16: Knobs that control how many rounds we debate and how we pick workers.
+ * Plain: Knobs that control how many rounds we debate and how we pick workers.
  * For engineers: Weights change allocation/voting behavior; keep conservative.
  */
 

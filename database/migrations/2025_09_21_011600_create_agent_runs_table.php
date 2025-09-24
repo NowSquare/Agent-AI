@@ -1,7 +1,7 @@
 <?php
 /**
  * Create the agent_runs table used as a simple "blackboard" for a run.
- * ELI16: A notepad the system uses to remember the plan and current round.
+ * Plain: A notepad the system uses to remember the plan and current round.
  * For engineers:
  * - state (jsonb) holds plan and transient run data
  * - round_no tracks debate rounds

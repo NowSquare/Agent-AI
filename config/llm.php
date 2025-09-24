@@ -1,7 +1,7 @@
 <?php
 /**
  * Core LLM settings: routing, providers, embeddings, and token caps.
- * ELI16: This tells the app which AI to use for small vs big jobs,
+ * Plain: This tells the app which AI to use for small vs big jobs,
  *        and how we store/search memory.
  * For engineers:
  * - Routing thresholds pick between CLASSIFY/GROUNDED/SYNTH
