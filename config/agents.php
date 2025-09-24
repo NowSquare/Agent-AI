@@ -1,4 +1,9 @@
 <?php
+/**
+ * Settings for the multi-agent system.
+ * ELI16: Knobs that control how many rounds we debate and how we pick workers.
+ * For engineers: Weights change allocation/voting behavior; keep conservative.
+ */
 
 return [
     /*
@@ -11,18 +16,23 @@ return [
     */
 
     // Number of debate/refinement rounds (K)
+    // WHY: More rounds can improve quality but cost more time/tokens.
     'rounds' => env('AGENTS_ROUNDS', 2),
 
     // Top-K workers to allocate per subtask (auction shortlist)
+    // WHY: Shortlist multiple workers to increase diversity of drafts.
     'workers_topk' => env('AGENTS_WORKERS_TOPK', 2),
 
     // Minimum groundedness score required for acceptance (0..1)
+    // Engineer note: used as a proxy from Critic scoring and metrics.
     'min_groundedness' => env('AGENTS_MIN_GROUNDEDNESS', 0.60),
 
     // Minority report: include candidates within epsilon of the top score
+    // WHY: Keep a strong alternative if almost as good as the leader.
     'minority_epsilon' => env('AGENTS_MINORITY_EPSILON', 0.05),
 
     // Utility scoring weights used during allocation (auction heuristic)
+    // Engineer note: capability_match dominates; lower cost and higher reliability help.
     'scoring' => [
         // Capability match weight: how strongly to prefer skill alignment
         'weights' => [
@@ -33,6 +43,7 @@ return [
     ],
 
     // Voting aggregation weights for Critic, Workers (self-score), and Arbiter
+    // WHY: Critics focus on evidence; Workers self-score confidence; Arbiter applies tie-breaks.
     'vote' => [
         'weights' => [
             'critic_weight'  => env('AGENTS_W_CRITIC', 0.60),

@@ -2,7 +2,7 @@
 
 ## Executive Summary
 
-Agent AI is an email-centered automation system built on Laravel 12. It links incoming emails to threads, interprets free text with a Large Language Model (LLM), and executes actions via signed links or controlled tool calls. Tool calls run through a **custom MCP layer** (Model Context Protocol) that enforces JSON schemas and exposes SSRF-safe tools. The system supports **attachments** (txt, md, csv, pdf, etc.) including virus scanning, extraction, and summarization. Passwordless login, Flowbite/Tailwind UI, and a future-proof data model reduce friction. An LLM is always available; when intent is unclear, the system asks follow-up questions until intent is clear (maximum 2 rounds). Redis/Horizon deliver asynchronous reliability. PostgreSQL guarantees integrity and versioned “memories” with TTL/decay. Postmark handles inbound/outbound email with robust RFC threading. The design is self-hostable with Docker. We add lightweight reliability features: **grounded retrieval via pgvector**, **AgentOps logs/evaluation**, **simple dynamic model selection**, and **internal multi-agent delegation**, optimized for small-business deployments without extra services.
+Agent AI is an email-centered automation system built on Laravel 12. It links incoming emails to threads, interprets free text with a Large Language Model (LLM), and executes actions via signed links or controlled tool calls. Tool calls run through a **custom MCP layer** (Model Context Protocol) that enforces JSON schemas and exposes SSRF-safe tools. The system supports **attachments** (txt, md, csv, pdf, etc.) including virus scanning, extraction, and summarization. Passwordless login, Flowbite/Tailwind UI, and a future-proof data model reduce friction. An LLM is always available; when intent is unclear, the system asks follow-up questions until intent is clear (maximum 2 rounds). Redis/Horizon deliver asynchronous reliability. PostgreSQL guarantees integrity and versioned "memories" with TTL/decay. Postmark handles inbound/outbound email with robust RFC threading. The design is self-hostable with Docker. We add lightweight reliability features: **grounded retrieval via pgvector**, **AgentOps logs/evaluation**, **simple dynamic model selection**, and **internal multi-agent delegation**, optimized for small-business deployments without extra services.
 
 ## Project Overview
 
@@ -1403,7 +1403,7 @@ class MemoryReader {
 
 ### Action Interpreter (system prompt)
 
-You are a strict JSON generator. Detect exactly one action from the user’s email reply.
+You are a strict JSON generator. Detect exactly one action from the user's email reply.
 Allowed `action_type`:
 
 * `approve`
@@ -1449,12 +1449,12 @@ Rules:
 * Strip previous quoted content using the **reply-parser**.
 * Detect language-specific quotation markers such as:
 
-  * “On … wrote:”
-  * “Op … schreef …”
+  * "On … wrote:"
+  * "Op … schreef …"
 * Remove signatures using heuristics, e.g.:
 
-  * “-- ”
-  * “Sent from …” / “Verzonden vanaf …”
+  * "-- "
+  * "Sent from …" / "Verzonden vanaf …"
 * Normalize whitespace and trim leading/trailing spaces.
 
 ### Appendix C — MCP Tool Schemas (Extended)
@@ -1509,7 +1509,7 @@ volumes: { pg: {}, redis: {}, ollama: {} }
 
 * **JSON-only**: every model output must be strict JSON according to schema (validated server-side).
 * **Short outputs**: no internal reasoning; optional mini-explanation in a `note` field (≤ 1 sentence).
-* **Language**: model writes in `:detected_locale` (e.g., “nl” or “en-GB”).
+* **Language**: model writes in `:detected_locale` (e.g., "nl" or "en-GB").
 * **Token caps** (from NFRs): input ≤ 2000, summary ≤ 500, output ≤ 300.
 * **Confidence**: scale [0,1]; thresholds: auto ≥ 0.75, clarification 0.50–0.74, options email < 0.50.
 
@@ -1636,13 +1636,13 @@ TXT,
 ### 2) Clarification Question (`clarify_question`)
 
 **Where**: when `0.50 ≤ confidence < 0.75`.
-**Goal**: One short, concrete question in the user’s language.
+**Goal**: One short, concrete question in the user's language.
 **Temperature**: 0.3
 
 ```php
 'clarify_question' => [
   'temperature' => 0.3,
-  'backstory' => 'You write one concise clarification question matching the user’s language.',
+  'backstory' => 'You write one concise clarification question matching the user's language.',
   'template' => <<<TXT
 Write ONE short question to disambiguate the action below. Be specific, ≤140 chars, match locale.
 
@@ -1665,7 +1665,7 @@ TXT,
 ```php
 'options_email_draft' => [
   'temperature' => 0.4,
-  'backstory' => 'You draft a brief options email in the user’s language.',
+  'backstory' => 'You draft a brief options email in the user's language.',
   'template' => <<<TXT
 Write a brief email offering 2–4 likely actions with friendly tone. Use locale.
 Insert the provided placeholder tokens as-is for signed links.
@@ -1925,9 +1925,9 @@ $result['confidence'] *= config("llm.calibration.$provider", 1.0);
 
 * **approve**: `{reason?}` — optional human-friendly explanation.
 * **reject**: `{reason?}` — optional; include only if explicitly present.
-* **revise**: `{changes: string[]}` — concrete bullet-style changes (“move to 14:00”, “add CC: x\@y”).
+* **revise**: `{changes: string[]}` — concrete bullet-style changes ("move to 14:00", "add CC: x\@y").
 * **select_option**: `{option_id | label}` — prefer `option_id` from thread/context; fallback to `label`.
-* **provide_value**: `{key, value}` — free key-value (“budget”, “under 500 EUR”).
+* **provide_value**: `{key, value}` — free key-value ("budget", "under 500 EUR").
 * **schedule_propose_times**: `{duration_min, timezone, window_start?, window_end?, constraints?}`.
 * **schedule_confirm**: `{selected_start, duration_min, timezone}` — ISO8601 start.
 * **unsubscribe**: `{scope}` — `"thread"` (this conversation only), `"account"` (sender/tenant), `"all"` (everything).
@@ -1948,8 +1948,8 @@ $result['confidence'] *= config("llm.calibration.$provider", 1.0);
 
 ## What We Explicitly Do Not Do
 
-* No “manager/agent orchestration” prompts: orchestration is server-side (MCP + dispatcher).
-* No chain-of-thought or “think aloud” instructions: we request **final JSON only**.
+* No "manager/agent orchestration" prompts: orchestration is server-side (MCP + dispatcher).
+* No chain-of-thought or "think aloud" instructions: we request **final JSON only**.
 * No direct tool-calls by the model: the model outputs intent/parameters; the server decides and validates.
 
 ## Database Schema (Current Implementation)
@@ -2557,3 +2557,35 @@ aws s3 cp attachments_$DATE.tar.gz s3://your-backup-bucket/
 **Tech Stack**: Laravel 12, PHP 8.4, PostgreSQL 17+, Redis 7, Postmark, Ollama, ClamAV, Tailwind/Flowbite.
 
 **Development Status**: Phase 1A (Database/Models) complete. Ready for Phase 1B (Auth/UI) and Phase 2 (LLM/MCP).
+
+# Agent-AI — How it Works (ELI16)
+
+## Big picture
+
+Agent‑AI is an email‑native assistant. You email it like a coworker. It reads what you send, looks up relevant facts from your own emails and files, and drafts a helpful reply. It is not a chat toy; it's a steady teammate that works from your inbox.
+
+Email is where most work starts: requests, approvals, files, and decisions. Agent‑AI stays close to that flow. It makes a memory from what you send and what it learns, so it can help better next time.
+
+Behind the scenes, multiple small "agents" cooperate with simple rules. Some plan, some do the work, some critique, and one makes the final call. Tools and retrieval keep it grounded in your own data.
+
+## A guided tour: From email to answer
+1) You send an email → a Contact is created/updated (on the very first contact, an Account is auto‑created from APP_NAME).
+2) The message attaches to a Thread.
+3) Your first web login with that email creates a User and links it to the Contact via `contact_links` (passwordless code).
+4) The Coordinator plans the work; Workers fetch/write drafts; the Critic checks evidence; the Arbiter picks the best; Memory saves the outcome.
+5) You see the full trace (Activity) for your own threads.
+
+```
+You → Email → Thread → Plan → Work → Debate → Decide → Memory → Reply
+```
+
+## Key ideas (ELI16)
+- Agent: a small specialist that does one job (plan, write, check, decide).
+- Tool: a safe function the agent can call (e.g., summarize attachment).
+- Retrieval: finding relevant bits from your past emails/files.
+- Embedding: turning text into numbers for fast search.
+- pgvector: Postgres plugin that stores those numbers.
+- Cosine similarity: a measure of "closeness" between two embeddings.
+- Routing: CLASSIFY → retrieval → GROUNDED | SYNTH (small model vs big model choice).
+- Token: the chunk size of text for the model; affects cost and time.
+- Latency: how long a step takes; Confidence: how sure the model is.

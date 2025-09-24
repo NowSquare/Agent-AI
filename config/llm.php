@@ -1,4 +1,13 @@
 <?php
+/**
+ * Core LLM settings: routing, providers, embeddings, and token caps.
+ * ELI16: This tells the app which AI to use for small vs big jobs,
+ *        and how we store/search memory.
+ * For engineers:
+ * - Routing thresholds pick between CLASSIFY/GROUNDED/SYNTH
+ * - Embeddings.dim must match the chosen embedding model
+ * - Provider blocks help local/dev swaps without code changes
+ */
 
 return [
     /*
@@ -6,10 +15,10 @@ return [
     | Core Request Settings
     |--------------------------------------------------------------------------
     */
-    'timeout_ms' => (int) env('LLM_TIMEOUT_MS', 120000),
+    'timeout_ms' => (int) env('LLM_TIMEOUT_MS', 120000), // HOW LONG to wait before declaring a timeout
     'retry' => [
         'max' => (int) env('LLM_RETRY_MAX', 1),
-        'on'  => [408, 429, 500, 502, 503, 504],
+        'on'  => [408, 429, 500, 502, 503, 504], // WHEN to retry (network/timeouts/rate limits)
     ],
 
     /*
@@ -31,6 +40,7 @@ return [
     | thresholds:
     |   - grounding_hit_min: minimum hit-rate/quality to consider retrieval “good”
     |   - synth_complexity_tokens: if input tokens exceed this, go SYNTH
+    | Engineer note: tune cautiously; affects latency and accuracy.
     */
     'routing' => [
         'mode' => env('LLM_ROUTING_MODE', 'auto'),
@@ -74,8 +84,8 @@ return [
         'provider'   => env('EMBEDDINGS_PROVIDER', 'ollama'),
         'model'      => env('EMBEDDINGS_MODEL', 'mxbai-embed-large'),
         'dim'        => (int) env('EMBEDDINGS_DIM', 1024),
-        'distance'   => env('EMBEDDINGS_DISTANCE', 'cosine'),
-        'index_lists'=> (int) env('EMBEDDINGS_INDEX_LISTS', 100),
+            'distance'   => env('EMBEDDINGS_DISTANCE', 'cosine'), // WHY cosine: good default for semantic similarity
+            'index_lists'=> (int) env('EMBEDDINGS_INDEX_LISTS', 100), // IVFFlat lists: bigger = faster lookup, more memory
     ],
 
     /*

@@ -1,4 +1,12 @@
 <?php
+/**
+ * Create the agent_steps table where each row is one step in the activity trace.
+ * ELI16: Like a diary entry for every move the AI makes.
+ * For engineers:
+ * - Stores JSON input/output and timing/token metrics per step
+ * - Multi-agent fields (agent_role, round_no, vote_score) help visualize debates
+ * - Indexed for common queries (by thread/time, by role)
+ */
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
