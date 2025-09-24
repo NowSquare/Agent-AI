@@ -87,6 +87,7 @@ Tip: If a tag isn’t local, flip the provider/model for that role in `.env` (or
 
 ## Data model essentials
 - `agent_steps` (trace): logs role, provider, model, tokens (in/out/total), latency_ms, confidence, and full `input_json`/`output_json`. The full trace is visible to the user for their own threads; other users cannot access it. Steps relate to `account`, `thread`, optional `email_message`/`action`, and optional `contact`/`user`.
+  - Multi-agent protocol fields: `agent_role` (Planner|Worker|Critic|Arbiter), `round_no`, optional `coalition_id`, `vote_score`, `decision_reason`.
 - Embeddings live in Postgres columns and power retrieval:
   - `email_messages.body_embedding`
   - `attachment_extractions.text_embedding`
@@ -113,6 +114,7 @@ php artisan test
 Guidance: put business logic in Services/Jobs, not Controllers. Write unit and feature tests for new services, routes, and data flows.
 
 ## Security & privacy
+- Multi-agent protocol (Plan → Allocate → Work → Debate → Decide → Curate): Planner creates tasks; Workers produce drafts; Critics debate for K rounds (2 by default); Arbiter selects a winner, logging `vote_score` and `decision_reason`; Memory Curator persists a summary with provenance.
 - Because this is your own data, Agent-AI shows the full content of steps for your threads.
 - Tenant boundary is enforced by `accounts` and `memberships`.
 

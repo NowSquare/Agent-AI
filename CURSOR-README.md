@@ -45,7 +45,8 @@ This project avoids heavy infra. The following refinements improve reliability a
  - Routing: CLASSIFY → run KNN over embeddings → if hit-rate ≥ threshold, answer via GROUNDED; else SYNTH.
 
 ### 2) AgentOps Logs & Evaluation
-- New `agent_steps` table with: agent, step_type, input/output JSON, tokens, latency, confidence, timestamps.
+- `agent_steps` includes role, provider, model, tokens, latency, confidence, and full JSON I/O.
+- Multi-agent protocol fields: `agent_role` (Planner|Worker|Critic|Arbiter), `round_no`, optional `coalition_id`, `vote_score`, `decision_reason`.
 - Log every LLM/tool call for traceability.
 
 ### 3) Simple Dynamic Model Selection
@@ -112,6 +113,13 @@ This project avoids heavy infra. The following refinements improve reliability a
 - Comprehensive testing and monitoring
 - Performance optimization and production deployment
 - Advanced features and polish
+
+**Multi-Agent Protocol (Plan → Allocate → Work → Debate → Decide → Curate)**
+- Planner: builds task plan (tasks[], deps[])
+- Workers: execute tasks (parallel/sequential)
+- Critics: run K debate rounds (default 2)
+- Arbiter: selects winner, records `vote_score` and `decision_reason`
+- Memory Curator: persists final outcome summary with provenance
 
 **Roles & Permissions**
 - **Recipient**: Email interactions, signed link confirmations
@@ -391,6 +399,7 @@ Note: File extension counts do not include files ignored by .gitignore.
 - **Agent Steps (Traceability)**
   - Every LLM/tool call is logged in `agent_steps` (role, provider, model, tokens in/out/total, latency_ms, confidence, and full `input_json`/`output_json`).
   - Activity UI (`/activity`) shows the full trace for your own threads; other users cannot access it.
+  - Additional fields for multi-agent: `agent_role`, `round_no`, optional `coalition_id`, `vote_score`, `decision_reason`.
 - **Conventions & Hygiene**
   - Keep controllers thin; put logic in Services/Jobs; validate with Form Requests.
   - Migrations: edit existing files; keep `php artisan migrate:fresh` green.
