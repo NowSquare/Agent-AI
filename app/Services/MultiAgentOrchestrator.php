@@ -11,6 +11,17 @@ use Illuminate\Support\Facades\Log;
 
 class MultiAgentOrchestrator
 {
+    /**
+     * MultiAgentOrchestrator coordinates the full multi-agent protocol flow.
+     *
+     * Phases (kept lightweight and testable):
+     *  - Plan:     Planner produces a task graph (tasks, deps)
+     *  - Allocate: Registry scores utility and selects top-K workers per task
+     *  - Work:     Workers produce drafts (can be parallel/sequential)
+     *  - Debate:   Critics run K rounds scoring groundedness/completeness/risk
+     *  - Decide:   Arbiter aggregates votes (reliability-weighted) with tie-breaks
+     *  - Curate:   Persist a typed memory (Decision/Insight/Fact) with provenance
+     */
     public function __construct(
         private LlmClient $llmClient,
         private AgentRegistry $agentRegistry,
@@ -22,6 +33,9 @@ class MultiAgentOrchestrator
 
     /**
      * Orchestrate multiple agents for complex requests.
+     */
+    /**
+     * Orchestrate a complex request across multiple agents using the protocol.
      */
     public function orchestrateComplexRequest(Action $action, Thread $thread, Account $account): void
     {
@@ -71,7 +85,7 @@ class MultiAgentOrchestrator
             return; // Wait for user response
         }
 
-        // Step 2: Allocate → Work (dispatch workers by capability)
+        // Step 2: Allocate → Work (dispatch workers by capability / utility scoring)
         $candidates = $this->dispatchWorkers($action, $thread, $account, $plan);
 
         // Step 3: Debate (Critic rounds = 2) → Decide (Arbiter)
@@ -504,44 +518,77 @@ Return a JSON structure with:
         $candidates = [];
 
         foreach ($plan['tasks'] as $taskDef) {
-            $agent = $this->agentRegistry->findBestAgentForAction($account, $action->toArray(), [
-                'thread_summary' => $thread->context_json['summary'] ?? '',
-            ]);
+            $k = (int) config('agents.workers_topk', 2);
 
-            $task = \App\Models\Task::create([
+            // Rank candidate agents by utility for this task (auction heuristic)
+            $shortlist = $this->agentRegistry->topKForTask($account, [
+                'description' => $taskDef['description'] ?? '',
+                'question' => $action->payload_json['question'] ?? '',
+            ], $k);
+
+            // Log allocation shortlist as Planner step for observability
+            \App\Models\AgentStep::create([
                 'account_id' => $account->id,
                 'thread_id' => $thread->id,
-                'agent_id' => $agent->id,
-                'status' => 'pending',
-                'input_json' => [
-                    'action_id' => $action->id,
-                    'action_type' => $action->type,
-                    'action_payload' => $action->payload_json,
-                    'thread_context' => [
-                        'thread_id' => $thread->id,
-                        'account_id' => $account->id,
-                        'subject' => $thread->subject,
-                        'summary' => $thread->context_json['summary'] ?? '',
-                        'recent_messages' => [],
-                    ],
-                    'agent_instructions' => [
-                        'role' => $agent->role,
-                        'task' => $taskDef['description'],
-                    ],
-                    'round_no' => 1,
+                'action_id' => $action->id,
+                'role' => 'CLASSIFY',
+                'provider' => 'internal',
+                'model' => 'allocator',
+                'step_type' => 'route',
+                'input_json' => ['task' => $taskDef],
+                'output_json' => [
+                    'shortlist' => array_map(function ($row) {
+                        return [
+                            'agent_id' => (string) $row['agent']->id,
+                            'name' => $row['agent']->name,
+                            'utility' => $row['utility'],
+                            'reliability' => $row['agent']->reliability,
+                            'cost_hint' => $row['agent']->cost_hint,
+                        ];
+                    }, $shortlist),
                 ],
+                'latency_ms' => 0,
+                'agent_role' => 'Planner',
+                'round_no' => 0,
             ]);
 
-            $this->agentProcessor->processTask($task);
+            // Execute each shortlisted worker for this task
+            foreach ($shortlist as $row) {
+                $agent = $row['agent'];
 
-            $candidates[] = [
-                'id' => (string)$task->id,
-                'text' => (string)($task->result_json['response'] ?? ''),
-                'score' => (float)($task->result_json['confidence'] ?? 0.0),
-                'evidence' => [],
-            ];
+                $task = \App\Models\Task::create([
+                    'account_id' => $account->id,
+                    'thread_id' => $thread->id,
+                    'agent_id' => $agent->id,
+                    'status' => 'pending',
+                    'input_json' => [
+                        'action_id' => $action->id,
+                        'action_type' => $action->type,
+                        'action_payload' => $action->payload_json,
+                        'thread_context' => [
+                            'thread_id' => $thread->id,
+                            'account_id' => $account->id,
+                            'subject' => $thread->subject,
+                            'summary' => $thread->context_json['summary'] ?? '',
+                            'recent_messages' => [],
+                        ],
+                        'agent_instructions' => [
+                            'role' => $agent->role,
+                            'task' => $taskDef['description'],
+                        ],
+                        'round_no' => 1,
+                    ],
+                ]);
 
-            // Log worker step explicitly (already logged in AgentProcessor, but include coalition/round fields if needed)
+                $this->agentProcessor->processTask($task);
+
+                $candidates[] = [
+                    'id' => (string)$task->id,
+                    'text' => (string)($task->result_json['response'] ?? ''),
+                    'score' => (float)($task->result_json['confidence'] ?? 0.0),
+                    'evidence' => [],
+                ];
+            }
         }
 
         return $candidates;
