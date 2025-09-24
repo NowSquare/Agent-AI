@@ -209,55 +209,55 @@ FEATURE IMPLEMENTATION RULES
 /**
  * What this section does — Adds a clear, safe, symbolic plan validation loop.
  * Plain: Before doing work, write a small checklist (a plan). Check it. If a step is missing, fix it, then go.
- * How this fits in:
+ * How this fits in (generic):
  * - Planner/Workers output steps as state → action → next-state
  * - Validator checks each step’s preconditions and applies effects
  * - If invalid: try a simple fix and re-check; debate can try once more
- * - Only send the final email when the plan is valid
+ * - Only execute the final step when the plan is valid
  * Key terms: preconditions (must be true before), effects (become true after), facts (simple key=value truth), validator (checker)
  *
- * For engineers:
+ * For engineers (generic):
  * - Plan JSON: { steps: [ { state: string[], action: {name,args}, next_state: string[] }, ... ] }
  * - Validate: PlanValidator::validate($plan, $initialFacts) → PlanReport
  * - Auto‑repair: insert a prerequisite action that makes the failed condition true
- * - Gate: update Action.payload_json with plan_report + plan_valid; only dispatch SendReply when plan_valid=true
- * - Log: AgentStep with model=plan-validator, agent_role=Critic, input_json.plan + output_json.report
+ * - Gate: persist plan_report + plan_valid; only run the gated final step when plan_valid=true
+ * - Log: emit an activity/trace step containing the plan and the validator report
  */
 
-SYMBOLIC PLAN VALIDATION (MANDATORY FOR MULTI‑AGENT) — Plain
+SYMBOLIC PLAN VALIDATION (FOLLOW‑UP TO “MAKE A PLAN”) — Plain (generic)
 - Plan shape (emit from Planner/Workers):
 ```
 {
   "steps": [
-    { "state": ["received=true","scanned=false"], "action": {"name": "ScanAttachment", "args": {}}, "next_state": ["scanned=true"] },
-    { "state": ["scanned=true","extracted=false"], "action": {"name": "ExtractText"}, "next_state": ["text_available=true"] },
-    { "state": ["text_available=true"], "action": {"name": "Summarize"}, "next_state": ["summary_ready=true"] },
-    { "state": ["summary_ready=true","confidence>=LLM_MIN_CONF"], "action": {"name": "SendReply"}, "next_state": ["reply_ready=true"] }
+    { "state": ["input_received=true","validated=false"], "action": {"name": "ValidateInput"}, "next_state": ["validated=true"] },
+    { "state": ["validated=true","transformed=false"], "action": {"name": "TransformData"}, "next_state": ["transformed=true"] },
+    { "state": ["transformed=true","output_ready=false"], "action": {"name": "ProduceOutput"}, "next_state": ["output_ready=true"] },
+    { "state": ["output_ready=true","confidence>=MIN_CONF"], "action": {"name": "Finalize"}, "next_state": ["done=true"] }
   ]
 }
 ```
 
-- Action rules live in `config/actions.php` (tiny, editable):
-  - Preconditions: strings like `scanned=true`, `confidence>=0.75`
-  - Effects: strings like `text_available=true`, `confidence+=0.1`
+- Action rules live in a small, editable action schema (configuration):
+  - Preconditions: strings like `validated=true`, `confidence>=0.75`
+  - Effects: strings like `output_ready=true`, `confidence+=0.1`
 
-- Validator usage:
-  - Build initial facts from the thread/action (e.g., `received`, `has_attachment`, `confidence`, etc.)
+- Validator usage (generic):
+  - Build initial facts from context (e.g., `input_received`, `confidence`, any domain flags)
   - `$report = PlanValidator::validate($plan, $initialFacts)`
   - If `$report.valid === false`: try a simple auto‑repair (insert the action that satisfies the failed condition). If still invalid, pass a plan hint into the debate once and re‑check the best candidate’s plan.
 
-- Gating the final email:
-  - Set `action.payload_json.plan_report` and `action.payload_json.plan_valid`
-  - Only allow the reply email when `plan_valid === true`
-  - Otherwise, send an Options/Clarification email
+- Gating the final step:
+  - Persist `plan_report` and `plan_valid` alongside your task/run
+  - Only run the gated final step when `plan_valid === true`
+  - Otherwise, branch to a safer fallback (e.g., options/clarification path in your domain)
 
-- Logging + UI:
-  - Write an `AgentStep` for the validator: `provider=internal`, `model=plan-validator`, `agent_role=Critic`, `input_json.plan`, `output_json.report`
-  - Activity shows a Plan panel: Valid ✓ (or first failing step ✗ + hint) and a compact list `S_k → Action → S_k+1`
+- Logging + UI (generic):
+  - Log a validation trace step containing: the plan, the initial facts, and the validator report
+  - Surface a Plan panel: Valid ✓ (or first failing step ✗ + hint) and a compact list `S_k → Action → S_k+1`
 
-- Tests to include:
-  - Unit: PlanValidator accepts a correct plan; rejects unmet preconditions; applies effects
-  - Feature: Attachment scenario initially fails → auto‑repairs by inserting ScanAttachment → plan validates → proceeds
+- Tests to include (generic):
+  - Unit: PlanValidator accepts a correct plan; rejects unmet preconditions; applies effects correctly
+  - Feature: An initial plan fails due to an unmet precondition → auto‑repair inserts the missing step → plan validates → proceeds
 
 - Debate integration:
   - When a plan hint is present, slightly favor candidates that provide a structured plan
