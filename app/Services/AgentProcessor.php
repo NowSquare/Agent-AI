@@ -1,4 +1,18 @@
 <?php
+/**
+ * What this file does — Runs a task with a chosen agent and logs the step.
+ * Plain: Given a job and an agent, it asks the AI for a draft and stores the result.
+ * How this fits in:
+ * - Called by Coordinator/Orchestrator after an agent is selected
+ * - Uses Grounding + Router to keep answers relevant and sized
+ * - Writes an AgentStep so Activity shows the trace
+ * Key terms: task (work unit), grounding (find evidence), role (CLASSIFY/GROUNDED/SYNTH)
+ *
+ * For engineers:
+ * - Inputs: Task model
+ * - Outputs: Task.result_json is populated; AgentStep row created
+ * - Failure modes: provider error → task failed; falls back to simple text
+ */
 
 namespace App\Services;
 
@@ -8,6 +22,13 @@ use App\Models\Memory;
 use App\Services\MemoryService;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Purpose: Execute a single agent task and persist the outcome.
+ * Responsibilities:
+ * - Build prompts, retrieve grounding, route to model, call LLM
+ * - Update the task status/results and log an AgentStep
+ * Collaborators: LlmClient, MemoryService, GroundingService, ModelRouter
+ */
 class AgentProcessor
 {
     public function __construct(
@@ -18,7 +39,12 @@ class AgentProcessor
     ) {}
 
     /**
-     * Process a task with the assigned agent.
+     * Summary: Process a task with the assigned agent and persist results.
+     * @param Task $task  The work unit to execute (contains inputs/context)
+     * @return void       Updates the Task and writes an AgentStep
+     * @throws \Exception If the task has no agent or LLM call irrecoverably fails
+     * Example:
+     *   $processor->processTask($task);
      */
     public function processTask(Task $task): void
     {
@@ -75,7 +101,10 @@ class AgentProcessor
     }
 
     /**
-     * Generate a response from the agent using LLM.
+     * Summary: Generate an agent response via LLM using grounding and routing.
+     * @param Agent $agent  The selected agent
+     * @param Task  $task   The task being processed
+     * @return array        ['response','confidence','agent_id','agent_name','processing_time','model_used']
      */
     private function generateAgentResponse(Agent $agent, Task $task): array
     {

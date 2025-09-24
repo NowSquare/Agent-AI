@@ -1,4 +1,12 @@
 <?php
+/**
+ * What this file does — Computes simple stats about recent multi‑agent runs.
+ * Plain: A scoreboard that sums rounds, time, and who wins often.
+ * How this fits in:
+ * - Used by the agent:metrics command to print a quick health check
+ * - Reads AgentRun and AgentStep; no writes
+ * Key terms: groundedness % (Critic score ≥ threshold), win distribution
+ */
 
 namespace App\Services;
 

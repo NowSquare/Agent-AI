@@ -1,4 +1,13 @@
 <?php
+/**
+ * What this file does — Saves a compact “Decision” memory with provenance and dedup.
+ * Plain: Stores a short note about what we decided, without duplicates.
+ * How this fits in:
+ * - Called after the Arbiter picks a winner
+ * - Lets future runs recall outcomes and evidence
+ * - Works with MemoryService TTL/decay
+ * Key terms: provenance_ids, content_hash
+ */
 
 namespace App\Services;
 

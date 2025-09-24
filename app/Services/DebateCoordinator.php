@@ -1,4 +1,18 @@
 <?php
+/**
+ * What this file does — Scores and narrows candidates over K rounds, allowing a minority report.
+ * Plain: The checker compares drafts, keeps the best few, and explains why.
+ * How this fits in:
+ * - Orchestrator calls it after workers produce drafts
+ * - Logs Critic rounds and the Arbiter’s final pick
+ * - Uses weights from config/agents.php
+ * Key terms: groundedness, completeness, risk, minority report (near‑top kept)
+ *
+ * For engineers:
+ * - Inputs: candidates[], evidence[], rounds K
+ * - Outputs: winner, votes[], reasons[]
+ * - Tie-breaks: higher groundedness → lower cost → oldest
+ */
 
 namespace App\Services;
 

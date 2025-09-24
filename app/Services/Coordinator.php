@@ -1,4 +1,18 @@
 <?php
+/**
+ * What this file does — Decides simple vs multi‑agent path and runs it.
+ * Plain: Chooses whether one agent can answer or if we need several.
+ * How this fits in:
+ * - Called after an Action is interpreted
+ * - For simple work: pick one agent and process
+ * - For complex work: hand off to MultiAgentOrchestrator
+ * Key terms: complex indicators (keywords/length), simple vs complex path
+ *
+ * For engineers:
+ * - Inputs: Action (with payload)
+ * - Outputs: Updates Action status/payload; creates Tasks and AgentSteps
+ * - Failure modes: missing thread/account; task failure marks action failed
+ */
 
 namespace App\Services;
 
@@ -9,6 +23,13 @@ use App\Models\Thread;
 use App\Models\Account;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Purpose: Top-level traffic cop for actions.
+ * Responsibilities:
+ * - Detect complexity
+ * - Route to simple agent or multi-agent orchestrator
+ * Collaborators: AgentRegistry, AgentProcessor, MultiAgentOrchestrator
+ */
 class Coordinator
 {
     public function __construct(

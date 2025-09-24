@@ -1,4 +1,18 @@
 <?php
+/**
+ * What this file does — Runs the plan→allocate→work→debate→decide→curate cycle.
+ * Plain: Coordinates several small agents to plan, write, check, pick, and save.
+ * How this fits in:
+ * - Called for complex actions that need multiple steps
+ * - Writes AgentSteps so Activity shows rounds and votes
+ * - Saves a decision memory after choosing a winner
+ * Key terms: Planner/Worker/Critic/Arbiter roles; round_no; vote_score
+ *
+ * For engineers:
+ * - Inputs: Action, Thread, Account
+ * - Outputs: Action updated with final_response; AgentSteps; Memory saved
+ * - Failure modes: LLM/provider issues → fewer candidates; still picks best available
+ */
 
 namespace App\Services;
 
