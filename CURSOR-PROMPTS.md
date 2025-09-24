@@ -178,6 +178,234 @@ BEGIN NOW.
 
 ## Execute the Plan Prompt
 
+## Demo & Verification Prompt — Run scenario and verify end-to-end
+
+```
+
+You are a meticulous QA engineer.
+Do NOT change code. Only run commands and analyze results.
+
+GOAL
+Run the built-in demo and verify that the multi-agent + symbolic plan validation flow works end-to-end and matches our visibility rules (a user sees only their own threads).
+
+STEP 0 — Preflight (print versions; don’t modify)
+
+* Print PHP, Laravel, and DB versions:
+  php -v
+  php artisan --version
+  php -r "echo extension\_loaded('pdo\_pgsql')?'pdo\_pgsql\:yes':'pdo\_pgsql\:no', PHP\_EOL;"
+* Show key env bits (read-only):
+  php -r "echo getenv('APP\_ENV'),' ',getenv('APP\_URL'),PHP\_EOL;"
+  php -r "echo 'LLM\_PROVIDER=',getenv('LLM\_PROVIDER'),'  GROUNDED=',getenv('LLM\_GROUNDED\_MODEL'),'  SYNTH=',getenv('LLM\_SYNTH\_MODEL'),'  CLASSIFY=',getenv('LLM\_CLASSIFY\_MODEL'),PHP\_EOL;"
+
+STEP 1 — Run the demo
+
+* Execute the scenario (no edits):
+  php artisan scenario\:run
+
+Expect: the command completes, prints the created thread/contact info, and triggers the orchestration.
+
+STEP 2 — Quick metrics sanity check
+
+* Run:
+  php artisan agent\:metrics --since=7d --limit=20
+
+Expect: non-zero counts and a summary (rounds, groundedness %, per-role metrics).
+
+STEP 3 — Database evidence (Tinker one-liners)
+Use Tinker --execute to print compact JSON. Don’t open interactive Tinker.
+
+1. Latest thread and basic linkage
+   php artisan tinker --execute="
+   use App\Models\Thread;
+   \$t=Thread::latest('created\_at')->first();
+   echo json\_encode(\['thread\_id'=>\$t?->id,'subject'=>\$t?->subject], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   "
+
+2. Contact ↔ User link (visibility rule)
+   php artisan tinker --execute="
+   use App\Models{Thread,Contact,ContactLink,User};
+   \$t=Thread::latest('created\_at')->first();
+   \$contact=\$t?->contacts()->first();
+   \$link=\$contact?->contactLinks()->first();
+   \$user=\$link?->user;
+   echo json\_encode(\[
+   'contact\_email'=>\$contact?->email,
+   'user\_id'=>\$user?->id,
+   'link\_exists'=>!!\$link
+   ], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   "
+
+3. Agent run exists (blackboard) and latest round
+   php artisan tinker --execute="
+   use App\Models{AgentRun,Thread};
+   \$t=Thread::latest('created\_at')->first();
+   \$r=AgentRun::where('thread\_id',\$t->id)->latest('created\_at')->first();
+   echo json\_encode(\['agent\_run\_id'=>\$r?->id,'round\_no'=>\$r?->round\_no], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   "
+
+4. Steps by role + max round
+   php artisan tinker --execute="
+   use App\Models{AgentStep,Thread};
+   \$t=Thread::latest('created\_at')->first();
+   \$roles=AgentStep::where('thread\_id',\$t->id)
+   ->selectRaw('agent\_role, count(\*) c, max(round\_no) max\_round')
+   ->groupBy('agent\_role')->orderBy('agent\_role')->get();
+   echo \$roles->toJson(JSON\_PRETTY\_PRINT), PHP\_EOL;
+   "
+
+5. Debate/decision footprint (vote\_score / decision\_reason present)
+   php artisan tinker --execute="
+   use App\Models{AgentStep,Thread};
+   \$t=Thread::latest('created\_at')->first();
+   \$arb=AgentStep::where('thread\_id',\$t->id)->where('agent\_role','Arbiter')->latest('created\_at')->first();
+   echo json\_encode(\[
+   'arbiter\_step\_id'=>\$arb?->id,
+   'vote\_score'=>\$arb?->vote\_score,
+   'decision\_reason'=>\$arb?->decision\_reason
+   ], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   "
+
+6. Plan validity (validator result)
+   php artisan tinker --execute="
+   use App\Models{AgentStep,Thread};
+   \$t=Thread::latest('created\_at')->first();
+   \$crit=AgentStep::where('thread\_id',\$t->id)->where('agent\_role','Critic')->latest('created\_at')->first();
+   echo json\_encode(\[
+   'critic\_step\_id'=>\$crit?->id,
+   'has\_plan\_panel'=> isset(\$crit?->input\_json\['plan'] ) || isset(\$crit?->output\_json\['plan']) || isset(\$crit?->output\_json\['plan\_report']),
+   'first\_hint'=> \$crit?->output\_json\['plan\_report']\['hint'] ?? null
+   ], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   "
+
+7. Memory saved (typed Decision with provenance)
+   php artisan tinker --execute="
+   use App\Models{Memory,Thread};
+   \$t=Thread::latest('created\_at')->first();
+   \$m=Memory::where('thread\_id',\$t->id)->latest('created\_at')->first();
+   echo json\_encode(\[
+   'memory\_id'=>\$m?->id,
+   'type'=>\$m?->type ?? null,
+   'has\_provenance'=> !empty(\$m?->provenance\_ids ?? \[])
+   ], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   "
+
+8. Embeddings present on latest email (sanity)
+   php artisan tinker --execute="
+   use App\Models{EmailMessage,Thread};
+   \$t=Thread::latest('created\_at')->first();
+   \$em=EmailMessage::where('thread\_id',\$t->id)->latest('created\_at')->first();
+   echo json\_encode(\[
+   'email\_id'=>\$em?->id,
+   'has\_body\_embedding'=> isset(\$em?->body\_embedding)
+   ], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   "
+
+STEP 4 — Route availability (Activity UI)
+
+* Check Activity routes exist:
+  php artisan route\:list | grep -i activity || true
+
+STEP 5 — Analyze results and produce a PASS/FAIL checklist
+Create a short table with ✅/❌ for:
+
+* Scenario command finished successfully
+* Metrics returned recent data
+* Thread created (id present)
+* Contact ↔ User link exists (visibility rule)
+* AgentRun present with a round number
+* AgentSteps cover roles: Planner, Worker, Critic, Arbiter (at least one each)
+* Debate produced a vote\_score and decision\_reason
+* Plan panel present + (if invalid at first) a repair hint was generated
+* A Decision memory was saved with provenance
+* Latest email has an embedding
+* Activity routes are registered
+
+If any ❌:
+
+* Write 1–2 line Plain explanations (“Plain: …”) of what it means and how to fix, using concrete commands (e.g., run backfill, check EMBEDDINGS\_DIM, verify config/agents.php rounds, ensure scenario fixture paths are correct).
+
+OUTPUT FORMAT
+
+* “DEMO RUN SUMMARY” — one paragraph with the key outcome (e.g., “Plan validated and reply gated; winner selected; memory saved.”)
+* “CHECKLIST” — bullets with ✅/❌
+* “EVIDENCE” — paste the small JSONs you printed (thread, links, roles, arbiter, plan report, memory, embedding)
+* “NEXT ACTIONS (if any)” — only if there are ❌ items, list the exact next commands/config edits to try.
+
+Do not change code in this session. Just run, inspect, and report.
+
+```
+
+## Demo Fix-it Prompt — Diagnose failures, fix, commit, and re-run
+
+```
+
+You are a senior Laravel engineer. We just ran the Demo & Verification Prompt and saw issues.
+Your job: diagnose and fix them, keeping the repo’s rules intact.
+
+RULES (do not break these)
+
+* **Never add new alter migrations.** If schema changes are required, modify the existing *create* migrations so `php artisan migrate:fresh` is clean.
+* Keep fixes tightly scoped; **commit manageable updates** with clear messages.
+* If behavior changes, update BOTH @CURSOR-README.md and README.md accordingly (Plain explanations).
+
+INPUTS TO CHECK (read-only unless fixing)
+
+1. Test output and console errors
+2. `storage/logs/laravel.log` (read latest relevant entries)
+3. DB evidence via the same Tinker one-liners from the Demo prompt
+4. Env/config mismatches (e.g., EMBEDDINGS\_DIM vs model)
+
+PROCEDURE
+
+1. Reproduce
+
+* Run:
+  php artisan test
+  php artisan scenario\:run
+* Tail the last \~200 lines of the log:
+  php -r "echo implode('', array\_slice(file('storage/logs/laravel.log')?:\[], -200));"
+* Summarize the first failing symptom in **Plain** language.
+
+2. Classify the failure and fix
+   Common buckets and actions:
+
+* **Missing column / wrong type / index** → Update the relevant *create* migration (not a new alter migration); ensure pgvector dims match `config('llm.embeddings.dim')`. Re-run `php artisan migrate:fresh`.
+* **Routing/role config** → Check `config/llm.php`, `config/agents.php`, and `.env` bindings; align model names and thresholds.
+* **Plan validation** → Ensure `config/actions.php` has the needed preconditions/effects; adjust `PlanValidator` hints or initial facts extractor.
+* **Activity/Routes** → Ensure controller and routes exist; fix typehints/names; re-run `php artisan route:list`.
+
+3. Verify
+
+* After each change:
+
+  * Run `php artisan migrate:fresh` (if schema touched)
+  * Run `php artisan test`
+  * Run `php artisan scenario:run`
+  * Run `php artisan agent:metrics --since=7d --limit=20`
+* Confirm the Demo & Verification checklist passes.
+
+4. Commit (small, coherent batches)
+
+* Use clear subjects, e.g.:
+
+  * `fix(embeddings): align EMBEDDINGS_DIM with mxbai-embed-large`
+  * `fix(validator): add ExtractText precondition and repair hint`
+  * `fix(activity): register route + view for step detail`
+
+5. Docs (if behavior changed)
+
+* Update @CURSOR-README.md and README.md (Plain wording).
+* Note visibility rule (user sees only their own threads) remains unchanged.
+
+OUTPUT
+
+* Short “FIX SUMMARY” in Plain English (what broke, what you changed, why it works now).
+* List of commits with one-line subjects.
+* Rerun of the **Demo & Verification Prompt** (summarize PASS/FAIL).
+
+```
+
 This prompt implements features from the plan with proper testing.
 
 ```
