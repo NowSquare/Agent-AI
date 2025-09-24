@@ -134,15 +134,18 @@ class LlmClient
         $providers = $requestedProvider ? [$requestedProvider] : $this->getProviderPriority();
         $lastError = null;
 
+        $lastModel = null;
         foreach ($providers as $provider) {
             try {
+                $model = $requestedModel ?: $this->selectModelForJsonPrompt($promptKey);
+                $lastModel = $model;
+
                 Log::debug('Attempting LLM call', [
                     'provider' => $provider,
                     'prompt_key' => $promptKey,
+                    'model' => $model,
                     'input_tokens' => $this->estimateTokens($prompt),
                 ]);
-
-                $model = $requestedModel ?: $this->selectModelForJsonPrompt($promptKey);
 
                 // For Ollama, use chat API with strict JSON mode and no streaming
                 if ($provider === 'ollama') {
@@ -150,6 +153,14 @@ class LlmClient
                 } else {
                     $result = $this->callProvider($provider, $prompt, $maxOutputTokens, $model);
                 }
+
+                // Log raw response for debugging before JSON parse
+                Log::debug('LLM raw response', [
+                    'provider' => $provider,
+                    'prompt_key' => $promptKey,
+                    'model' => $model,
+                    'raw_preview' => mb_substr($result, 0, 400),
+                ]);
 
                 // Validate JSON response
                 $json = json_decode($result, true);
@@ -166,6 +177,7 @@ class LlmClient
                 Log::info('LLM call successful', [
                     'provider' => $provider,
                     'prompt_key' => $promptKey,
+                    'model' => $model,
                     'confidence' => $json['confidence'] ?? null,
                 ]);
 
@@ -175,6 +187,7 @@ class LlmClient
                 Log::warning('LLM provider failed', [
                     'provider' => $provider,
                     'prompt_key' => $promptKey,
+                    'model' => $lastModel,
                     'error' => $e->getMessage(),
                 ]);
                 $lastError = $e;
@@ -188,6 +201,7 @@ class LlmClient
         Log::error('All LLM providers failed', [
             'prompt_key' => $promptKey,
             'providers_attempted' => $providers,
+            'last_model' => $lastModel,
             'last_error' => $lastError?->getMessage(),
         ]);
 
