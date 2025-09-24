@@ -10,6 +10,9 @@
           <th class="px-4 py-2 text-left">Time</th>
           <th class="px-4 py-2 text-left">Thread</th>
           <th class="px-4 py-2 text-left">Role</th>
+          <th class="px-4 py-2 text-left">Agent Role</th>
+          <th class="px-4 py-2 text-left">Round</th>
+          <th class="px-4 py-2 text-left">Vote</th>
           <th class="px-4 py-2 text-left">Provider:Model</th>
           <th class="px-4 py-2 text-left">Tokens</th>
           <th class="px-4 py-2 text-left">Latency</th>
@@ -23,6 +26,9 @@
           <td class="px-4 py-2 whitespace-nowrap">{{ $s->created_at->diffForHumans() }}</td>
           <td class="px-4 py-2">{{ optional($s->thread)->subject }}</td>
           <td class="px-4 py-2">{{ $s->role }}</td>
+          <td class="px-4 py-2">{{ $s->agent_role ?? '—' }}</td>
+          <td class="px-4 py-2">@if(($s->round_no ?? 0) > 0)<span class="inline-block px-2 py-0.5 rounded bg-gray-100 dark:bg-gray-800">R{{ $s->round_no }}</span>@else — @endif</td>
+          <td class="px-4 py-2">{{ $s->vote_score !== null ? number_format($s->vote_score,2) : '—' }}</td>
           <td class="px-4 py-2">{{ $s->provider }}:{{ $s->model }}</td>
           <td class="px-4 py-2">{{ $s->tokens_total }}</td>
           <td class="px-4 py-2">{{ $s->latency_ms }} ms</td>
