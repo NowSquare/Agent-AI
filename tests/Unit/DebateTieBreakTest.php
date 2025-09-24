@@ -1,4 +1,5 @@
 <?php
+/** Plain: Proves tie-break picks grounded candidate (has evidence) before cheaper/older. */
 
 namespace Tests\Unit;
 

@@ -1,4 +1,5 @@
 <?php
+/** Plain: Proves the metrics CLI runs and exits 0 with a minimal configuration. */
 
 namespace Tests\Feature;
 

@@ -8,6 +8,7 @@ use App\Models\Account;
 use App\Models\Agent;
 use App\Services\AgentRegistry;
 
+/** Plain: Proves utility scoring prefers capability+reliability over cost when ranking agents. */
 class AgentRegistryScoringTest extends TestCase
 {
     use RefreshDatabase;

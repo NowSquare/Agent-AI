@@ -8,6 +8,7 @@ use App\Services\MemoryCurator;
 use App\Models\Account;
 use App\Models\Thread;
 
+/** Plain: Proves Decision memories are deduplicated by content hash. */
 class MemoryCuratorDedupTest extends TestCase
 {
     use RefreshDatabase;
