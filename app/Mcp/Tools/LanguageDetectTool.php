@@ -57,15 +57,35 @@ class LanguageDetectTool extends Tool
             }
         }
 
-        // Map friendly names like "English" to locale code
-        if (isset($result['language']) && strlen((string) $result['language']) > 10) {
-            $mapped = app(\App\Services\LanguageDetector::class)->detect((string) $sampleText, useLlmFallback: false);
-            $result['language'] = strtolower(explode('_', $mapped)[0]);
+        // Map friendly names like "English" or "French" to locale codes
+        if (isset($result['language'])) {
+            $langRaw = (string) $result['language'];
+            $nameToCode = [
+                'english' => 'en', 'french' => 'fr', 'german' => 'de', 'spanish' => 'es', 'italian' => 'it',
+                'dutch' => 'nl', 'portuguese' => 'pt', 'russian' => 'ru', 'chinese' => 'zh', 'japanese' => 'ja',
+                'korean' => 'ko', 'arabic' => 'ar', 'hindi' => 'hi', 'turkish' => 'tr', 'polish' => 'pl',
+            ];
+            $lower = strtolower(trim($langRaw));
+            if (isset($nameToCode[$lower])) {
+                $result['language'] = $nameToCode[$lower];
+            }
         }
 
         // Default confidence if missing
         if (! isset($result['confidence'])) {
             $result['confidence'] = 0.9;
+        }
+
+        // Map string confidence levels (from reasoning models) to numeric
+        if (isset($result['confidence']) && is_string($result['confidence'])) {
+            $map = ['low' => 0.3, 'medium' => 0.6, 'high' => 0.9];
+            $lc = strtolower(trim($result['confidence']));
+            $result['confidence'] = $map[$lc] ?? 0.9;
+        }
+
+        // Clamp numeric confidence into [0,1]
+        if (isset($result['confidence']) && is_numeric($result['confidence'])) {
+            $result['confidence'] = max(0.0, min(1.0, (float) $result['confidence']));
         }
 
         // Fallback: if still no language, derive from library mapping of sample text
