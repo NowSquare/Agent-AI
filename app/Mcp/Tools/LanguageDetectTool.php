@@ -68,6 +68,12 @@ class LanguageDetectTool extends Tool
             $result['confidence'] = 0.9;
         }
 
+        // Fallback: if still no language, derive from library mapping of sample text
+        if (! isset($result['language']) || $result['language'] === '' || $result['language'] === null) {
+            $mapped = app(\App\Services\LanguageDetector::class)->detect((string) $sampleText, useLlmFallback: false);
+            $result['language'] = strtolower(explode('_', $mapped)[0]);
+        }
+
         $validator = Validator::make($result, LanguageDetectSchema::rules());
         if ($validator->fails()) {
             throw new ValidationException($validator);
