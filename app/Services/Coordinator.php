@@ -78,11 +78,23 @@ class Coordinator
             'and', 'also', 'as well as', 'plus', 'with',
         ];
 
+        // Attachment/workflow indicators: treat as complex so we can validate/repair a plan
+        $attachmentIndicators = ['attach', 'attachment', 'pdf', 'file', 'image', 'scan', 'extract', 'summarize'];
+
         $isComplex = false;
         foreach ($complexIndicators as $indicator) {
             if (str_contains(strtolower($question), $indicator)) {
                 $isComplex = true;
                 break;
+            }
+        }
+
+        if ($isComplex === false) {
+            foreach ($attachmentIndicators as $indicator) {
+                if (str_contains(strtolower($question), $indicator)) {
+                    $isComplex = true; // WHY: These usually require ordered steps (scan → extract → summarize)
+                    break;
+                }
             }
         }
 

@@ -35,16 +35,21 @@ class DebateCoordinator
     {
         $eps = (float) config('agents.minority_epsilon', 0.05);
         $weights = config('agents.vote.weights');
+        $hasPlanHint = collect($evidence)->contains(fn($e) => ($e['type'] ?? null) === 'plan_hint');
 
         $votes = [];
         $current = $candidates;
         for ($r = 1; $r <= $rounds; $r++) {
             // Critic scoring per candidate
-            $scored = array_map(function ($c) {
+            $scored = array_map(function ($c) use ($hasPlanHint) {
                 $g = $this->estimateGroundedness($c);
                 $comp = $this->estimateCompleteness($c);
                 $risk = $this->estimateRisk($c);
                 $criticScore = max(0.0, min(1.0, 0.6*$g + 0.3*$comp + 0.1*(1-$risk)));
+                if ($hasPlanHint && !empty($c['plan'])) {
+                    // WHY: Slightly prefer candidates that bring a structured plan when a plan repair is requested
+                    $criticScore = min(1.0, $criticScore + 0.05);
+                }
                 return $c + [
                     'groundedness' => $g,
                     'completeness' => $comp,
