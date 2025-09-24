@@ -1,4 +1,9 @@
 <?php
+/**
+ * What this file does — Declares JSON API routes used by the UI and internal tools.
+ * Plain: The backend endpoints that the app calls in the background.
+ * For engineers: Keep destructive actions signed or authenticated; namespace routes clearly.
+ */
 
 use App\Http\Controllers\Api\ActionController;
 use App\Http\Controllers\Api\AgentSpecializationController;

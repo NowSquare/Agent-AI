@@ -1,4 +1,12 @@
 <?php
+/**
+ * What this file does — Represents a customer account (tenant boundary).
+ * Plain: Your project/company container. Contacts, users, and threads live inside it.
+ * How this fits in:
+ * - Ensures data separation by account
+ * - Seeds a default account from APP_NAME on first contact
+ * - Visibility and metrics often filter by account
+ */
 
 namespace App\Models;
 

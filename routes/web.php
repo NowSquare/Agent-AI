@@ -1,4 +1,9 @@
 <?php
+/**
+ * What this file does — Declares browser routes for pages, signed links, and webhooks.
+ * Plain: Lists URLs for login, dashboard, activity, signed actions, downloads, and the webhook.
+ * For engineers: Keep signed routes minimal and CSRF-free where appropriate; auth wraps dashboard/activity.
+ */
 
 use App\Http\Controllers\Auth\ChallengeController;
 use App\Http\Controllers\Auth\LoginController;

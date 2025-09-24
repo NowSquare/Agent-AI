@@ -1,4 +1,12 @@
 <?php
+/**
+ * What this file does — Authenticated web user of the system.
+ * Plain: The person who logs into the dashboard (passwordless via email code).
+ * How this fits in:
+ * - Linked to contacts via ContactLink to determine visibility
+ * - Belongs to accounts via memberships
+ * - Used by policies and Activity scope
+ */
 
 namespace App\Models;
 
