@@ -103,7 +103,7 @@ class SendOptionsEmail implements ShouldQueue
             }
         }
 
-        // Try different header fields for sender email
+        // Try different header fields for sender email; fallback to from_email column
         $possibleFields = ['from', 'sender', 'reply-to', 'return-path'];
 
         foreach ($possibleFields as $field) {
@@ -119,6 +119,11 @@ class SendOptionsEmail implements ShouldQueue
                     return $matches[1];
                 }
             }
+        }
+
+        // Fallback: use normalized from_email on the email message if headers are missing
+        if (! empty($lastInboundMessage->from_email)) {
+            return $lastInboundMessage->from_email;
         }
 
         throw new \Exception('Could not extract sender email from message headers: '.json_encode($headerMap));

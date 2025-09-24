@@ -34,9 +34,13 @@ return new class extends Migration
             $table->text('summary_text')->nullable(); // LLM-generated summary.
             $table->timestampTz('summarized_at')->nullable();
 
+            // Additional metadata and summarization payloads used by services/models
+            $table->json('meta_json')->nullable();
+            $table->json('summarize_json')->nullable();
+
             $table->timestampsTz();
             $table->index('email_message_id');
-            $table->index(['scan_status','extract_status']);
+            $table->index(['scan_status', 'extract_status']);
         });
     }
 
