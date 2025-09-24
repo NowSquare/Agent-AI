@@ -164,7 +164,7 @@ class ProcessInboundEmail implements ShouldQueue
         $emailMessage = EmailMessage::create($messageData);
 
         // Create and store embedding for the email body (if present)
-        if (!empty($emailMessage->body_text)) {
+        if (! empty($emailMessage->body_text)) {
             $embedSvc = app(\App\Services\Embeddings::class);
             $vec = $embedSvc->embedText($emailMessage->body_text);
             $embedSvc->storeEmailBodyEmbedding($emailMessage->id, $vec);
@@ -494,6 +494,7 @@ class ProcessInboundEmail implements ShouldQueue
     private function detectLanguage(LlmClient $llmClient, string $text): string
     {
         $detector = app(LanguageDetector::class);
+
         return $detector->detect($text);
     }
 
@@ -504,7 +505,7 @@ class ProcessInboundEmail implements ShouldQueue
     {
         $summarizer = app(ThreadSummarizer::class);
         $summary = $summarizer->getSummary($thread);
-        
+
         return $summary['summary'] ?? "Thread: {$thread->subject}";
     }
 
@@ -514,10 +515,10 @@ class ProcessInboundEmail implements ShouldQueue
     private function getRecentMemories(Account $account, $thread): string
     {
         $memoryService = app(MemoryService::class);
-        
+
         // Get memories from all scopes, ordered by relevance
         $memories = collect([]);
-        
+
         // Thread-specific memories
         $threadMemories = $memoryService->retrieve(
             Memory::SCOPE_CONVERSATION,
@@ -526,7 +527,7 @@ class ProcessInboundEmail implements ShouldQueue
             3
         );
         $memories = $memories->merge($threadMemories);
-        
+
         // Account-level memories
         $accountMemories = $memoryService->retrieve(
             Memory::SCOPE_ACCOUNT,
@@ -535,23 +536,23 @@ class ProcessInboundEmail implements ShouldQueue
             3
         );
         $memories = $memories->merge($accountMemories);
-        
+
         // Format memories for prompt context
         if ($memories->isEmpty()) {
             return '';
         }
-        
+
         $excerpt = "Relevant Context:\n";
         foreach ($memories as $memory) {
             $value = is_array($memory->value_json) ? json_encode($memory->value_json) : $memory->value_json;
             $excerpt .= "- {$memory->key}: {$value}\n";
         }
-        
+
         // Truncate if too long (keep under typical token limits)
         if (strlen($excerpt) > config('memory.max_excerpt_chars', 1200)) {
-            $excerpt = substr($excerpt, 0, config('memory.max_excerpt_chars', 1200)) . "...\n";
+            $excerpt = substr($excerpt, 0, config('memory.max_excerpt_chars', 1200))."...\n";
         }
-        
+
         return $excerpt;
     }
 
@@ -625,15 +626,21 @@ class ProcessInboundEmail implements ShouldQueue
                     default => null,
                 };
 
-                if (!$scopeId) {
+                if (! $scopeId) {
                     continue;
+                }
+
+                // Ensure value is an array payload
+                $memoryValue = $item['value'] ?? [];
+                if (! is_array($memoryValue)) {
+                    $memoryValue = ['value' => (string) $memoryValue];
                 }
 
                 $memoryService->writeGate(
                     scope: $item['scope'],
                     scopeId: $scopeId,
                     key: $item['key'],
-                    value: $item['value'] ?? [],
+                    value: $memoryValue,
                     confidence: $item['confidence'] ?? 0.5,
                     ttlClass: $item['ttl_category'] ?? Memory::TTL_VOLATILE,
                     emailMessageId: $emailMessage->message_id,
