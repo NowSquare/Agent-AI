@@ -57,9 +57,13 @@ class SendActionResponse implements ShouldQueue
     {
         // The agent response is now stored in the action payload
         $agentResponse = $this->action->payload_json['agent_response'] ?? '';
+        $final = $this->action->payload_json['final_response'] ?? '';
 
         if (!empty($agentResponse)) {
             return $agentResponse;
+        }
+        if (!empty($final)) {
+            return $final;
         }
 
         // Fallback for actions without agent processing

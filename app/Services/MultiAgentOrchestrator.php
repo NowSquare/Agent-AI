@@ -129,12 +129,21 @@ class MultiAgentOrchestrator
             ]);
 
             if (!$report['valid']) {
-                // Feed repair hint to debate (one iteration) and re-pick
-                $decision = $this->debate->runKRounds($candidates, evidence: [['type'=>'plan_hint','hint'=>$report['hint']]], rounds: 1);
-                $winner = $decision['winner'];
-                if (!empty($winner['plan'])) {
-                    $symbolicPlan = $winner['plan'];
+                // Try simple auto-repair based on failed precondition
+                $repaired = $this->repairPlan($symbolicPlan, (string)($report['error'] ?? ''));
+                if ($repaired) {
+                    $symbolicPlan = $repaired;
                     $report = $planValidator->validate($symbolicPlan, $initialFacts);
+                }
+
+                // If still invalid, feed hint to debate once and retry best plan
+                if (!$report['valid']) {
+                    $decision = $this->debate->runKRounds($candidates, evidence: [['type'=>'plan_hint','hint'=>$report['hint']]], rounds: 1);
+                    $winner = $decision['winner'];
+                    if (!empty($winner['plan'])) {
+                        $symbolicPlan = $winner['plan'];
+                        $report = $planValidator->validate($symbolicPlan, $initialFacts);
+                    }
                 }
             }
 
@@ -193,9 +202,11 @@ class MultiAgentOrchestrator
      */
     private function extractInitialFacts(Action $action, Thread $thread): array
     {
+        $question = (string) ($action->payload_json['question'] ?? '');
+        $hasAttachmentHeuristic = stripos($question, 'attach') !== false;
         return [
             'received' => true,
-            'has_attachment' => $thread->emailMessages()->with('attachments')->get()->pluck('attachments')->flatten()->isNotEmpty(),
+            'has_attachment' => $thread->emailMessages()->with('attachments')->get()->pluck('attachments')->flatten()->isNotEmpty() || $hasAttachmentHeuristic,
             'clamav_ready' => true, // assuming daemon available per config
             'scanned' => false,
             'extracted' => false,
@@ -205,6 +216,39 @@ class MultiAgentOrchestrator
             'retrieval_done' => false,
             'confidence' => (float) ($action->payload_json['confidence'] ?? 0.5),
         ];
+    }
+
+    /**
+     * Try to repair a plan by inserting a prerequisite action whose effect satisfies the failed condition.
+     * Plain: If a step needs something that isn't true yet, add the step that makes it true.
+     */
+    private function repairPlan(array $plan, string $error): ?array
+    {
+        if (!preg_match('/Precondition failed:\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(<=|>=|=|<|>)\s*([a-zA-Z0-9_.-]+)/', $error, $m)) {
+            return null;
+        }
+        $key = $m[1]; $op = $m[2]; $val = $m[3];
+        if ($op !== '=') {
+            return null; // only boolean equality auto-repair for simplicity
+        }
+        $target = $key.'='.$val;
+        $schema = config('actions');
+        $actionName = null;
+        foreach ($schema as $name => $def) {
+            foreach ($def['eff'] as $eff) {
+                if ($eff === $target) { $actionName = $name; break 2; }
+            }
+        }
+        if (!$actionName) return null;
+
+        $steps = $plan['steps'] ?? [];
+        $steps[] = [
+            'state' => [$key.'='.(($val === 'true') ? 'false' : 'false')],
+            'action' => ['name' => $actionName, 'args' => []],
+            'next_state' => [$target],
+        ];
+        $plan['steps'] = $steps;
+        return $plan;
     }
 
     /**
