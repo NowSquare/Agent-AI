@@ -4,6 +4,8 @@ namespace App\Mcp\Tools;
 
 use App\Services\LlmClient;
 use Illuminate\JsonSchema\JsonSchema;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Laravel\Mcp\Request;
 use Laravel\Mcp\Response;
 use Laravel\Mcp\Server\Tool;
@@ -36,6 +38,16 @@ class ActionInterpretationTool extends Tool
 
         // Use the LLM to interpret the action
         $interpretation = $this->interpretAction($cleanReply, $threadSummary, $attachmentsExcerpt, $recentMemories);
+
+        // Basic shape validation to ensure consistent contract
+        $validator = Validator::make($interpretation, [
+            'action_type' => ['required', 'string'],
+            'parameters' => ['required', 'array'],
+            'confidence' => ['required', 'numeric'],
+        ]);
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
 
         return Response::json($interpretation);
     }
@@ -93,6 +105,25 @@ class ActionInterpretationTool extends Tool
                 'clarification_prompt' => null,
             ];
         }
+    }
+
+    /**
+     * Programmatic entrypoint for services to get the JSON array directly.
+     */
+    public function runReturningArray(string $cleanReply, string $threadSummary = '', string $attachmentsExcerpt = '', array $recentMemories = []): array
+    {
+        $interpretation = $this->interpretAction($cleanReply, $threadSummary, $attachmentsExcerpt, $recentMemories);
+
+        $validator = Validator::make($interpretation, [
+            'action_type' => ['required', 'string'],
+            'parameters' => ['required', 'array'],
+            'confidence' => ['required', 'numeric'],
+        ]);
+        if ($validator->fails()) {
+            throw new ValidationException($validator);
+        }
+
+        return $interpretation;
     }
 
     /**

@@ -604,12 +604,14 @@ class ProcessInboundEmail implements ShouldQueue
         string $locale
     ): void {
         try {
-            $memoryResult = $llmClient->json('memory_extract', [
-                'detected_locale' => $locale,
-                'clean_reply' => $cleanReply,
-                'thread_summary' => $this->getThreadSummary($thread),
-                'attachments_excerpt' => $this->getAttachmentsExcerpt($emailMessage),
-            ]);
+            // Use MCP tool with schema validation for memory extraction
+            $memoryResult = app(\App\Mcp\Tools\MemoryExtractTool::class)
+                ->runReturningArray(
+                    $locale,
+                    $cleanReply,
+                    $this->getThreadSummary($thread),
+                    $this->getAttachmentsExcerpt($emailMessage)
+                );
 
             $memoryService = app(MemoryService::class);
             $meta = [
@@ -683,16 +685,12 @@ class ProcessInboundEmail implements ShouldQueue
     {
         try {
             // Create a mock Request object for the MCP tool
-            $request = new \Laravel\Mcp\Request([
-                'clean_reply' => $cleanReply,
-                'thread_summary' => $threadSummary,
-                'attachments_excerpt' => $attachmentsExcerpt,
-                'recent_memories' => $recentMemories,
-            ]);
-
-            $response = $actionInterpreter->handle($request);
-
-            return json_decode(json_encode($response), true);
+            return $actionInterpreter->runReturningArray(
+                cleanReply: $cleanReply,
+                threadSummary: $threadSummary,
+                attachmentsExcerpt: $attachmentsExcerpt,
+                recentMemories: is_array($recentMemories) ? $recentMemories : []
+            );
 
         } catch (\Exception $e) {
             Log::error('MCP Action interpretation failed', [

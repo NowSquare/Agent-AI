@@ -6,7 +6,10 @@ use App\Mcp\Prompts\DefineAgentsPrompt;
 use App\Mcp\Prompts\OrchestrateComplexRequestPrompt;
 use App\Mcp\Tools\ActionInterpretationTool;
 use App\Mcp\Tools\AgentSelectionTool;
+use App\Mcp\Tools\LanguageDetectTool;
+use App\Mcp\Tools\MemoryExtractTool;
 use App\Mcp\Tools\ResponseGenerationTool;
+use App\Mcp\Tools\ThreadSummarizeTool;
 use Laravel\Mcp\Server;
 
 class AgentAiServer extends Server
@@ -35,6 +38,9 @@ class AgentAiServer extends Server
         ActionInterpretationTool::class,
         AgentSelectionTool::class,
         ResponseGenerationTool::class,
+        LanguageDetectTool::class,
+        ThreadSummarizeTool::class,
+        MemoryExtractTool::class,
     ];
 
     /**

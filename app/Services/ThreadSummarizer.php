@@ -18,8 +18,8 @@ class ThreadSummarizer
     public function getSummary(Thread $thread, bool $forceRefresh = false): array
     {
         $cacheKey = "thread_summary:{$thread->id}";
-        
-        if (!$forceRefresh && $cached = Cache::get($cacheKey)) {
+
+        if (! $forceRefresh && $cached = Cache::get($cacheKey)) {
             return $cached;
         }
 
@@ -37,7 +37,7 @@ class ThreadSummarizer
             // Build message context
             $messageContext = $messages->map(function ($message) {
                 return sprintf(
-                    "%s (%s): %s",
+                    '%s (%s): %s',
                     $message->from_name ?: $message->from_email,
                     $message->created_at->diffForHumans(),
                     $message->body_text ?: strip_tags($message->body_html)
@@ -55,18 +55,20 @@ class ThreadSummarizer
 
             $memoryContext = '';
             if ($memories->isNotEmpty()) {
-                $memoryContext = "Key Context:\n" . $memories->map(function ($memory) {
+                $memoryContext = "Key Context:\n".$memories->map(function ($memory) {
                     $value = is_array($memory->value_json) ? json_encode($memory->value_json) : $memory->value_json;
+
                     return "- {$memory->key}: {$value}";
                 })->join("\n");
             }
 
-            // Call LLM for summarization
-            $result = $this->llmClient->json('thread_summarize', [
-                'detected_locale' => app()->getLocale(),
-                'last_messages' => $messageContext,
-                'key_memories' => $memoryContext,
-            ]);
+            // Call MCP tool for summarization (schema-validated)
+            $tool = app(\App\Mcp\Tools\ThreadSummarizeTool::class);
+            $result = $tool->runReturningArray(
+                app()->getLocale(),
+                $messageContext,
+                $memoryContext
+            );
 
             // Validate and normalize response
             $summary = [
