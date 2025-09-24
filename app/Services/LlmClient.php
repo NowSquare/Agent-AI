@@ -1,4 +1,21 @@
 <?php
+/**
+ * What this file does — One client for talking to different LLM providers.
+ * Plain: A single gateway that sends prompts to AI models (local or cloud) and returns answers.
+ * How this fits in:
+ * - Called by services to generate text or JSON
+ * - Follows routing defaults from config/llm.php
+ * - Falls back to local Ollama when externals fail
+ * Key terms defined here:
+ * - Provider: which AI backend to call (ollama/openai/anthropic)
+ * - Prompt template: a text with placeholders (in config/prompts.php)
+ * - Calibration: small multiplier to normalize confidence across providers
+ *
+ * For engineers:
+ * - Inputs/Outputs: call()/json() take a prompt key + variables; return string/array
+ * - Side effects: logs, HTTP requests; no DB writes
+ * - Failure modes: timeout, HTTP error, invalid JSON → throws RuntimeException
+ */
 
 namespace App\Services;
 
@@ -11,6 +28,16 @@ use Illuminate\Support\Facades\Log;
  * Supports multiple providers with automatic fallback to local Ollama.
  * Handles timeouts, retries, token limits, and confidence calibration.
  */
+/**
+ * Purpose: Provide a simple, provider-agnostic API for text and JSON completions.
+ * Responsibilities:
+ * - Build prompts from templates
+ * - Select providers and fallback on failure
+ * - Enforce timeouts/retries and normalize confidence
+ * Collaborators:
+ * - Grounding/Router services decide when/how to call LLM
+ * - config/llm.php defines models and thresholds
+ */
 class LlmClient
 {
     public function __construct(
@@ -20,7 +47,14 @@ class LlmClient
     }
 
     /**
-     * Make a plain text completion request.
+     * Summary: Make a plain text completion request.
+     * @param string $promptKey  Name of prompt template in config/prompts.php
+     * @param array  $vars       Values to substitute into the template
+     * @param int|null $maxOutputTokens Hard cap for output length
+     * @return string             Model response as plain text
+     * @throws \RuntimeException If all providers fail or HTTP/timeout issues occur
+     * Example:
+     *   $text = $llm->call('thread_summarize', ['last_messages' => '...']);
      */
     public function call(
         string $promptKey,
@@ -71,7 +105,14 @@ class LlmClient
     }
 
     /**
-     * Make a JSON-mode completion request.
+     * Summary: Make a JSON-mode completion request and validate/adjust confidence.
+     * @param string $promptKey  Name of JSON prompt template
+     * @param array  $vars       Values to substitute (can include provider/model override)
+     * @param int|null $maxOutputTokens Output token limit
+     * @return array             Decoded JSON array from the model
+     * @throws \RuntimeException On invalid JSON or provider failures
+     * Example:
+     *   $out = $llm->json('action_interpret', ['clean_reply' => '...']);
      */
     public function json(
         string $promptKey,
@@ -143,7 +184,11 @@ class LlmClient
     }
 
     /**
-     * Build prompt from template with variable substitution.
+     * Summary: Build a prompt from a named template by replacing :placeholders.
+     * @param string $key   Template key under config/prompts.php
+     * @param array  $vars  Replacement vars (':name' → value)
+     * @return string       The final prompt string
+     * @throws \InvalidArgumentException If template is missing
      */
     private function buildPrompt(string $key, array $vars): string
     {
@@ -162,7 +207,8 @@ class LlmClient
     }
 
     /**
-     * Get provider priority list (external first, Ollama last).
+     * Summary: Get provider priority list. Defaults to configured provider then Ollama fallback.
+     * @return array<string> Provider slugs in order
      */
     private function getProviderPriority(): array
     {
@@ -179,7 +225,12 @@ class LlmClient
     }
 
     /**
-     * Call specific LLM provider.
+     * Summary: Dispatch to a specific provider implementation.
+     * @param string $provider  'openai'|'anthropic'|'ollama'
+     * @param string $prompt    Full prompt text
+     * @param int    $maxTokens Output token limit
+     * @param string|null $model Preferred model name
+     * @return string           Raw response text
      */
     private function callProvider(string $provider, string $prompt, int $maxTokens, ?string $model = null): string
     {
@@ -192,7 +243,11 @@ class LlmClient
     }
 
     /**
-     * Call OpenAI API.
+     * Summary: Call OpenAI chat completions.
+     * @param string $prompt
+     * @param int    $maxTokens
+     * @param string|null $model
+     * @return string
      */
     private function callOpenAI(string $prompt, int $maxTokens, ?string $model): string
     {
@@ -217,7 +272,7 @@ class LlmClient
     }
 
     /**
-     * Call Anthropic API.
+     * Summary: Call Anthropic messages API.
      */
     private function callAnthropic(string $prompt, int $maxTokens, ?string $model): string
     {
@@ -241,7 +296,7 @@ class LlmClient
     }
 
     /**
-     * Call Ollama API (local).
+     * Summary: Call Ollama local API.
      */
     private function callOllama(string $prompt, int $maxTokens, ?string $model): string
     {
@@ -267,7 +322,9 @@ class LlmClient
     }
 
     /**
-     * Rough token estimation (words / 0.75).
+     * Summary: Rough token estimation as words / 0.75.
+     * @param string $text  Text to estimate
+     * @return int          Approximate token count
      */
     private function estimateTokens(string $text): int
     {

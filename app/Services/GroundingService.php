@@ -1,9 +1,33 @@
 <?php
+/**
+ * What this file does — Finds relevant snippets in your data using embeddings.
+ * Plain: Turns the question into numbers and searches nearby pieces of text.
+ * How this fits in:
+ * - Called before answering to fetch context from emails/attachments/memories
+ * - Helps the model quote real facts instead of guessing
+ * - Feeds hitRate/topSim to the router
+ * Key terms:
+ * - embedding: number list representing meaning
+ * - cosine distance: measure of closeness between embeddings
+ *
+ * For engineers:
+ * - Inputs: query string, k
+ * - Output: array of {src,id,text,similarity}
+ * - Failure modes: empty results → hitRate 0; assumes pgvector enabled
+ */
 
 namespace App\Services;
 
 use Illuminate\Support\Facades\DB;
 
+/**
+ * Purpose: Provide retrieval over pgvector columns in Postgres.
+ * Responsibilities:
+ * - Embed queries via Embeddings service
+ * - Query three sources with IVFFlat indexes
+ * - Compute simple metrics (hitRate, topSimilarity)
+ * Collaborators: Embeddings, pgvector-enabled tables
+ */
 class GroundingService
 {
     public function __construct(private Embeddings $embeddings)
@@ -11,8 +35,10 @@ class GroundingService
     }
 
     /**
-     * Retrieve top-k snippets across email bodies, attachments, and memories.
-     * Returns array of [src, id, text, sim].
+     * Summary: Retrieve top-k snippets across email bodies, attachments, and memories.
+     * @param string $query  Natural language question
+     * @param int    $k      Number of items per source to return
+     * @return array[]       Each has src,id,text,similarity in [0,1]
      */
     public function retrieveTopK(string $query, int $k = 8): array
     {
@@ -49,6 +75,11 @@ SQL;
         ], $rows);
     }
 
+    /**
+     * Summary: Fraction of results above a minimum similarity bar (config/llm.routing.thresholds.grounding_hit_min analogue).
+     * @param array $results Retrieval results from retrieveTopK
+     * @return float         0..1
+     */
     public function hitRate(array $results): float
     {
         if (empty($results)) {
@@ -63,6 +94,9 @@ SQL;
         return $hits / max(1, count($results));
     }
 
+    /**
+     * Summary: Highest similarity score among results.
+     */
     public function topSimilarity(array $results): float
     {
         $max = 0.0;
