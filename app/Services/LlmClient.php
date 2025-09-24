@@ -149,7 +149,11 @@ class LlmClient
 
                 // For Ollama, use chat API with strict JSON mode and no streaming
                 if ($provider === 'ollama') {
-                    $result = $this->callOllamaChatJson($prompt, $maxOutputTokens, $model);
+                    // Prefer tool-calling for structured outputs when enabled for the prompt's role
+                    $roleConfig = $this->config['routing']['roles'][$this->getRoleForPrompt($promptKey)] ?? [];
+                    $useTools = (bool) ($roleConfig['tools'] ?? false);
+
+                    $result = $this->callOllamaChatJson($prompt, $maxOutputTokens, $model, $promptKey, $useTools);
                 } else {
                     $result = $this->callProvider($provider, $prompt, $maxOutputTokens, $model);
                 }
@@ -368,24 +372,44 @@ class LlmClient
     /**
      * Summary: Call Ollama chat API with strict JSON mode for JSON prompts.
      */
-    private function callOllamaChatJson(string $prompt, int $maxTokens, ?string $model): string
+    private function callOllamaChatJson(string $prompt, int $maxTokens, ?string $model, string $promptKey, bool $useTools = false): string
     {
         $base = rtrim(config('llm.providers.ollama.base_url', 'http://localhost:11434'), '/');
+        $body = [
+            'model' => $model ?: 'llama3.1:8b',
+            'stream' => false,
+            'messages' => [],
+            'options' => [
+                'num_predict' => $maxTokens,
+                'temperature' => 0,
+                'top_p' => 1,
+            ],
+        ];
+
+        if ($useTools) {
+            [$toolName, $parameters] = $this->getToolFunctionForPrompt($promptKey);
+            $body['tools'] = [[
+                'type' => 'function',
+                'function' => [
+                    'name' => $toolName,
+                    'description' => 'Return structured JSON via function arguments for this task.',
+                    'parameters' => $parameters,
+                ],
+            ]];
+            $body['messages'] = [
+                ['role' => 'system', 'content' => "If appropriate, call the {$toolName} function exactly once with the correct arguments. Do not include extra text."],
+                ['role' => 'user',   'content' => $prompt],
+            ];
+        } else {
+            $body['format'] = 'json';
+            $body['messages'] = [
+                ['role' => 'system', 'content' => 'Respond ONLY with a single valid JSON object. No prose, no code fences.'],
+                ['role' => 'user',   'content' => $prompt],
+            ];
+        }
+
         $response = Http::timeout($this->config['timeout_ms'] / 1000)
-            ->post($base.'/api/chat', [
-                'model' => $model ?: 'llama3.1:8b',
-                'format' => 'json',
-                'stream' => false,
-                'messages' => [
-                    ['role' => 'system', 'content' => 'Respond ONLY with a single valid JSON object. No prose, no code fences.'],
-                    ['role' => 'user',   'content' => $prompt],
-                ],
-                'options' => [
-                    'num_predict' => $maxTokens,
-                    'temperature' => 0,
-                    'top_p' => 1,
-                ],
-            ]);
+            ->post($base.'/api/chat', $body);
 
         if (! $response->successful()) {
             throw new \RuntimeException("Ollama API error: {$response->status()} {$response->body()}");
@@ -393,8 +417,73 @@ class LlmClient
 
         $data = $response->json();
 
-        // Non-streamed chat returns a single message
+        Log::debug('LLM full response', [
+            'data' => $data,
+        ]);
+
+        if ($useTools && isset($data['message']['tool_calls']) && ! empty($data['message']['tool_calls'])) {
+            $call = $data['message']['tool_calls'][0];
+            $args = $call['function']['arguments'] ?? [];
+
+            return is_string($args) ? $args : json_encode($args);
+        }
+
         return $data['message']['content'] ?? '';
+    }
+
+    private function getToolFunctionForPrompt(string $promptKey): array
+    {
+        switch ($promptKey) {
+            case 'language_detect':
+                return ['language_detect', [
+                    'type' => 'object',
+                    'properties' => [
+                        'language' => ['type' => 'string', 'description' => 'BCP-47 code or language name'],
+                        'confidence' => ['type' => 'number', 'minimum' => 0, 'maximum' => 1],
+                    ],
+                    'required' => ['language'],
+                ]];
+            case 'thread_summarize':
+                return ['thread_summarize', [
+                    'type' => 'object',
+                    'properties' => [
+                        'summary' => ['type' => 'string'],
+                        'key_entities' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        'open_questions' => ['type' => 'array', 'items' => ['type' => 'string']],
+                    ],
+                    'required' => ['summary'],
+                ]];
+            case 'memory_extract':
+                return ['memory_extract', [
+                    'type' => 'object',
+                    'properties' => [
+                        'items' => ['type' => 'array', 'items' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'key' => ['type' => 'string'],
+                                'value' => ['type' => ['string', 'number', 'boolean', 'object', 'array', 'null']],
+                                'scope' => ['type' => 'string', 'enum' => ['conversation', 'user', 'account']],
+                                'ttl_category' => ['type' => 'string', 'enum' => ['volatile', 'seasonal', 'durable', 'legal']],
+                                'confidence' => ['type' => 'number', 'minimum' => 0, 'maximum' => 1],
+                                'provenance' => ['type' => 'string'],
+                            ],
+                            'required' => ['key', 'scope', 'ttl_category'],
+                        ]],
+                    ],
+                    'required' => ['items'],
+                ]];
+            default:
+                return [$promptKey, ['type' => 'object']];
+        }
+    }
+
+    private function getRoleForPrompt(string $promptKey): string
+    {
+        return match ($promptKey) {
+            'language_detect', 'thread_summarize', 'memory_extract' => 'GROUNDED',
+            'action_interpret' => 'CLASSIFY',
+            default => 'SYNTH',
+        };
     }
 
     /**
