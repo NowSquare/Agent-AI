@@ -376,90 +376,93 @@ STEP 3 — Database evidence (Tinker one-liners)
 Use Tinker --execute to print compact JSON. Don’t open interactive Tinker.
 
 1. Latest thread and basic linkage
-   php artisan tinker --execute="
+   php artisan tinker --execute='
    use App\Models\Thread;
-   \$t=Thread::latest('created_at')->first();
-   echo json_encode(['thread_id'=>\$t?->id,'subject'=>\$t?->subject], JSON_PRETTY_PRINT), PHP_EOL;
-   "
+   $t=Thread::latest("created_at")->first();
+   echo json_encode(["thread_id"=>$t?->id,"subject"=>$t?->subject], JSON_PRETTY_PRINT), PHP_EOL;
+   '
 
 2. Contact ↔ User link (visibility rule)
-   php artisan tinker --execute="
-   use App\Models{Thread,Contact,ContactLink,User};
-   \$t=Thread::latest('created_at')->first();
-   \$contact=\$t?->contacts()->first();
-   \$link=\$contact?->contactLinks()->first();
-   \$user=\$link?->user;
+   php artisan tinker --execute='
+   use App\Models\{Thread, Contact, ContactLink, User};
+   $t=Thread::latest("created_at")->first();
+   $contact=$t?->contacts()->first();
+   $link=$contact?->contactLinks()->first();
+   $user=$link?->user;
    echo json_encode([
-   'contact_email'=>\$contact?->email,
-   'user_id'=>\$user?->id,
-   'link_exists'=>!!\$link
+   "contact_email"=>$contact?->email,
+   "user_id"=>$user?->id,
+   "link_exists"=>(bool)$link
    ], JSON_PRETTY_PRINT), PHP_EOL;
-   "
+   '
 
 3. Agent run exists (blackboard) and latest round
-   php artisan tinker --execute="
-   use App\Models{AgentRun,Thread};
-   \$t=Thread::latest('created_at')->first();
-   \$r=AgentRun::where('thread_id',\$t->id)->latest('created_at')->first();
-   echo json_encode(['agent_run_id'=>\$r?->id,'round_no'=>\$r?->round_no], JSON_PRETTY_PRINT), PHP_EOL;
-   "
+   php artisan tinker --execute='
+   use App\Models\{AgentRun, Thread};
+   $t=Thread::latest("created_at")->first();
+   $r=AgentRun::where("thread_id",$t->id)->latest("created_at")->first();
+   echo json_encode(["agent_run_id"=>$r?->id,"round_no"=>$r?->round_no], JSON_PRETTY_PRINT), PHP_EOL;
+   '
 
 4. Steps by role + max round
-   php artisan tinker --execute="
-   use App\Models{AgentStep,Thread};
-   \$t=Thread::latest('created_at')->first();
-   \$roles=AgentStep::where('thread_id',\$t->id)
-   ->selectRaw('agent_role, count(*) c, max(round_no) max_round')
-   ->groupBy('agent_role')->orderBy('agent_role')->get();
-   echo \$roles->toJson(JSON_PRETTY_PRINT), PHP_EOL;
-   "
+   php artisan tinker --execute='
+   use App\Models\{AgentStep, Thread};
+   $t=Thread::latest("created_at")->first();
+   $roles=AgentStep::where("thread_id",$t->id)
+   ->selectRaw("agent_role, count(*) c, max(round_no) max_round")
+   ->groupBy("agent_role")->orderBy("agent_role")->get();
+   echo $roles->toJson(JSON_PRETTY_PRINT), PHP_EOL;
+   '
 
-5. Debate/decision footprint (vote\_score / decision\_reason present)
-   php artisan tinker --execute="
-   use App\Models{AgentStep,Thread};
-   \$t=Thread::latest('created_at')->first();
-   \$arb=AgentStep::where('thread_id',\$t->id)->where('agent_role','Arbiter')->latest('created_at')->first();
+5. Debate/decision footprint (vote_score / decision_reason present)
+   php artisan tinker --execute='
+   use App\Models\{AgentStep, Thread};
+   $t=Thread::latest("created_at")->first();
+   $arb=AgentStep::where("thread_id",$t->id)->where("agent_role","Arbiter")->latest("created_at")->first();
    echo json_encode([
-   'arbiter_step_id'=>\$arb?->id,
-   'vote_score'=>\$arb?->vote_score,
-   'decision_reason'=>\$arb?->decision_reason
+   "arbiter_step_id"=>$arb?->id,
+   "vote_score"=>$arb?->vote_score,
+   "decision_reason"=>$arb?->decision_reason
    ], JSON_PRETTY_PRINT), PHP_EOL;
-   "
+   '
 
 6. Plan validity (validator result)
-   php artisan tinker --execute="
-   use App\Models{AgentStep,Thread};
-   \$t=Thread::latest('created_at')->first();
-   \$crit=AgentStep::where('thread_id',\$t->id)->where('agent_role','Critic')->latest('created_at')->first();
+   php artisan tinker --execute='
+   use App\Models\{AgentStep, Thread};
+   $t=Thread::latest("created_at")->first();
+   $crit=AgentStep::where("thread_id",$t->id)->where("agent_role","Critic")->latest("created_at")->first();
+   $ij=$crit?->input_json ?? [];
+   $oj=$crit?->output_json ?? [];
    echo json_encode([
-   'critic_step_id'=>\$crit?->id,
-   'has_plan_panel'=> isset(\$crit?->input_json['plan'] ) || isset(\$crit?->output_json['plan']) || isset(\$crit?->output_json['plan_report']),
-   'first_hint'=> \$crit?->output_json['plan_report']['hint'] ?? null
+   "critic_step_id"=>$crit?->id,
+   "has_plan_panel"=> isset($ij["plan"]) || isset($oj["plan"]) || isset($oj["plan_report"]),
+   "first_hint"=> $oj["plan_report"]["hint"] ?? null
    ], JSON_PRETTY_PRINT), PHP_EOL;
-   "
+   '
 
 7. Memory saved (typed Decision with provenance)
-   php artisan tinker --execute="
-   use App\Models{Memory,Thread};
-   \$t=Thread::latest('created_at')->first();
-   \$m=Memory::where('thread_id',\$t->id)->latest('created_at')->first();
+   php artisan tinker --execute='
+   use App\Models\{Memory, Thread};
+   $t=Thread::latest("created_at")->first();
+   $m=Memory::where("thread_id",$t->id)->latest("created_at")->first();
+   $prov = $m?->provenance_ids ?? [];
    echo json_encode([
-   'memory_id'=>\$m?->id,
-   'type'=>\$m?->type ?? null,
-   'has_provenance'=> !empty(\$m?->provenance_ids ?? [])
+   "memory_id"=>$m?->id,
+   "type"=>$m?->type ?? null,
+   "has_provenance"=> !empty($prov)
    ], JSON_PRETTY_PRINT), PHP_EOL;
-   "
+   '
 
 8. Embeddings present on latest email (sanity)
-   php artisan tinker --execute="
-   use App\Models{EmailMessage,Thread};
-   \$t=Thread::latest('created_at')->first();
-   \$em=EmailMessage::where('thread_id',\$t->id)->latest('created_at')->first();
+   php artisan tinker --execute='
+   use App\Models\{EmailMessage, Thread};
+   $t=Thread::latest("created_at")->first();
+   $em=EmailMessage::where("thread_id",$t->id)->latest("created_at")->first();
    echo json_encode([
-   'email_id'=>\$em?->id,
-   'has_body_embedding'=> isset(\$em?->body_embedding)
+   "email_id"=>$em?->id,
+   "has_body_embedding"=> isset($em?->body_embedding)
    ], JSON_PRETTY_PRINT), PHP_EOL;
-   "
+   '
 
 STEP 4 — Route availability (Activity UI)
 
