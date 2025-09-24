@@ -118,7 +118,7 @@ Guidance: put business logic in Services/Jobs, not Controllers. Write unit and f
 - Because this is your own data, Agent-AI shows the full content of steps for your threads.
 - Tenant boundary is enforced by `accounts` and `memberships`.
 
-## Phase 2 — Multi-Agent Enhancements
+## Multi-agent enhancements
 - Allocation (auction heuristic): utility = w_cap*capability_match + w_cost*(1/cost_hint) + w_rel*reliability. Picks top‑K workers per subtask; allocation is logged in `agent_steps` with `agent_role=Planner`.
 - Structured debate (K rounds + minority report): Critics score groundedness/completeness/risk; near‑top candidates are retained as a minority report (ε). Weighted voting aggregates Critic + Worker self‑scores; tie‑breakers prefer higher groundedness, then lower expected cost, then oldest candidate.
 - Typed memories: `Decision|Insight|Fact` with `provenance_ids[]` and a stable content hash to deduplicate outcomes. TTL/decay rules continue to apply.

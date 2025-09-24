@@ -49,7 +49,7 @@ This project avoids heavy infra. The following refinements improve reliability a
 - Multi-agent protocol fields: `agent_role` (Planner|Worker|Critic|Arbiter), `round_no`, optional `coalition_id`, `vote_score`, `decision_reason`.
 - Log every LLM/tool call for traceability.
 
-### Phase 2 — Multi-Agent Protocol Details
+### Multi-Agent Protocol Details
 - **Allocation (auction)**: utility = `w_cap*capability_match + w_cost*(1/cost_hint) + w_rel*reliability`. Top‑K workers selected per task via `AgentRegistry::topKForTask`. Allocation shortlist is logged (Planner step).
 - **Debate (K rounds + minority report)**: Critics score groundedness/completeness/risk each round; retain candidates within ε of top as a minority report. Voting aggregates Critic + Worker self‑scores using `config/agents.php` weights. Tie‑breakers: higher groundedness → lower expected cost → oldest.
 - **Typed Memories**: Curator writes `Decision|Insight|Fact` memories with `provenance_ids[]` and a stable `content_hash` to deduplicate.
@@ -94,19 +94,19 @@ This project avoids heavy infra. The following refinements improve reliability a
 
 ### Current Development Status
 
-**✅ COMPLETED: Phase 1A - Database & Models**
+**Current implementation overview — Database & Models**
 - Complete database schema with 29 migrations
 - 21 Eloquent models with full relationships
 - ULID primary keys, JSONB fields, PostgreSQL optimizations
 - ThreadResolver service and ProcessInboundEmail job
 - Postmark webhook controller with HMAC validation
 
-**🔄 IN PROGRESS: Phase 1B - Auth & UI Foundation**
+**In progress — Auth & UI Foundation**
 - Passwordless authentication (ChallengeController, VerifyController)
 - Basic Blade/Flowbite dashboard and thread pages
 - i18n middleware and language detection
 
-**📋 NEXT: Phase 2 - LLM & MCP**
+**Next — LLM & MCP**
 - LLM client with Ollama fallback and provider support
 - MCP layer (ToolRegistry, McpController, tool schemas)
 - Action interpretation and clarification loop
@@ -114,13 +114,13 @@ This project avoids heavy infra. The following refinements improve reliability a
 - Add **pgvector grounding**, **AgentOps logs**, **simple model routing**, **internal delegation**, plus an evaluation checklist.
  - LLM routing: CLASSIFY → (pgvector retrieval) → GROUNDED or SYNTH, with config-driven thresholds and role bindings.
 
-**✅ COMPLETED: Phase 3 - Attachments Pipeline**
+**Attachments Pipeline — Implemented**
 - Full attachment pipeline: MIME/size limits, ClamAV scan, text extraction, LLM summarization
 - Signed downloads with expiry and nonce validation
 - Async processing on dedicated queue, LLM context integration
 - Security hardening and comprehensive logging
 
-**📋 FUTURE: Phase 4 - Quality & Production**
+**Planned — Quality & Production**
 - Comprehensive testing and monitoring
 - Performance optimization and production deployment
 - Advanced features and polish
@@ -506,7 +506,7 @@ Example: "It needs more..."
 
 ### Complete Email Processing Pipeline
 
-#### Phase 1: Email Ingestion & Analysis
+#### Email Ingestion & Analysis
 1. **Postmark Webhook** (`POST /webhooks/inbound-email`)
    - Receives inbound email via HTTP Basic Auth
    - Validates HMAC signature
@@ -525,7 +525,7 @@ Example: "It needs more..."
    - Processes attachments (scanning, extraction)
    - Calls MCP `ActionInterpretationTool` for structured action interpretation
 
-#### Phase 2: Intelligent Agent Routing
+#### Intelligent Agent Routing
 
 4. **Complexity Detection** (`Coordinator::shouldUseMultiAgentOrchestration()`)
    - Analyzes question for complexity keywords: "plan", "organize", "schedule", "multiple", "research"
@@ -543,7 +543,7 @@ Example: "It needs more..."
 - Coordinator creates tasks with dependency management
 - Sequential execution with proper ordering
 
-#### Phase 3: Agent Processing & Response
+#### Agent Processing & Response
 
 5. **Task Execution** (`AgentProcessor`)
    - Builds contextual prompts with agent personality
@@ -1250,9 +1250,9 @@ CLAMAV_PORT=3310
 
 ### Milestones
 
-1. **Phase 1 (1 week)**: Inbound webhook, threading, signed links, passwordless basics, Flowbite skeleton.
-2. **Phase 2 (2 weeks)**: LLM interpretation, clarification loop (max 2), confidence thresholds, memory write gate, MCP skeleton.
-3. **Phase 3 (1–2 weeks)**: **Attachments** (scan/extract/download), TTL/decay/purge jobs, observability, docs and demo.
+1. **Milestone A**: Inbound webhook, threading, signed links, passwordless basics, Flowbite skeleton.
+2. **Milestone B**: LLM interpretation, clarification loop (max 2), confidence thresholds, memory write gate, MCP skeleton.
+3. **Milestone C**: **Attachments** (scan/extract/download), TTL/decay/purge jobs, observability, docs and demo.
 
 ### Dependencies
 
@@ -2556,7 +2556,7 @@ aws s3 cp attachments_$DATE.tar.gz s3://your-backup-bucket/
 
 **Tech Stack**: Laravel 12, PHP 8.4, PostgreSQL 17+, Redis 7, Postmark, Ollama, ClamAV, Tailwind/Flowbite.
 
-**Development Status**: Phase 1A (Database/Models) complete. Ready for Phase 1B (Auth/UI) and Phase 2 (LLM/MCP).
+**Development Status**: Database/Models complete. Auth/UI in progress. LLM/MCP next.
 
 # Agent-AI — How it Works (Plain)
 
