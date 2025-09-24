@@ -12,8 +12,6 @@ class ExtractAttachmentText implements ShouldQueue
 {
     use Queueable;
 
-    public string $queue = 'attachments';
-
     public int $tries = 3;
 
     public int $backoff = 30;
