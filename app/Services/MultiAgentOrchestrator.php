@@ -1,4 +1,5 @@
 <?php
+
 /**
  * What this file does — Runs the plan→allocate→work→debate→decide→curate cycle.
  * Plain: Coordinates several small agents to plan, write, check, pick, and save.
@@ -16,11 +17,11 @@
 
 namespace App\Services;
 
+use App\Models\Account;
 use App\Models\Action;
 use App\Models\Agent;
 use App\Models\Task;
 use App\Models\Thread;
-use App\Models\Account;
 use Illuminate\Support\Facades\Log;
 
 class MultiAgentOrchestrator
@@ -93,9 +94,10 @@ class MultiAgentOrchestrator
             'task_count' => count($plan['tasks'] ?? []),
         ]);
 
-        // Step 2: Check if user confirmation is needed
-        if ($this->shouldAskForConfirmation($orchestrationPlan)) {
-            $this->sendConfirmationEmail($action, $thread, $orchestrationPlan);
+        // Step 2: Check if user confirmation is needed (disabled by default)
+        if ($this->shouldAskForConfirmation($plan)) {
+            $this->sendConfirmationEmail($action, $thread, $plan);
+
             return; // Wait for user response
         }
 
@@ -109,7 +111,10 @@ class MultiAgentOrchestrator
         // Prefer a candidate that carries a plan; fall back to Planner plan
         $symbolicPlan = $plan['plan'] ?? null;
         foreach ($candidates as $c) {
-            if (!empty($c['plan'])) { $symbolicPlan = $c['plan']; break; }
+            if (! empty($c['plan'])) {
+                $symbolicPlan = $c['plan'];
+                break;
+            }
         }
         if ($symbolicPlan) {
             $report = $planValidator->validate($symbolicPlan, $initialFacts);
@@ -128,19 +133,19 @@ class MultiAgentOrchestrator
                 'round_no' => 0,
             ]);
 
-            if (!$report['valid']) {
+            if (! $report['valid']) {
                 // Try simple auto-repair based on failed precondition
-                $repaired = $this->repairPlan($symbolicPlan, (string)($report['error'] ?? ''));
+                $repaired = $this->repairPlan($symbolicPlan, (string) ($report['error'] ?? ''));
                 if ($repaired) {
                     $symbolicPlan = $repaired;
                     $report = $planValidator->validate($symbolicPlan, $initialFacts);
                 }
 
                 // If still invalid, feed hint to debate once and retry best plan
-                if (!$report['valid']) {
-                    $decision = $this->debate->runKRounds($candidates, evidence: [['type'=>'plan_hint','hint'=>$report['hint']]], rounds: 1);
+                if (! $report['valid']) {
+                    $decision = $this->debate->runKRounds($candidates, evidence: [['type' => 'plan_hint', 'hint' => $report['hint']]], rounds: 1);
                     $winner = $decision['winner'];
-                    if (!empty($winner['plan'])) {
+                    if (! empty($winner['plan'])) {
                         $symbolicPlan = $winner['plan'];
                         $report = $planValidator->validate($symbolicPlan, $initialFacts);
                     }
@@ -159,7 +164,7 @@ class MultiAgentOrchestrator
         }
 
         // Step 3: Debate (Critic rounds = 2) → Decide (Arbiter)
-        $decision = $this->debate->runKRounds($candidates, evidence: [] , rounds: 2);
+        $decision = $this->debate->runKRounds($candidates, evidence: [], rounds: 2);
         $winner = $decision['winner'];
 
         // Log Arbiter decision
@@ -172,18 +177,18 @@ class MultiAgentOrchestrator
                 'provider' => 'internal',
                 'model' => 'arbiter',
                 'step_type' => 'route',
-                'input_json' => ['candidates' => array_map(fn($c) => ['id'=>$c['id'],'score'=>$c['score']], $candidates)],
+                'input_json' => ['candidates' => array_map(fn ($c) => ['id' => $c['id'], 'score' => $c['score']], $candidates)],
                 'output_json' => ['winner_id' => $winner['id'] ?? null, 'votes' => $decision['votes']],
                 'latency_ms' => 0,
                 'agent_role' => 'Arbiter',
                 'round_no' => count($decision['votes']),
-                'vote_score' => isset($winner['score']) ? round((float)$winner['score'], 2) : null,
+                'vote_score' => isset($winner['score']) ? round((float) $winner['score'], 2) : null,
                 'decision_reason' => $decision['reasons'][array_key_last($decision['reasons'])] ?? null,
             ]);
         }
 
         // Step 4: Curate memory of the outcome
-        $finalAnswer = (string)($winner['text'] ?? '');
+        $finalAnswer = (string) ($winner['text'] ?? '');
         $this->curator->persistOutcome($run->id, $thread, $account, $finalAnswer, provenanceIds: []);
 
         // Mark action as completed with final answer
@@ -204,6 +209,7 @@ class MultiAgentOrchestrator
     {
         $question = (string) ($action->payload_json['question'] ?? '');
         $hasAttachmentHeuristic = stripos($question, 'attach') !== false;
+
         return [
             'received' => true,
             'has_attachment' => $thread->emailMessages()->with('attachments')->get()->pluck('attachments')->flatten()->isNotEmpty() || $hasAttachmentHeuristic,
@@ -224,10 +230,12 @@ class MultiAgentOrchestrator
      */
     private function repairPlan(array $plan, string $error): ?array
     {
-        if (!preg_match('/Precondition failed:\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(<=|>=|=|<|>)\s*([a-zA-Z0-9_.-]+)/', $error, $m)) {
+        if (! preg_match('/Precondition failed:\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*(<=|>=|=|<|>)\s*([a-zA-Z0-9_.-]+)/', $error, $m)) {
             return null;
         }
-        $key = $m[1]; $op = $m[2]; $val = $m[3];
+        $key = $m[1];
+        $op = $m[2];
+        $val = $m[3];
         if ($op !== '=') {
             return null; // only boolean equality auto-repair for simplicity
         }
@@ -236,10 +244,15 @@ class MultiAgentOrchestrator
         $actionName = null;
         foreach ($schema as $name => $def) {
             foreach ($def['eff'] as $eff) {
-                if ($eff === $target) { $actionName = $name; break 2; }
+                if ($eff === $target) {
+                    $actionName = $name;
+                    break 2;
+                }
             }
         }
-        if (!$actionName) return null;
+        if (! $actionName) {
+            return null;
+        }
 
         $steps = $plan['steps'] ?? [];
         $steps[] = [
@@ -248,6 +261,7 @@ class MultiAgentOrchestrator
             'next_state' => [$target],
         ];
         $plan['steps'] = $steps;
+
         return $plan;
     }
 
@@ -378,7 +392,7 @@ Return a JSON structure with:
     private function getAvailableToolsList(): string
     {
         // TODO: Implement proper tool registry
-        return "define_agents, web_search, calendar_access, email_composition";
+        return 'define_agents, web_search, calendar_access, email_composition';
     }
 
     /**
@@ -489,7 +503,7 @@ Return a JSON structure with:
     {
         // Try to find existing agent with similar role
         $existingAgent = $account->agents()
-            ->where('role', 'LIKE', '%' . $agentData['role'] . '%')
+            ->where('role', 'LIKE', '%'.$agentData['role'].'%')
             ->first();
 
         if ($existingAgent) {
@@ -581,7 +595,7 @@ Return a JSON structure with:
         $dependencies = $task->input_json['dependencies'] ?? [];
 
         foreach ($dependencies as $dependency) {
-            if (!in_array($dependency, $executedTasks)) {
+            if (! in_array($dependency, $executedTasks)) {
                 return false;
             }
         }
@@ -707,13 +721,13 @@ Return a JSON structure with:
                 $this->agentProcessor->processTask($task);
 
                 $candidates[] = [
-                    'id' => (string)$task->id,
-                    'agent_id' => (string)$agent->id,
-                    'text' => (string)($task->result_json['response'] ?? ''),
-                    'score' => (float)($task->result_json['confidence'] ?? 0.0),
+                    'id' => (string) $task->id,
+                    'agent_id' => (string) $agent->id,
+                    'text' => (string) ($task->result_json['response'] ?? ''),
+                    'score' => (float) ($task->result_json['confidence'] ?? 0.0),
                     'evidence' => [],
-                    'cost_hint' => (int)($agent->cost_hint ?? 100),
-                    'reliability' => (float)($agent->reliability ?? 0.8),
+                    'cost_hint' => (int) ($agent->cost_hint ?? 100),
+                    'reliability' => (float) ($agent->reliability ?? 0.8),
                 ];
             }
         }
@@ -746,7 +760,7 @@ Return a JSON structure with:
         }
 
         $response .= "---\n";
-        $response .= "*This response was coordinated by multiple AI agents working together.*";
+        $response .= '*This response was coordinated by multiple AI agents working together.*';
 
         return $response;
     }
@@ -761,7 +775,7 @@ Return a JSON structure with:
         $response = trim($response);
 
         // Ensure proper formatting
-        if (!str_ends_with($response, '.')) {
+        if (! str_ends_with($response, '.')) {
             $response .= '.';
         }
 
