@@ -584,9 +584,12 @@ Return a JSON structure with:
 
                 $candidates[] = [
                     'id' => (string)$task->id,
+                    'agent_id' => (string)$agent->id,
                     'text' => (string)($task->result_json['response'] ?? ''),
                     'score' => (float)($task->result_json['confidence'] ?? 0.0),
                     'evidence' => [],
+                    'cost_hint' => (int)($agent->cost_hint ?? 100),
+                    'reliability' => (float)($agent->reliability ?? 0.8),
                 ];
             }
         }
