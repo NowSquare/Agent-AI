@@ -206,6 +206,63 @@ FEATURE IMPLEMENTATION RULES
 5) Logging
 6) i18n support
 
+/**
+ * What this section does — Adds a clear, safe, symbolic plan validation loop.
+ * Plain: Before doing work, write a small checklist (a plan). Check it. If a step is missing, fix it, then go.
+ * How this fits in:
+ * - Planner/Workers output steps as state → action → next-state
+ * - Validator checks each step’s preconditions and applies effects
+ * - If invalid: try a simple fix and re-check; debate can try once more
+ * - Only send the final email when the plan is valid
+ * Key terms: preconditions (must be true before), effects (become true after), facts (simple key=value truth), validator (checker)
+ *
+ * For engineers:
+ * - Plan JSON: { steps: [ { state: string[], action: {name,args}, next_state: string[] }, ... ] }
+ * - Validate: PlanValidator::validate($plan, $initialFacts) → PlanReport
+ * - Auto‑repair: insert a prerequisite action that makes the failed condition true
+ * - Gate: update Action.payload_json with plan_report + plan_valid; only dispatch SendReply when plan_valid=true
+ * - Log: AgentStep with model=plan-validator, agent_role=Critic, input_json.plan + output_json.report
+ */
+
+SYMBOLIC PLAN VALIDATION (MANDATORY FOR MULTI‑AGENT) — Plain
+- Plan shape (emit from Planner/Workers):
+```
+{
+  "steps": [
+    { "state": ["received=true","scanned=false"], "action": {"name": "ScanAttachment", "args": {}}, "next_state": ["scanned=true"] },
+    { "state": ["scanned=true","extracted=false"], "action": {"name": "ExtractText"}, "next_state": ["text_available=true"] },
+    { "state": ["text_available=true"], "action": {"name": "Summarize"}, "next_state": ["summary_ready=true"] },
+    { "state": ["summary_ready=true","confidence>=LLM_MIN_CONF"], "action": {"name": "SendReply"}, "next_state": ["reply_ready=true"] }
+  ]
+}
+```
+
+- Action rules live in `config/actions.php` (tiny, editable):
+  - Preconditions: strings like `scanned=true`, `confidence>=0.75`
+  - Effects: strings like `text_available=true`, `confidence+=0.1`
+
+- Validator usage:
+  - Build initial facts from the thread/action (e.g., `received`, `has_attachment`, `confidence`, etc.)
+  - `$report = PlanValidator::validate($plan, $initialFacts)`
+  - If `$report.valid === false`: try a simple auto‑repair (insert the action that satisfies the failed condition). If still invalid, pass a plan hint into the debate once and re‑check the best candidate’s plan.
+
+- Gating the final email:
+  - Set `action.payload_json.plan_report` and `action.payload_json.plan_valid`
+  - Only allow the reply email when `plan_valid === true`
+  - Otherwise, send an Options/Clarification email
+
+- Logging + UI:
+  - Write an `AgentStep` for the validator: `provider=internal`, `model=plan-validator`, `agent_role=Critic`, `input_json.plan`, `output_json.report`
+  - Activity shows a Plan panel: Valid ✓ (or first failing step ✗ + hint) and a compact list `S_k → Action → S_k+1`
+
+- Tests to include:
+  - Unit: PlanValidator accepts a correct plan; rejects unmet preconditions; applies effects
+  - Feature: Attachment scenario initially fails → auto‑repairs by inserting ScanAttachment → plan validates → proceeds
+
+- Debate integration:
+  - When a plan hint is present, slightly favor candidates that provide a structured plan
+  - Keep tie‑breaks as documented (groundedness → lower cost → oldest)
+
 EXECUTION MODE
 GIT/MCP WORKFLOW (MANDATORY)
 
