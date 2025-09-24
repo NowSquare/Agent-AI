@@ -190,25 +190,27 @@ Run the built-in demo and verify that the multi-agent + symbolic plan validation
 
 STEP 0 — Preflight (print versions; don’t modify)
 
+* Clear Laravel caches:
+  php artisan optimize:clear
 * Print PHP, Laravel, and DB versions:
   php -v
   php artisan --version
-  php -r "echo extension\_loaded('pdo\_pgsql')?'pdo\_pgsql\:yes':'pdo\_pgsql\:no', PHP\_EOL;"
+  php -r "echo extension_loaded('pdo_pgsql')?'pdo_pgsql:yes':'pdo_pgsql:no', PHP_EOL;"
 * Show key env bits (read-only):
-  php -r "echo getenv('APP\_ENV'),' ',getenv('APP\_URL'),PHP\_EOL;"
-  php -r "echo 'LLM\_PROVIDER=',getenv('LLM\_PROVIDER'),'  GROUNDED=',getenv('LLM\_GROUNDED\_MODEL'),'  SYNTH=',getenv('LLM\_SYNTH\_MODEL'),'  CLASSIFY=',getenv('LLM\_CLASSIFY\_MODEL'),PHP\_EOL;"
+  php -r "echo getenv('APP_ENV'),' ',getenv('APP_URL'),PHP_EOL;"
+  php -r "echo 'LLM_PROVIDER=',getenv('LLM_PROVIDER'),'  GROUNDED=',getenv('LLM_GROUNDED_MODEL'),'  SYNTH=',getenv('LLM_SYNTH_MODEL'),'  CLASSIFY=',getenv('LLM_CLASSIFY_MODEL'),PHP_EOL;"
 
 STEP 1 — Run the demo
 
 * Execute the scenario (no edits):
-  php artisan scenario\:run
+  php artisan scenario:run
 
 Expect: the command completes, prints the created thread/contact info, and triggers the orchestration.
 
 STEP 2 — Quick metrics sanity check
 
 * Run:
-  php artisan agent\:metrics --since=7d --limit=20
+  php artisan agent:metrics --since=7d --limit=20
 
 Expect: non-zero counts and a summary (rounds, groundedness %, per-role metrics).
 
@@ -218,93 +220,93 @@ Use Tinker --execute to print compact JSON. Don’t open interactive Tinker.
 1. Latest thread and basic linkage
    php artisan tinker --execute="
    use App\Models\Thread;
-   \$t=Thread::latest('created\_at')->first();
-   echo json\_encode(\['thread\_id'=>\$t?->id,'subject'=>\$t?->subject], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   \$t=Thread::latest('created_at')->first();
+   echo json_encode(['thread_id'=>\$t?->id,'subject'=>\$t?->subject], JSON_PRETTY_PRINT), PHP_EOL;
    "
 
 2. Contact ↔ User link (visibility rule)
    php artisan tinker --execute="
    use App\Models{Thread,Contact,ContactLink,User};
-   \$t=Thread::latest('created\_at')->first();
+   \$t=Thread::latest('created_at')->first();
    \$contact=\$t?->contacts()->first();
    \$link=\$contact?->contactLinks()->first();
    \$user=\$link?->user;
-   echo json\_encode(\[
-   'contact\_email'=>\$contact?->email,
-   'user\_id'=>\$user?->id,
-   'link\_exists'=>!!\$link
-   ], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   echo json_encode([
+   'contact_email'=>\$contact?->email,
+   'user_id'=>\$user?->id,
+   'link_exists'=>!!\$link
+   ], JSON_PRETTY_PRINT), PHP_EOL;
    "
 
 3. Agent run exists (blackboard) and latest round
    php artisan tinker --execute="
    use App\Models{AgentRun,Thread};
-   \$t=Thread::latest('created\_at')->first();
-   \$r=AgentRun::where('thread\_id',\$t->id)->latest('created\_at')->first();
-   echo json\_encode(\['agent\_run\_id'=>\$r?->id,'round\_no'=>\$r?->round\_no], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   \$t=Thread::latest('created_at')->first();
+   \$r=AgentRun::where('thread_id',\$t->id)->latest('created_at')->first();
+   echo json_encode(['agent_run_id'=>\$r?->id,'round_no'=>\$r?->round_no], JSON_PRETTY_PRINT), PHP_EOL;
    "
 
 4. Steps by role + max round
    php artisan tinker --execute="
    use App\Models{AgentStep,Thread};
-   \$t=Thread::latest('created\_at')->first();
-   \$roles=AgentStep::where('thread\_id',\$t->id)
-   ->selectRaw('agent\_role, count(\*) c, max(round\_no) max\_round')
-   ->groupBy('agent\_role')->orderBy('agent\_role')->get();
-   echo \$roles->toJson(JSON\_PRETTY\_PRINT), PHP\_EOL;
+   \$t=Thread::latest('created_at')->first();
+   \$roles=AgentStep::where('thread_id',\$t->id)
+   ->selectRaw('agent_role, count(*) c, max(round_no) max_round')
+   ->groupBy('agent_role')->orderBy('agent_role')->get();
+   echo \$roles->toJson(JSON_PRETTY_PRINT), PHP_EOL;
    "
 
 5. Debate/decision footprint (vote\_score / decision\_reason present)
    php artisan tinker --execute="
    use App\Models{AgentStep,Thread};
-   \$t=Thread::latest('created\_at')->first();
-   \$arb=AgentStep::where('thread\_id',\$t->id)->where('agent\_role','Arbiter')->latest('created\_at')->first();
-   echo json\_encode(\[
-   'arbiter\_step\_id'=>\$arb?->id,
-   'vote\_score'=>\$arb?->vote\_score,
-   'decision\_reason'=>\$arb?->decision\_reason
-   ], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   \$t=Thread::latest('created_at')->first();
+   \$arb=AgentStep::where('thread_id',\$t->id)->where('agent_role','Arbiter')->latest('created_at')->first();
+   echo json_encode([
+   'arbiter_step_id'=>\$arb?->id,
+   'vote_score'=>\$arb?->vote_score,
+   'decision_reason'=>\$arb?->decision_reason
+   ], JSON_PRETTY_PRINT), PHP_EOL;
    "
 
 6. Plan validity (validator result)
    php artisan tinker --execute="
    use App\Models{AgentStep,Thread};
-   \$t=Thread::latest('created\_at')->first();
-   \$crit=AgentStep::where('thread\_id',\$t->id)->where('agent\_role','Critic')->latest('created\_at')->first();
-   echo json\_encode(\[
-   'critic\_step\_id'=>\$crit?->id,
-   'has\_plan\_panel'=> isset(\$crit?->input\_json\['plan'] ) || isset(\$crit?->output\_json\['plan']) || isset(\$crit?->output\_json\['plan\_report']),
-   'first\_hint'=> \$crit?->output\_json\['plan\_report']\['hint'] ?? null
-   ], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   \$t=Thread::latest('created_at')->first();
+   \$crit=AgentStep::where('thread_id',\$t->id)->where('agent_role','Critic')->latest('created_at')->first();
+   echo json_encode([
+   'critic_step_id'=>\$crit?->id,
+   'has_plan_panel'=> isset(\$crit?->input_json['plan'] ) || isset(\$crit?->output_json['plan']) || isset(\$crit?->output_json['plan_report']),
+   'first_hint'=> \$crit?->output_json['plan_report']['hint'] ?? null
+   ], JSON_PRETTY_PRINT), PHP_EOL;
    "
 
 7. Memory saved (typed Decision with provenance)
    php artisan tinker --execute="
    use App\Models{Memory,Thread};
-   \$t=Thread::latest('created\_at')->first();
-   \$m=Memory::where('thread\_id',\$t->id)->latest('created\_at')->first();
-   echo json\_encode(\[
-   'memory\_id'=>\$m?->id,
+   \$t=Thread::latest('created_at')->first();
+   \$m=Memory::where('thread_id',\$t->id)->latest('created_at')->first();
+   echo json_encode([
+   'memory_id'=>\$m?->id,
    'type'=>\$m?->type ?? null,
-   'has\_provenance'=> !empty(\$m?->provenance\_ids ?? \[])
-   ], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   'has_provenance'=> !empty(\$m?->provenance_ids ?? [])
+   ], JSON_PRETTY_PRINT), PHP_EOL;
    "
 
 8. Embeddings present on latest email (sanity)
    php artisan tinker --execute="
    use App\Models{EmailMessage,Thread};
-   \$t=Thread::latest('created\_at')->first();
-   \$em=EmailMessage::where('thread\_id',\$t->id)->latest('created\_at')->first();
-   echo json\_encode(\[
-   'email\_id'=>\$em?->id,
-   'has\_body\_embedding'=> isset(\$em?->body\_embedding)
-   ], JSON\_PRETTY\_PRINT), PHP\_EOL;
+   \$t=Thread::latest('created_at')->first();
+   \$em=EmailMessage::where('thread_id',\$t->id)->latest('created_at')->first();
+   echo json_encode([
+   'email_id'=>\$em?->id,
+   'has_body_embedding'=> isset(\$em?->body_embedding)
+   ], JSON_PRETTY_PRINT), PHP_EOL;
    "
 
 STEP 4 — Route availability (Activity UI)
 
 * Check Activity routes exist:
-  php artisan route\:list | grep -i activity || true
+  php artisan route:list | grep -i activity || true
 
 STEP 5 — Analyze results and produce a PASS/FAIL checklist
 Create a short table with ✅/❌ for:
@@ -315,7 +317,7 @@ Create a short table with ✅/❌ for:
 * Contact ↔ User link exists (visibility rule)
 * AgentRun present with a round number
 * AgentSteps cover roles: Planner, Worker, Critic, Arbiter (at least one each)
-* Debate produced a vote\_score and decision\_reason
+* Debate produced a vote_score and decision_reason
 * Plan panel present + (if invalid at first) a repair hint was generated
 * A Decision memory was saved with provenance
 * Latest email has an embedding
@@ -323,7 +325,7 @@ Create a short table with ✅/❌ for:
 
 If any ❌:
 
-* Write 1–2 line Plain explanations (“Plain: …”) of what it means and how to fix, using concrete commands (e.g., run backfill, check EMBEDDINGS\_DIM, verify config/agents.php rounds, ensure scenario fixture paths are correct).
+* Write 1–2 line Plain explanations (“Plain: …”) of what it means and how to fix, using concrete commands (e.g., run backfill, check EMBEDDINGS_DIM, verify config/agents.php rounds, ensure scenario fixture paths are correct).
 
 OUTPUT FORMAT
 
@@ -361,10 +363,10 @@ PROCEDURE
 1. Reproduce
 
 * Run:
+  php artisan optimize:clear
   php artisan test
-  php artisan scenario\:run
-* Tail the last \~200 lines of the log:
-  php -r "echo implode('', array\_slice(file('storage/logs/laravel.log')?:\[], -200));"
+  php artisan scenario:run
+* Review the last ~200 lines in @storage/logs/laravel.log.
 * Summarize the first failing symptom in **Plain** language.
 
 2. Classify the failure and fix
