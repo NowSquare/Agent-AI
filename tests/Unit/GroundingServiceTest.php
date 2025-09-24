@@ -1,4 +1,5 @@
 <?php
+/** Plain: Proves retrieval returns top-k with similarity and basic metrics work. */
 
 namespace Tests\Unit;
 

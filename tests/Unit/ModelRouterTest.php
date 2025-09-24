@@ -1,4 +1,5 @@
 <?php
+/** Plain: Proves ModelRouter picks GROUNDED vs SYNTH based on thresholds. */
 
 namespace Tests\Unit;
 

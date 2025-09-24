@@ -1,4 +1,12 @@
 <?php
+/**
+ * What this file does — Handles passwordless login flow (challenge and verify).
+ * Plain: Sends a code to your email and checks it when you enter it.
+ * How this fits in:
+ * - Creates Users on first verified login
+ * - Links Users to Contacts via ContactLink
+ * - Applies rate limits and expiry from config
+ */
 
 namespace App\Services;
 

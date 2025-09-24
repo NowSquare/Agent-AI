@@ -1,4 +1,5 @@
 <?php
+/** Plain: Proves answers use retrieval (GROUNDED) when hit-rate is high. */
 
 namespace Tests\Feature;
 

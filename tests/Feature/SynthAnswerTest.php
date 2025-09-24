@@ -1,4 +1,5 @@
 <?php
+/** Plain: Proves routing goes to SYNTH when input is large or retrieval is weak. */
 
 namespace Tests\Feature;
 
