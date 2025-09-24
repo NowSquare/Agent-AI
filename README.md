@@ -86,15 +86,15 @@ Embeddings:
 Tip: If a tag isn’t local, flip the provider/model for that role in `.env` (or pull the tag in Ollama).
 
 ## Data model essentials
-- `agent_steps` (trace): logs role, provider, model, tokens (in/out/total), latency_ms, confidence, and `input_json`/`output_json` (with basic secret scrubbing; user content is not redacted). Steps relate to `account`, `thread`, optional `email_message`/`action`, and optional `contact`/`user`.
+- `agent_steps` (trace): logs role, provider, model, tokens (in/out/total), latency_ms, confidence, and full `input_json`/`output_json`. The full trace is visible to the user for their own threads; other users cannot access it. Steps relate to `account`, `thread`, optional `email_message`/`action`, and optional `contact`/`user`.
 - Embeddings live in Postgres columns and power retrieval:
   - `email_messages.body_embedding`
   - `attachment_extractions.text_embedding`
   - `memories.content_embedding`
   Dim is the vector length (e.g., 1024 for `mxbai-embed-large`). Retrieval is cosine KNN with provenance.
-- Visibility rules:
-  - A user sees steps for threads that involve any of their linked contacts (within their account).
-  - Admins see all steps in their account.
+### Visibility rules
+- **You see the full trace for your own threads only.** A thread is yours if it involves a contact linked to your user (via `contact_links`).
+- **No separate admin role today.** (Future-ready: if teams/multi-tenant are introduced later, an account admin could see all threads within that account—without changing the data model.)
 
 ## Develop & test
 ```bash
@@ -113,8 +113,7 @@ php artisan test
 Guidance: put business logic in Services/Jobs, not Controllers. Write unit and feature tests for new services, routes, and data flows.
 
 ## Security & privacy
-- We scrub obvious secrets in `input_json`/`output_json` but do not redact end‑user content; the point is traceability.
-- Full trace is visible to the user for their threads; admins see all within their account.
+- Because this is your own data, Agent-AI shows the full content of steps for your threads.
 - Tenant boundary is enforced by `accounts` and `memberships`.
 
 ## Roadmap & contributions

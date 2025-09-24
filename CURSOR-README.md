@@ -381,7 +381,7 @@ Note: File extension counts do not include files ignored by .gitignore.
 - **Data Flow (Email → Contact → User)**
   - Inbound email creates/updates a Contact and attaches it to a Thread. On first-ever contact, an Account is auto-created from `APP_NAME`.
   - First web login with the same email: if no User, create User, link via `contact_links`, send challenge; after verification the user sees their Dashboard and Activity.
-  - Users see all their Threads (via linked contacts) and the full Agent Steps trace.
+  - Users see the full trace for their own threads only. A thread is yours if it involves a contact linked to your user via `contact_links`.
 - **LLM Routing (CLASSIFY → Retrieval → GROUNDED | SYNTH)**
   - Defaults: GROUNDED=`gpt-oss:20b`, SYNTH=`gpt-oss:120b`, CLASSIFY=`mistral-small3.2:24b` (tune in `.env`).
   - Thresholds: `LLM_GROUNDING_HIT_MIN`, `LLM_SYNTH_COMPLEXITY_TOKENS`. See `config/llm.php` and `.env` comments.
@@ -389,8 +389,8 @@ Note: File extension counts do not include files ignored by .gitignore.
   - Embeddings on `email_messages.body_embedding`, `attachment_extractions.text_embedding`, `memories.content_embedding`.
   - Cosine KNN retrieval; snippets carry provenance. Backfill embeddings with `php artisan embeddings:backfill`.
 - **Agent Steps (Traceability)**
-  - Every LLM/tool call is logged in `agent_steps` (role, provider, model, tokens, latency, confidence, JSON I/O with basic scrubbing).
-  - Activity UI (`/activity`) shows a user’s own steps; admins see all within their account.
+  - Every LLM/tool call is logged in `agent_steps` (role, provider, model, tokens in/out/total, latency_ms, confidence, and full `input_json`/`output_json`).
+  - Activity UI (`/activity`) shows the full trace for your own threads; other users cannot access it.
 - **Conventions & Hygiene**
   - Keep controllers thin; put logic in Services/Jobs; validate with Form Requests.
   - Migrations: edit existing files; keep `php artisan migrate:fresh` green.
@@ -2517,7 +2517,7 @@ aws s3 cp attachments_$DATE.tar.gz s3://your-backup-bucket/
 - Email processing status tracking and async timeouts (10min LLM, 15min queue)
 - Action dispatching with signed links and confirmation flows
 - Agent Registry with intelligent routing (Chef Mario, Tech Support, dynamic agents)
-- Memory Gate with TTL/decay, confidence scoring, and PII redaction
+- Memory Gate with TTL/decay and confidence scoring
 - Memory retrieval with scope-based relevance and recency decay
 - Memory pruning with configurable thresholds and TTL enforcement
 - Memory API endpoints for forget/preview with signed URLs
