@@ -1,4 +1,5 @@
 <?php
+
 /**
  * What this file does — Computes simple stats about recent multi‑agent runs.
  * Plain: A scoreboard that sums rounds, time, and who wins often.
@@ -10,9 +11,9 @@
 
 namespace App\Services;
 
+use App\Models\Agent;
 use App\Models\AgentRun;
 use App\Models\AgentStep;
-use App\Models\Agent;
 use Illuminate\Support\Carbon;
 
 /**
@@ -31,7 +32,7 @@ class MultiAgentMetrics
     /** @return array<string,mixed> */
     public function compute(?string $sinceIso = null, int $limit = 20): array
     {
-        $since = $sinceIso ? Carbon::parse($sinceIso) : now()->subDays(7);
+        $since = $sinceIso ? $this->parseSince($sinceIso) : now()->subDays(7);
 
         $runs = AgentRun::query()
             ->where('created_at', '>=', $since)
@@ -45,8 +46,8 @@ class MultiAgentMetrics
             'rounds_max' => 0,
             'roles' => [
                 'Planner' => ['count' => 0, 'latency_ms' => 0],
-                'Worker'  => ['count' => 0, 'latency_ms' => 0],
-                'Critic'  => ['count' => 0, 'latency_ms' => 0],
+                'Worker' => ['count' => 0, 'latency_ms' => 0],
+                'Critic' => ['count' => 0, 'latency_ms' => 0],
                 'Arbiter' => ['count' => 0, 'latency_ms' => 0],
             ],
             'groundedness_pct' => 0.0,
@@ -54,24 +55,27 @@ class MultiAgentMetrics
         ];
 
         $minG = (float) config('agents.min_groundedness', 0.6);
-        $criticTotal = 0; $criticGrounded = 0;
+        $criticTotal = 0;
+        $criticGrounded = 0;
 
         foreach ($runs as $run) {
             $roundMax = AgentStep::where('thread_id', $run->thread_id)->max('round_no') ?? 0;
-            $summary['rounds_max'] = max($summary['rounds_max'], (int)$roundMax);
+            $summary['rounds_max'] = max($summary['rounds_max'], (int) $roundMax);
 
             $steps = AgentStep::where('thread_id', $run->thread_id)->get();
             foreach ($steps as $s) {
                 $role = $s->agent_role ?? null;
                 if ($role && isset($summary['roles'][$role])) {
                     $summary['roles'][$role]['count'] += 1;
-                    $summary['roles'][$role]['latency_ms'] += (int)($s->latency_ms ?? 0);
+                    $summary['roles'][$role]['latency_ms'] += (int) ($s->latency_ms ?? 0);
                 }
 
                 if ($role === 'Critic') {
                     $criticTotal += 1;
-                    $score = (float)($s->vote_score ?? 0.0);
-                    if ($score >= $minG) { $criticGrounded += 1; }
+                    $score = (float) ($s->vote_score ?? 0.0);
+                    if ($score >= $minG) {
+                        $criticGrounded += 1;
+                    }
                 }
 
                 if ($role === 'Arbiter' && isset($s->output_json['winner_id'])) {
@@ -91,6 +95,7 @@ class MultiAgentMetrics
         $summary['win_distribution'] = collect($summary['win_distribution'])
             ->mapWithKeys(function ($wins, $agentId) {
                 $name = optional(Agent::find($agentId))->name ?: $agentId;
+
                 return [$name => $wins];
             })
             ->sortDesc()
@@ -98,6 +103,28 @@ class MultiAgentMetrics
 
         return $summary;
     }
+
+    private function parseSince(string $input): Carbon
+    {
+        $trimmed = trim($input);
+        if ($trimmed === '') {
+            return now()->subDays(7);
+        }
+
+        // Support relative forms like 7d, 24h, 90m
+        if (preg_match('/^(\d+)\s*([dhm])$/i', $trimmed, $m)) {
+            $amount = (int) $m[1];
+            $unit = strtolower($m[2]);
+
+            return match ($unit) {
+                'd' => now()->subDays($amount),
+                'h' => now()->subHours($amount),
+                'm' => now()->subMinutes($amount),
+                default => now()->subDays(7),
+            };
+        }
+
+        // Fallback to Carbon parsing (ISO8601, etc.)
+        return Carbon::parse($trimmed);
+    }
 }
-
-

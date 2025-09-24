@@ -2,10 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\ProcessInboundEmail;
+use App\Models\EmailInboundPayload;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
-use App\Models\EmailInboundPayload;
-use App\Jobs\ProcessInboundEmail;
 
 /**
  * What this file does — Simulates an inbound Postmark webhook using a local fixture.
@@ -25,20 +25,24 @@ class InboundSimulate extends Command
     public function handle(): int
     {
         $path = $this->option('file');
-        if (!File::exists($path)) {
+        if (! File::exists($path)) {
             $this->error("Fixture not found: {$path}");
+
             return 1;
         }
         $json = File::get($path);
         $payload = json_decode($json, true);
-        if (!$payload) {
+        if (! $payload) {
             $this->error('Invalid JSON fixture.');
+
             return 1;
         }
 
         // Store as EmailInboundPayload using existing model (encrypted ciphertext handled in job)
         $row = EmailInboundPayload::create([
             'ciphertext' => encrypt(json_encode($payload)),
+            'received_at' => now(),
+            'purge_after' => now()->addDays(30),
         ]);
 
         // Kick the normal job synchronously for determinism
@@ -46,11 +50,16 @@ class InboundSimulate extends Command
 
         $threadId = optional(\App\Models\EmailMessage::latest('created_at')->first())->thread_id;
         $from = $payload['From'] ?? '';
-        $email = (new class { public function email($s){ return preg_match('/<([^>]+)>/', $s, $m) ? strtolower(trim($m[1])) : strtolower(trim($s)); } })->email($from);
+        $email = (new class
+        {
+            public function email($s)
+            {
+                return preg_match('/<([^>]+)>/', $s, $m) ? strtolower(trim($m[1])) : strtolower(trim($s));
+            }
+        })->email($from);
 
         $this->info("Simulated inbound created. thread_id={$threadId} contact_email={$email}");
+
         return 0;
     }
 }
-
-

@@ -48,8 +48,8 @@ return new class extends Migration
 
             $table->timestampsTz();
             $table->index('thread_id');
-            $table->index(['direction','delivery_status']);
-            $table->index(['direction','processing_status']);
+            $table->index(['direction', 'delivery_status']);
+            $table->index(['direction', 'processing_status']);
             $table->index('from_email');
         });
 
