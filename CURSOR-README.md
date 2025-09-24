@@ -2589,3 +2589,36 @@ You → Email → Thread → Plan → Work → Debate → Decide → Memory → 
 - Routing: CLASSIFY → retrieval → GROUNDED | SYNTH (small model vs big model choice).
 - Token: the chunk size of text for the model; affects cost and time.
 - Latency: how long a step takes; Confidence: how sure the model is.
+
+## Symbolic plans (Plain)
+Why plans: Before doing work, the system sketches a small, checkable plan. Think of it like a recipe: current kitchen state → do an action → new kitchen state.
+
+Plan shape:
+```
+{
+  "steps": [
+    {
+      "state": ["received=true", "scanned=false"],
+      "action": {"name": "ScanAttachment", "args": {}},
+      "next_state": ["scanned=true"]
+    },
+    {
+      "state": ["scanned=true", "extracted=false"],
+      "action": {"name": "ExtractText"},
+      "next_state": ["text_available=true"]
+    }
+  ]
+}
+```
+
+Action rules (tiny and editable): Each action has preconditions (what must be true before) and effects (what becomes true after). These are simple strings like `scanned=true` or `confidence>=0.75` defined in `config/actions.php`.
+
+Validator: The PlanValidator walks each step:
+- If a precondition is missing (e.g., trying to ExtractText before ScanAttachment), it stops and returns a clear hint like “Add ScanAttachment before ExtractText.”
+- If all checks pass, the plan is marked Valid ✓.
+
+Auto‑repair and debate: If a plan is invalid, the system first tries a simple fix (insert the missing step). If needed, the debate loop prefers candidates that include a proper plan and tries again once.
+
+Gating replies: The final “SendReply” is only allowed when the plan is valid. If not valid, the system sends an Options or Clarification email instead.
+
+Where you see this: In Activity → a “Plan” panel shows Valid/Invalid, the first failing step, a human hint, and a compact list of steps.
