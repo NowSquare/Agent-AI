@@ -1,4 +1,20 @@
 <?php
+/**
+ * What this file does — Turns text into number vectors (embeddings).
+ * Plain: We convert words into lists of numbers so the database can search by meaning.
+ * How this fits in:
+ * - GroundingService asks for vectors to search pgvector columns
+ * - Memory writing may embed content for later retrieval
+ * - Dimensions must match config/llm.php embeddings.dim
+ * Key terms:
+ * - embedding: number list representing meaning
+ * - dim: how long the list is (e.g., 1024)
+ *
+ * For engineers:
+ * - Inputs: text string
+ * - Output: float[] sized to dim
+ * - Failure modes: provider error; returns empty/throws if model missing
+ */
 
 namespace App\Services;
 
@@ -6,6 +22,13 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Purpose: Create embeddings using the configured provider/model.
+ * Responsibilities:
+ * - Call provider to embed text
+ * - Normalize output to the configured dimension
+ * Collaborators: config('llm.embeddings.*') and Llm providers
+ */
 class Embeddings
 {
     public function __construct(private array $config = [])

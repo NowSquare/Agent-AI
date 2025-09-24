@@ -1,4 +1,21 @@
 <?php
+/**
+ * What this file does — Keeps track of available agents and scores who should work on a task.
+ * Plain: A phonebook of agents with a simple “who fits best” calculator.
+ * How this fits in:
+ * - Orchestrator asks for the top K workers per task
+ * - Coordinator uses it for simple/one‑agent cases
+ * - Reliability is updated over time from wins
+ * Key terms:
+ * - capability_match: how well the agent’s tags match the task
+ * - cost_hint: a rough cost/time signal; cheaper is better
+ * - reliability: moving average success rate (0..1)
+ *
+ * For engineers:
+ * - Inputs: account, action/task description
+ * - Outputs: ranked agents with utility scores
+ * - Side effects: updateReliability()
+ */
 
 namespace App\Services;
 
@@ -6,6 +23,14 @@ use App\Models\Agent;
 use App\Models\Account;
 use Illuminate\Support\Collection;
 
+/**
+ * Purpose: Score and shortlist agents for a task.
+ * Responsibilities:
+ * - Compute utility using weights from config/agents.php
+ * - Return top‑K agents per task
+ * - Maintain rolling reliability
+ * Collaborators: Agent model, Orchestrator
+ */
 class AgentRegistry
 {
     /**
