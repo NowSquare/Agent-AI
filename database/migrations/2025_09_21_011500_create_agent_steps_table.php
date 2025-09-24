@@ -28,11 +28,18 @@ return new class extends Migration
             $table->integer('tokens_total')->default(0);
             $table->integer('latency_ms')->default(0);
             $table->decimal('confidence', 3, 2)->nullable();
+            // Multi-agent protocol fields
+            $table->string('agent_role', 16)->nullable(); // Planner|Worker|Critic|Arbiter
+            $table->integer('round_no')->default(0);
+            $table->foreignUlid('coalition_id')->nullable();
+            $table->decimal('vote_score', 4, 2)->nullable();
+            $table->text('decision_reason')->nullable();
             $table->timestampsTz();
 
             $table->index(['thread_id', 'created_at']);
             $table->index(['role', 'created_at']);
             $table->index(['provider', 'model']);
+            $table->index(['agent_role','round_no']);
             $table->index('contact_id');
             $table->index('user_id');
             $table->index('account_id');

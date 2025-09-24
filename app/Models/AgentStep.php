@@ -14,6 +14,7 @@ class AgentStep extends Model
         'account_id','thread_id','email_message_id','action_id','contact_id','user_id',
         'role','provider','model','step_type','input_json','output_json',
         'tokens_input','tokens_output','tokens_total','latency_ms','confidence',
+        'agent_role','round_no','coalition_id','vote_score','decision_reason',
     ];
 
     protected function casts(): array
@@ -22,6 +23,7 @@ class AgentStep extends Model
             'input_json' => 'array',
             'output_json' => 'array',
             'confidence' => 'float',
+            'vote_score' => 'float',
         ];
     }
 
