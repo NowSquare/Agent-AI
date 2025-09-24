@@ -118,6 +118,17 @@ Guidance: put business logic in Services/Jobs, not Controllers. Write unit and f
 - Because this is your own data, Agent-AI shows the full content of steps for your threads.
 - Tenant boundary is enforced by `accounts` and `memberships`.
 
+## Phase 2 — Multi-Agent Enhancements
+- Allocation (auction heuristic): utility = w_cap*capability_match + w_cost*(1/cost_hint) + w_rel*reliability. Picks top‑K workers per subtask; allocation is logged in `agent_steps` with `agent_role=Planner`.
+- Structured debate (K rounds + minority report): Critics score groundedness/completeness/risk; near‑top candidates are retained as a minority report (ε). Weighted voting aggregates Critic + Worker self‑scores; tie‑breakers prefer higher groundedness, then lower expected cost, then oldest candidate.
+- Typed memories: `Decision|Insight|Fact` with `provenance_ids[]` and a stable content hash to deduplicate outcomes. TTL/decay rules continue to apply.
+- Metrics & tooling: `php artisan agent:metrics --since=... --limit=...` prints rounds, per‑role activity, groundedness %, and win distribution.
+
+### Add a new agent (mini‑guide)
+1) Define capability tags and a rough `cost_hint` on the `Agent` (`capabilities_json.keywords|domains|expertise|action_types`).
+2) Register/seed the agent for the account; reliability will update automatically from wins.
+3) Provide a Worker handler implicitly via `AgentProcessor` prompts; optionally shape Critic policy by improving groundedness inputs.
+
 ## Roadmap & contributions
 Near‑term polish:
 - More precise token/latency capture in `agent_steps`

@@ -49,6 +49,17 @@ This project avoids heavy infra. The following refinements improve reliability a
 - Multi-agent protocol fields: `agent_role` (Planner|Worker|Critic|Arbiter), `round_no`, optional `coalition_id`, `vote_score`, `decision_reason`.
 - Log every LLM/tool call for traceability.
 
+### Phase 2 — Multi-Agent Protocol Details
+- **Allocation (auction)**: utility = `w_cap*capability_match + w_cost*(1/cost_hint) + w_rel*reliability`. Top‑K workers selected per task via `AgentRegistry::topKForTask`. Allocation shortlist is logged (Planner step).
+- **Debate (K rounds + minority report)**: Critics score groundedness/completeness/risk each round; retain candidates within ε of top as a minority report. Voting aggregates Critic + Worker self‑scores using `config/agents.php` weights. Tie‑breakers: higher groundedness → lower expected cost → oldest.
+- **Typed Memories**: Curator writes `Decision|Insight|Fact` memories with `provenance_ids[]` and a stable `content_hash` to deduplicate.
+- **Metrics**: `agent:metrics --since --limit` prints rounds, per‑role counts/latency, groundedness %, and win distribution.
+
+### How to Add a New Agent (Developer)
+1. Add capability tags (`keywords`, `domains`, `expertise`, `action_types`) and `cost_hint` on the `Agent`.
+2. Ensure the agent is available for the account (seed or UI). Reliability updates over time from wins.
+3. Workers run via `AgentProcessor` (prompting uses role/capabilities); Critics leverage groundedness inputs; no extra wiring required for basic participation.
+
 ### 3) Simple Dynamic Model Selection
 - Small model for classification/short tasks.
 - GROUNDED default model: `gpt-oss:20b` (local-first), configurable via .env.
