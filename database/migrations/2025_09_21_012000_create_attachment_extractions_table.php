@@ -5,6 +5,11 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * What this file does — Stores extracted text from attachments plus embeddings for search.
+ * Plain: We keep a short text excerpt and a number list (embedding) so we can find files by meaning.
+ * For engineers: `dim` must match the embedding model; IVFFlat + vector_cosine_ops supports cosine KNN.
+ */
 return new class extends Migration
 {
     /**

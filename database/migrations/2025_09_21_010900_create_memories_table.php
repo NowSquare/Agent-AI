@@ -1,4 +1,9 @@
 <?php
+/**
+ * What this file does — Creates the memories table and pgvector column for semantic search.
+ * Plain: Saves short facts/decisions with a number list so we can search by meaning later.
+ * For engineers: `content_embedding` vector($dim) must match the embedding model; IVFFlat index uses cosine.
+ */
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
