@@ -1,4 +1,5 @@
 <?php
+
 /**
  * What this file does — One client for talking to different LLM providers.
  * Plain: A single gateway that sends prompts to AI models (local or cloud) and returns answers.
@@ -48,13 +49,15 @@ class LlmClient
 
     /**
      * Summary: Make a plain text completion request.
-     * @param string $promptKey  Name of prompt template in config/prompts.php
-     * @param array  $vars       Values to substitute into the template
-     * @param int|null $maxOutputTokens Hard cap for output length
-     * @return string             Model response as plain text
+     *
+     * @param  string  $promptKey  Name of prompt template in config/prompts.php
+     * @param  array  $vars  Values to substitute into the template
+     * @param  int|null  $maxOutputTokens  Hard cap for output length
+     * @return string Model response as plain text
+     *
      * @throws \RuntimeException If all providers fail or HTTP/timeout issues occur
-     * Example:
-     *   $text = $llm->call('thread_summarize', ['last_messages' => '...']);
+     *                           Example:
+     *                           $text = $llm->call('thread_summarize', ['last_messages' => '...']);
      */
     public function call(
         string $promptKey,
@@ -106,13 +109,15 @@ class LlmClient
 
     /**
      * Summary: Make a JSON-mode completion request and validate/adjust confidence.
-     * @param string $promptKey  Name of JSON prompt template
-     * @param array  $vars       Values to substitute (can include provider/model override)
-     * @param int|null $maxOutputTokens Output token limit
-     * @return array             Decoded JSON array from the model
+     *
+     * @param  string  $promptKey  Name of JSON prompt template
+     * @param  array  $vars  Values to substitute (can include provider/model override)
+     * @param  int|null  $maxOutputTokens  Output token limit
+     * @return array Decoded JSON array from the model
+     *
      * @throws \RuntimeException On invalid JSON or provider failures
-     * Example:
-     *   $out = $llm->json('action_interpret', ['clean_reply' => '...']);
+     *                           Example:
+     *                           $out = $llm->json('action_interpret', ['clean_reply' => '...']);
      */
     public function json(
         string $promptKey,
@@ -124,7 +129,7 @@ class LlmClient
 
         // Allow per-call provider/model override (for routing)
         $requestedProvider = $vars['provider'] ?? null;
-        $requestedModel    = $vars['model'] ?? null;
+        $requestedModel = $vars['model'] ?? null;
 
         $providers = $requestedProvider ? [$requestedProvider] : $this->getProviderPriority();
         $lastError = null;
@@ -137,8 +142,14 @@ class LlmClient
                     'input_tokens' => $this->estimateTokens($prompt),
                 ]);
 
-                $model = $requestedModel ?: $this->config['model'] ?? null;
-                $result = $this->callProvider($provider, $prompt, $maxOutputTokens, $model);
+                $model = $requestedModel ?: $this->selectModelForJsonPrompt($promptKey);
+
+                // For Ollama, use chat API with strict JSON mode and no streaming
+                if ($provider === 'ollama') {
+                    $result = $this->callOllamaChatJson($prompt, $maxOutputTokens, $model);
+                } else {
+                    $result = $this->callProvider($provider, $prompt, $maxOutputTokens, $model);
+                }
 
                 // Validate JSON response
                 $json = json_decode($result, true);
@@ -184,10 +195,31 @@ class LlmClient
     }
 
     /**
+     * Summary: Choose an appropriate model for a JSON prompt based on routing roles.
+     */
+    private function selectModelForJsonPrompt(string $promptKey): ?string
+    {
+        $roles = $this->config['routing']['roles'] ?? [];
+
+        // Default fallbacks if roles are missing
+        $classify = $roles['CLASSIFY']['model'] ?? ($this->config['model'] ?? null);
+        $grounded = $roles['GROUNDED']['model'] ?? ($this->config['model'] ?? null);
+        $synth = $roles['SYNTH']['model'] ?? ($this->config['model'] ?? null);
+
+        return match ($promptKey) {
+            'language_detect', 'thread_summarize', 'memory_extract' => $grounded,
+            'action_interpret' => $classify,
+            default => $synth,
+        };
+    }
+
+    /**
      * Summary: Build a prompt from a named template by replacing :placeholders.
-     * @param string $key   Template key under config/prompts.php
-     * @param array  $vars  Replacement vars (':name' → value)
-     * @return string       The final prompt string
+     *
+     * @param  string  $key  Template key under config/prompts.php
+     * @param  array  $vars  Replacement vars (':name' → value)
+     * @return string The final prompt string
+     *
      * @throws \InvalidArgumentException If template is missing
      */
     private function buildPrompt(string $key, array $vars): string
@@ -208,6 +240,7 @@ class LlmClient
 
     /**
      * Summary: Get provider priority list. Defaults to configured provider then Ollama fallback.
+     *
      * @return array<string> Provider slugs in order
      */
     private function getProviderPriority(): array
@@ -226,11 +259,12 @@ class LlmClient
 
     /**
      * Summary: Dispatch to a specific provider implementation.
-     * @param string $provider  'openai'|'anthropic'|'ollama'
-     * @param string $prompt    Full prompt text
-     * @param int    $maxTokens Output token limit
-     * @param string|null $model Preferred model name
-     * @return string           Raw response text
+     *
+     * @param  string  $provider  'openai'|'anthropic'|'ollama'
+     * @param  string  $prompt  Full prompt text
+     * @param  int  $maxTokens  Output token limit
+     * @param  string|null  $model  Preferred model name
+     * @return string Raw response text
      */
     private function callProvider(string $provider, string $prompt, int $maxTokens, ?string $model = null): string
     {
@@ -244,10 +278,6 @@ class LlmClient
 
     /**
      * Summary: Call OpenAI chat completions.
-     * @param string $prompt
-     * @param int    $maxTokens
-     * @param string|null $model
-     * @return string
      */
     private function callOpenAI(string $prompt, int $maxTokens, ?string $model): string
     {
@@ -322,9 +352,42 @@ class LlmClient
     }
 
     /**
+     * Summary: Call Ollama chat API with strict JSON mode for JSON prompts.
+     */
+    private function callOllamaChatJson(string $prompt, int $maxTokens, ?string $model): string
+    {
+        $base = rtrim(config('llm.providers.ollama.base_url', 'http://localhost:11434'), '/');
+        $response = Http::timeout($this->config['timeout_ms'] / 1000)
+            ->post($base.'/api/chat', [
+                'model' => $model ?: 'llama3.1:8b',
+                'format' => 'json',
+                'stream' => false,
+                'messages' => [
+                    ['role' => 'system', 'content' => 'Respond ONLY with a single valid JSON object. No prose, no code fences.'],
+                    ['role' => 'user',   'content' => $prompt],
+                ],
+                'options' => [
+                    'num_predict' => $maxTokens,
+                    'temperature' => 0,
+                    'top_p' => 1,
+                ],
+            ]);
+
+        if (! $response->successful()) {
+            throw new \RuntimeException("Ollama API error: {$response->status()} {$response->body()}");
+        }
+
+        $data = $response->json();
+
+        // Non-streamed chat returns a single message
+        return $data['message']['content'] ?? '';
+    }
+
+    /**
      * Summary: Rough token estimation as words / 0.75.
-     * @param string $text  Text to estimate
-     * @return int          Approximate token count
+     *
+     * @param  string  $text  Text to estimate
+     * @return int Approximate token count
      */
     private function estimateTokens(string $text): int
     {
