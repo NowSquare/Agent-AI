@@ -876,9 +876,12 @@ Use these fields to reliably control the follow-up loop.
 
 ### MCP Layer (Planned)
 
-**Status**: Not yet implemented. Will provide schema-driven tool calls with SSRF protection.
+**Status**: Implemented for key JSON tasks. We now expose MCP tools with server-side schema validation for:
+  - `LanguageDetectTool` → returns `{ language, confidence }`
+  - `ThreadSummarizeTool` → returns `{ summary, key_entities[], open_questions[] }`
+  - `MemoryExtractTool` → returns `{ items: [{ key, value, scope, ttl_category, confidence, provenance? }] }`
 
-**Future Implementation:**
+**Next Steps:**
 - ToolRegistry with explicit bindings
 - Custom token guard for `api_tokens` table
 - JSON schema validation for tool parameters
