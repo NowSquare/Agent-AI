@@ -18,6 +18,10 @@ return new class extends Migration
             $table->string('name');
             $table->string('role')->nullable(); // Free-form descriptor (e.g., "scheduler", "notifier")
             $table->json('capabilities_json')->nullable(); // jsonb: advertised tool abilities etc.
+            // Allocation & reliability metrics (used by AgentRegistry scoring)
+            $table->unsignedInteger('cost_hint')->default(100); // Rough token/time cost hint (higher = more expensive)
+            $table->decimal('reliability', 3, 2)->default(0.80); // Rolling average (0..1)
+            $table->unsignedInteger('reliability_samples')->default(0); // Sample count for reliability
 
             $table->timestampsTz();
             $table->index('account_id');
