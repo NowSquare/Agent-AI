@@ -362,6 +362,12 @@ STEP 0 — Preflight (print versions; don’t modify)
   php artisan --version
   php -r "echo extension_loaded('pdo_pgsql')?'pdo_pgsql:yes':'pdo_pgsql:no', PHP_EOL;"
 * Show key env bits (read-only):
+  # Preferred (Laravel-aware; boots the framework and reads .env via config/env):
+  php artisan tinker --execute="echo json_encode(['APP_ENV'=>config('app.env'),'APP_URL'=>config('app.url')], JSON_PRETTY_PRINT), PHP_EOL;"
+  php artisan tinker --execute="echo json_encode(['LLM_CLASSIFY_PROVIDER'=>env('LLM_CLASSIFY_PROVIDER'),'LLM_CLASSIFY_MODEL'=>env('LLM_CLASSIFY_MODEL'),'LLM_GROUNDED_PROVIDER'=>env('LLM_GROUNDED_PROVIDER'),'LLM_GROUNDED_MODEL'=>env('LLM_GROUNDED_MODEL'),'LLM_SYNTH_PROVIDER'=>env('LLM_SYNTH_PROVIDER'),'LLM_SYNTH_MODEL'=>env('LLM_SYNTH_MODEL')], JSON_PRETTY_PRINT), PHP_EOL;"
+  php artisan tinker --execute="echo json_encode(config('llm'), JSON_PRETTY_PRINT), PHP_EOL;"
+
+  # OS environment (may be empty unless variables are exported to the shell):
   php -r "echo getenv('APP_ENV'),' ',getenv('APP_URL'),PHP_EOL;"
   php -r "echo 'LLM_PROVIDER=',getenv('LLM_PROVIDER'),'  GROUNDED=',getenv('LLM_GROUNDED_MODEL'),'  SYNTH=',getenv('LLM_SYNTH_MODEL'),'  CLASSIFY=',getenv('LLM_CLASSIFY_MODEL'),PHP_EOL;"
 
