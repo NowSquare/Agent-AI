@@ -384,9 +384,10 @@ Use Tinker --execute to print compact JSON. Don’t open interactive Tinker.
 
 2. Contact ↔ User link (visibility rule)
    php artisan tinker --execute='
-   use App\Models\{Thread, Contact, ContactLink, User};
+   use App\Models\{Thread, EmailMessage, Contact, ContactLink, User};
    $t=Thread::latest("created_at")->first();
-   $contact=$t?->contacts()->first();
+   $em=$t?->emailMessages()->latest("created_at")->first();
+   $contact = $t ? Contact::where("account_id", $t->account_id)->where("email", $em?->from_email)->first() : null;
    $link=$contact?->contactLinks()->first();
    $user=$link?->user;
    echo json_encode([
