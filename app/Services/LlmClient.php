@@ -417,10 +417,6 @@ class LlmClient
 
         $data = $response->json();
 
-        Log::debug('LLM full response', [
-            'data' => $data,
-        ]);
-
         if ($useTools && isset($data['message']['tool_calls']) && ! empty($data['message']['tool_calls'])) {
             $call = $data['message']['tool_calls'][0];
             $args = $call['function']['arguments'] ?? [];
