@@ -2622,3 +2622,34 @@ Auto‑repair and debate: If a plan is invalid, the system first tries a simple 
 Gating replies: The final “SendReply” is only allowed when the plan is valid. If not valid, the system sends an Options or Clarification email instead.
 
 Where you see this: In Activity → a “Plan” panel shows Valid/Invalid, the first failing step, a human hint, and a compact list of steps.
+
+## How to extend the action schema (Plain)
+Goal: Add a new action in a safe, predictable way so plans can use it.
+
+1) Pick a clear action name
+- Keep it short and specific, like `DetectLanguage` or `OptionsEmail`.
+
+2) Define preconditions (“pre”) and effects (“eff”)
+- Preconditions: What must be true before this action runs.
+- Effects: What becomes true after it runs.
+- Use simple strings: `key=value`, numeric compares like `confidence>=0.75`, increments like `confidence+=0.1`.
+
+3) Edit `config/actions.php`
+```php
+'DetectLanguage' => [
+  'pre' => ['received=true'],
+  'eff' => ['lang_detected=true']
+],
+```
+
+4) Test it locally with the validator
+- Make a small plan that uses your action.
+- Run the PlanValidator unit test or add your own similar to `PlanValidatorTest`.
+
+5) Keep it minimal
+- Avoid complex logic. If it needs more than 1–2 conditions, split into smaller actions.
+- Use existing facts when possible (`received`, `retrieval_done`, `summary_ready`, `confidence`, etc.).
+
+6) When to use it
+- Planner/Workers can include your action in their plan steps.
+- The validator will check that the plan orders steps correctly and suggest fixes if not.
