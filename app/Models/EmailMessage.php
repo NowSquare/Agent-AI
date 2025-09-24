@@ -1,4 +1,13 @@
 <?php
+/**
+ * What this file does — Stores one email in the conversation.
+ * Plain: One row per message with who sent it, body, and status.
+ * How this fits in:
+ * - Threads are made of many EmailMessages
+ * - Attachments and processing status live here
+ * - Embeddings for search may be added via migration (pgvector)
+ * Key terms: direction (inbound/outbound), processing_status
+ */
 
 namespace App\Models;
 
@@ -7,6 +16,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * Purpose: Represent a single email with metadata and relationships.
+ * Responsibilities:
+ * - Track delivery/processing states
+ * - Link to attachments and its thread
+ * Collaborators: Thread, Attachment
+ */
 class EmailMessage extends Model
 {
     use HasUlids;

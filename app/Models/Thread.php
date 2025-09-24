@@ -1,4 +1,13 @@
 <?php
+/**
+ * What this file does — Represents an email conversation (thread).
+ * Plain: The container that holds all the messages and actions for one topic.
+ * How this fits in:
+ * - New emails attach here; actions and memories link to the same thread
+ * - Activity trace steps point back to the thread
+ * - Visibility: users only see threads linked to their contacts
+ * Key terms: context_json (summary/metadata), version/version_history
+ */
 
 namespace App\Models;
 
@@ -8,6 +17,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+/**
+ * Purpose: Store conversation state and relationships.
+ * Responsibilities:
+ * - Link to messages, actions, and memories
+ * - Track version and last activity for UI ordering
+ * Collaborators: EmailMessage, Action, Memory, ThreadMetadata
+ */
 class Thread extends Model
 {
     use HasUlids, HasFactory;
@@ -58,6 +74,11 @@ class Thread extends Model
         return $this->hasMany(ThreadMetadata::class);
     }
 
+    /**
+     * Summary: Bump thread version with a reason and update last activity.
+     * @param string|null $reason Why the version changed (for audit)
+     * @return void
+     */
     public function incrementVersion(string $reason = null): void
     {
         $history = $this->version_history ?? [];

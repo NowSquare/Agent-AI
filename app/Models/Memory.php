@@ -1,4 +1,13 @@
 <?php
+/**
+ * What this file does — Stores a small fact/decision with confidence and expiry.
+ * Plain: Short notes the system can remember later (some fade out over time).
+ * How this fits in:
+ * - Retrieval can use memories as evidence
+ * - MemoryCurator writes Decision memories after a run
+ * - TTL/decay and usage tracking keep memories fresh
+ * Key terms: scope (conversation/user/account), ttl_category, confidence
+ */
 
 namespace App\Models;
 
@@ -9,6 +18,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Builder;
 use Carbon\Carbon;
 
+/**
+ * Purpose: Represent a typed memory with lifecycle fields.
+ * Responsibilities:
+ * - Persist value_json with confidence and TTL
+ * - Track usage (last_used_at, usage_count)
+ * Collaborators: MemoryService, GroundingService
+ */
 class Memory extends Model
 {
     use HasUlids;
