@@ -5,6 +5,7 @@ namespace App\Console\Commands;
 use App\Jobs\ProcessInboundEmail;
 use App\Models\EmailInboundPayload;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\File;
 
 /**
@@ -40,7 +41,7 @@ class InboundSimulate extends Command
 
         // Store as EmailInboundPayload using existing model (encrypted ciphertext handled in job)
         $row = EmailInboundPayload::create([
-            'ciphertext' => encrypt(json_encode($payload)),
+            'ciphertext' => Crypt::encryptString(json_encode($payload)),
             'received_at' => now(),
             'purge_after' => now()->addDays(30),
         ]);
