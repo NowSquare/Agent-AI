@@ -11,25 +11,32 @@
 - Data model essentials
 - Develop & test
 - Security & privacy
-- Roadmap & contributions
 - License
 
 ## Why this matters
 Work starts in email—quotes, questions, decisions, approvals. But context is scattered, and generic chatbots don’t know your business. Agent AI is a personal assistant you can simply email. It builds long-term memory from your conversations and documents, then replies with grounded, practical help you can trust.
 
 ## What it does (Feature Highlights)
-- **Email-native assistant** — Send questions, tasks, and documents by email. Agent AI replies in your thread.
-- **Multi-agent orchestration (with tools)** — Specialized agents collaborate (e.g., extract, research, plan, draft, review) and call tools when needed.
+- **Email‑native assistant** — Send questions, tasks, and documents by email. Agent AI replies in your thread.
+- **Multi‑agent orchestration (with tools)** — Specialized agents collaborate (e.g., extract, research, plan, draft, review) and call tools when needed.
 - **Compounding memory** — A growing knowledge base from your emails and attachments that improves answers over time.
 - **Grounded responses via pgvector** — Searches your own data (emails, attachments, memories) before it speaks.
-- **Transparent activity** — Full step-by-step trace: role, model, tokens, latency, and JSON I/O, so you see how decisions were made.
-- **Passwordless login from a contact** — Email first; on your first login a user is created and linked to your contact automatically.
-- **Local-first models (Ollama), optional cloud** — Run privately on your machine by default, flip certain roles to cloud if desired.
+- **Transparent activity** — Full step‑by‑step trace so you see how decisions were made.
+- **Local‑first models (Ollama), optional cloud** — Private by default; role‑based model routing.
 
 > Note: On the first inbound contact, an Account is auto-created from `APP_NAME`. Single-tenant by default, future-proof for multi-tenant.
 
-## How it works (architecture at a glance)
-Send an email → a **Contact** is created (and an Account from `APP_NAME` if none exists) → the message is attached to a **Thread**. When you first log in with that email, a **User** is created and linked to the Contact. From there, a **Coordinator** routes your request through **multiple agents** that can call **tools** (MCP) when needed. The system retrieves relevant context via **pgvector** and answers using the LLM routing policy (CLASSIFY → retrieval → GROUNDED | SYNTH). The **Activity** view shows the full trace for your threads.
+## How it works (detailed)
+At a high level: Email → Thread → Plan → Work → Debate → Decide → Memory → Reply.
+
+1) You send an email. A Contact and Thread are ensured. Attachments (txt, md, csv, pdf) are stored.
+2) Attachments are scanned (ClamAV). Clean files continue to extraction/summarization; infected files trigger an incident email.
+3) The message is cleaned (quoted text/signatures removed), then interpreted into a structured Action via a schema‑validated tool.
+4) The Coordinator chooses a simple single‑agent path or a multi‑agent orchestration based on complexity.
+5) Retrieval (pgvector) fetches relevant snippets from prior emails, attachment text, and memories.
+6) An agent drafts a response (or a team does: Workers produce drafts, Critics check, Arbiter picks the best).
+7) The Curator saves a compact memory of what was decided, with provenance to the steps that led there.
+8) An email reply is sent only when there’s substantive content (or a personalized incident/clarification/options email).
 
 LLM routing is explicit:
 - CLASSIFY → cheap/fast intent & complexity detection.
@@ -39,6 +46,28 @@ LLM routing is explicit:
 Grounding lives in Postgres (pgvector):
 - Embeddings in `email_messages.body_embedding`, `attachment_extractions.text_embedding`, `memories.content_embedding`.
 - Retrieval uses cosine KNN across these tables, with provenance kept for each snippet.
+
+## Email pipeline (end‑to‑end)
+1) Inbound webhook receives the email and stores a normalized `EmailMessage` with headers/body/attachments.
+2) Attachments pipeline: scan → (if clean) extract → summarize; summaries feed interpretation and retrieval.
+3) Action interpretation produces `{type, parameters, confidence}` with schemas enforced.
+4) Coordinator routes: simple (single agent) vs complex (multi‑agent with plan validation and auto‑repair).
+5) Response generation: agent(s) write a helpful reply using retrieval context; Critics check groundedness; Arbiter decides.
+6) Memory curation: decision/insight facts are saved with provenance and TTL.
+7) Email dispatch: only substantive content. Incident email if infected files; clarification/options when confidence is low.
+
+## Multi‑agent flow
+- **Coordinator**: decides simple vs complex, selects agents, manages orchestration.
+- **Planner**: proposes a symbolic plan (steps with preconditions/effects). Validator checks and can auto‑repair the plan.
+- **Workers**: create drafts, call tools, use retrieval context.
+- **Critics**: score groundedness/completeness/risk over K rounds.
+- **Arbiter**: picks the winner, records a short decision reason.
+- **Curator**: writes memories with provenance for traceability.
+
+## Memory model
+- Scope: `conversation`, `user`, `account` with priority `conversation > user > account`.
+- TTL categories: `volatile`, `seasonal`, `durable`, `legal` with decay over time.
+- Read logic prefers newer, higher‑confidence memories after decay.
 
 ## Quickstart
 > Warning: Enable `pgvector` in Postgres (CREATE EXTENSION IF NOT EXISTS vector) before first run.

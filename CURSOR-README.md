@@ -2039,7 +2039,8 @@ Agent AI uses **Postmark** for all email handling. Follow these steps to set up 
    MAIL_MAILER=postmark
    POSTMARK_TOKEN=pm_xxx
    POSTMARK_MESSAGE_STREAM_ID=outbound
-   AGENT_MAIL=<your-inbound-address>@inbound.postmarkapp.com
+   # Provider-agnostic agent mailbox; used for From and Reply-To
+   AGENT_MAIL=<hash>@inbound.postmarkapp.com
 
    WEBHOOK_USER=postmark
    WEBHOOK_PASS=your-long-random-password
@@ -2064,6 +2065,11 @@ Agent AI uses **Postmark** for all email handling. Follow these steps to set up 
 - **Docker**: https://abc123.ngrok-free.app/webhooks/inbound-email
 
 Send test emails to your `AGENT_MAIL` address to verify webhook processing.
+
+Outbound Email Headers
++- From: `AGENT_MAIL`
++- Reply-To: `local+<thread_id>@domain` built from `AGENT_MAIL` for correct threading
+
 ## Frontend Wireframes & Pages
 
 Agent AI uses a clean, email-first interface built with Blade templates, Tailwind CSS, and Flowbite components. All pages support `en_US` and `nl_NL` locales.
