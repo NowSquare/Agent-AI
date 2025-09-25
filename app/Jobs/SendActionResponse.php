@@ -205,7 +205,19 @@ class SendActionResponse implements ShouldQueue
 
         // Send the response email via Postmark
         try {
-            Mail::to($recipientEmail)->send(new ActionResponseMail($this->action, $thread, $content));
+            // Append original inbound message (quoted) for context
+            $original = (string) ($lastInboundMessage->body_text ?? '');
+            if ($original === '' && ! empty($lastInboundMessage->body_html)) {
+                // Basic HTML to text fallback
+                $original = trim(strip_tags((string) $lastInboundMessage->body_html));
+            }
+            $lines = preg_split('/\r\n|\r|\n/', $original ?: '');
+            $quoted = $lines && count($lines) > 0
+                ? '> '.implode("\n> ", array_map('trim', $lines))
+                : '';
+            $contentWithOriginal = rtrim($content).($quoted !== '' ? "\n\n---\nOriginal message:\n{$quoted}" : '');
+
+            Mail::to($recipientEmail)->send(new ActionResponseMail($this->action, $thread, $contentWithOriginal));
 
             // Persist an outbound EmailMessage for audit and continuity
             \App\Models\EmailMessage::create([
@@ -224,7 +236,7 @@ class SendActionResponse implements ShouldQueue
                 'provider_message_id' => null,
                 'delivery_status' => 'sent',
                 'delivery_error_json' => null,
-                'body_text' => $content,
+                'body_text' => $contentWithOriginal,
                 'body_html' => null,
                 'x_thread_id' => $thread->id,
                 'raw_size_bytes' => strlen($content),
