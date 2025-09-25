@@ -19,6 +19,42 @@ php artisan boost:mcp
 # Terminal D: brew services start clamav (macOS)
 ```
 
+### Development Environment Reset
+
+Complete environment refresh for clean state during development.
+
+Preferred (single command):
+
+```bash
+php artisan clear:all --force
+```
+
+Alternative (manual steps):
+
+```bash
+# Stop running services
+php artisan horizon:terminate
+brew services stop clamav
+
+# Clear Laravel caches and queues
+php artisan optimize:clear
+php artisan queue:clear
+php artisan horizon:clear
+
+# Nuclear Redis option (if you want everything gone)
+redis-cli FLUSHALL
+
+# Reset database with fresh migrations and seeders
+php artisan migrate:fresh --seed
+
+# Clear application logs (prefer the artisan command above which clears via PHP)
+truncate -s 0 storage/logs/laravel.log
+
+# Restart services
+brew services start clamav
+php artisan horizon
+```
+
 ## Make a Plan Prompt
 
 This prompt generates a feature implementation plan with clear acceptance criteria.
