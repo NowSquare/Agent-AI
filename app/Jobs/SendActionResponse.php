@@ -87,7 +87,10 @@ class SendActionResponse implements ShouldQueue
                     $detector = app(LanguageDetector::class);
                     $locale = $detector->detect($lastInbound->body_text ?? $lastInbound->subject ?? '');
 
-                    $files = $lastInbound->attachments()->get(['filename', 'scan_status', 'scan_result']);
+                    // Only include truly infected attachments in the incident list
+                    $files = $lastInbound->attachments()
+                        ->where('scan_status', 'infected')
+                        ->get(['filename', 'scan_status', 'scan_result']);
                     $fileList = collect($files)->map(function ($f) {
                         $reason = $f->scan_status === 'infected' ? ($f->scan_result ?: 'infected') : ($f->scan_result ?: $f->scan_status);
 
