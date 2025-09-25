@@ -277,11 +277,13 @@ GIT/MCP WORKFLOW (MANDATORY)
   - After each **logical unit of work** (1–2 related files):
     - Run tests for modified components
     - push_files with commit message
-    - Commit message format:
+    - Commit message format (use real line breaks, not escaped \n):
       <scope>: short summary
       WHAT: what changed
       WHY: why it matters
       TESTS: how verified
+    - When using CLI, pass multiple -m flags to create paragraphs, e.g.:
+      git commit -m "feat(scope): short summary" -m "WHAT: details" -m "WHY: rationale" -m "TESTS: how verified"
 
 TESTING REQUIREMENTS
 - Unit, Feature, Integration
