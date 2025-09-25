@@ -68,7 +68,7 @@ return [
             ],
             'SYNTH' => [
                 'provider' => env('LLM_SYNTH_PROVIDER', 'ollama'),
-                'model' => env('LLM_SYNTH_MODEL', 'gpt-oss:120b'),
+                'model' => env('LLM_SYNTH_MODEL', 'gpt-oss:20b'),
                 'tools' => (bool) env('LLM_SYNTH_TOOLS', true),
                 'reasoning' => (bool) env('LLM_SYNTH_REASONING', true),
             ],

@@ -183,7 +183,7 @@ OUTPUT:
         'backstory' => null,
         'template' => ':prompt
 
-Verify your answer against provided context; if unsupported, say "insufficient information" succinctly.
+Respond briefly using numbered lists or short paragraphs (no tables). Verify against context; if crucial details are missing, ask 1–2 specific questions.
 Return JSON only:
 {
   "response": "concise helpful answer (Markdown allowed)",

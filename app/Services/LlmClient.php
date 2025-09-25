@@ -149,10 +149,9 @@ class LlmClient
 
                 // For Ollama, use chat API with strict JSON mode and no streaming
                 if ($provider === 'ollama') {
-                    // Prefer tool-calling only for prompts with dedicated schemas.
-                    // Explicitly DISABLE tools for agent_response to avoid tool-call parse errors on long Markdown.
+                    // Prefer tool-calling for prompts with dedicated schemas (including agent_response)
                     $roleConfig = $this->config['routing']['roles'][$this->getRoleForPrompt($promptKey)] ?? [];
-                    $useTools = $this->hasToolForPrompt($promptKey) && $promptKey !== 'agent_response';
+                    $useTools = $this->hasToolForPrompt($promptKey);
 
                     $result = $this->callOllamaChatJson($prompt, $maxOutputTokens, $model, $promptKey, $useTools);
                 } else {
@@ -515,6 +514,7 @@ class LlmClient
             'thread_summarize',
             'memory_extract',
             'incident_email_draft',
+            'agent_response',
         ], true);
     }
 
