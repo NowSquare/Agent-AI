@@ -490,6 +490,23 @@ class LlmClient
                     ],
                     'required' => ['subject', 'text', 'html'],
                 ]];
+            case 'attachment_summarize':
+                return ['attachment_summarize', [
+                    'type' => 'object',
+                    'properties' => [
+                        'title' => ['type' => 'string', 'description' => 'Short title (≤60 chars)'],
+                        'gist' => ['type' => 'string', 'description' => '≤120 words summary'],
+                        'key_points' => ['type' => 'array', 'items' => ['type' => 'string']],
+                        'table_hint' => [
+                            'type' => 'object',
+                            'properties' => [
+                                'has_tabular_data' => ['type' => 'boolean'],
+                                'likely_headers' => ['type' => 'array', 'items' => ['type' => 'string']],
+                            ],
+                        ],
+                    ],
+                    'required' => ['title', 'gist', 'key_points'],
+                ]];
             case 'agent_response':
                 return ['agent_response', [
                     'type' => 'object',
@@ -514,6 +531,7 @@ class LlmClient
             'thread_summarize',
             'memory_extract',
             'incident_email_draft',
+            'attachment_summarize',
             'agent_response',
         ], true);
     }
