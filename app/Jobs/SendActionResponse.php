@@ -35,7 +35,7 @@ class SendActionResponse implements ShouldQueue
             throw new \Exception('Action has no associated thread');
         }
 
-        $responseContent = $this->getResponseContent();
+        $responseContent = $this->getResponseContent($thread);
 
         // If we don't have real content, skip sending a placeholder email
         if (trim($responseContent) === '') {
@@ -64,7 +64,7 @@ class SendActionResponse implements ShouldQueue
     /**
      * Get the response content from the agent processing.
      */
-    private function getResponseContent(): string
+    private function getResponseContent(Thread $thread): string
     {
         // The agent response is now stored in the action payload
         $agentResponse = $this->action->payload_json['agent_response'] ?? '';
@@ -75,6 +75,15 @@ class SendActionResponse implements ShouldQueue
         }
         if (! empty($final)) {
             return $final;
+        }
+
+        // Outcome-based fallback: if attachments were infected, inform the sender
+        $lastInbound = $thread->emailMessages()->where('direction', 'inbound')->latest('created_at')->first();
+        if ($lastInbound) {
+            $infected = $lastInbound->attachments()->where('scan_status', 'infected')->exists();
+            if ($infected) {
+                return "We couldn't process your attachments because they failed our virus scan. Please resend clean PDFs (or share a safe link) and we'll proceed right away.";
+            }
         }
 
         // No generic placeholders; only send when we have real content
