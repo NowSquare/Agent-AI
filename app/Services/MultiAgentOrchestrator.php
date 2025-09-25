@@ -215,6 +215,16 @@ class MultiAgentOrchestrator
                 'processing_type' => 'multi_agent_protocol',
             ]),
         ]);
+
+        // Queue outbound response email to the original sender
+        try {
+            \App\Jobs\SendActionResponse::dispatch($action);
+        } catch (\Throwable $e) {
+            Log::warning('MultiAgentOrchestrator: Failed to dispatch SendActionResponse job', [
+                'action_id' => $action->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
     }
 
     /**

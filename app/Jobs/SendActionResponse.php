@@ -2,11 +2,11 @@
 
 namespace App\Jobs;
 
+use App\Mail\ActionResponseMail;
 use App\Models\Action;
 use App\Models\Thread;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
-use App\Mail\ActionResponseMail;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 
@@ -15,6 +15,7 @@ class SendActionResponse implements ShouldQueue
     use Queueable;
 
     public int $tries = 3;
+
     public int $backoff = 30;
 
     /**
@@ -35,7 +36,7 @@ class SendActionResponse implements ShouldQueue
         ]);
 
         $thread = $this->action->thread;
-        if (!$thread) {
+        if (! $thread) {
             throw new \Exception('Action has no associated thread');
         }
 
@@ -59,19 +60,19 @@ class SendActionResponse implements ShouldQueue
         $agentResponse = $this->action->payload_json['agent_response'] ?? '';
         $final = $this->action->payload_json['final_response'] ?? '';
 
-        if (!empty($agentResponse)) {
+        if (! empty($agentResponse)) {
             return $agentResponse;
         }
-        if (!empty($final)) {
+        if (! empty($final)) {
             return $final;
         }
 
         // Fallback for actions without agent processing
         return match ($this->action->type) {
             'info_request' => "Thank you for your question. I'll provide a detailed response shortly.",
-            'approve' => "Your request has been approved.",
-            'reject' => "Your request has been reviewed and declined.",
-            default => "Your request has been processed.",
+            'approve' => 'Your request has been approved.',
+            'reject' => 'Your request has been reviewed and declined.',
+            default => 'Your request has been processed.',
         };
     }
 
@@ -105,7 +106,7 @@ class SendActionResponse implements ShouldQueue
             ->orderBy('created_at', 'desc')
             ->first();
 
-        if (!$lastInboundMessage) {
+        if (! $lastInboundMessage) {
             throw new \Exception('No inbound message found in thread');
         }
 
@@ -114,6 +115,29 @@ class SendActionResponse implements ShouldQueue
         // Send the response email via Postmark
         try {
             Mail::to($recipientEmail)->send(new ActionResponseMail($this->action, $thread, $content));
+
+            // Persist an outbound EmailMessage for audit and continuity
+            \App\Models\EmailMessage::create([
+                'thread_id' => $thread->id,
+                'direction' => 'outbound',
+                'processing_status' => 'sent',
+                'message_id' => (string) \Str::ulid(),
+                'in_reply_to' => $lastInboundMessage->message_id,
+                'references' => trim(($lastInboundMessage->references ? $lastInboundMessage->references.' ' : '').$lastInboundMessage->message_id),
+                'from_email' => config('mail.from.address'),
+                'from_name' => config('mail.from.name'),
+                'to_json' => [['email' => $recipientEmail, 'name' => '']],
+                'subject' => 'Re: '.$thread->subject,
+                'headers_json' => [['Name' => 'In-Reply-To', 'Value' => $lastInboundMessage->message_id]],
+                'provider_message_id' => null,
+                'delivery_status' => 'sent',
+                'delivery_error_json' => null,
+                'body_text' => $content,
+                'body_html' => null,
+                'x_thread_id' => $thread->id,
+                'raw_size_bytes' => strlen($content),
+                'processed_at' => now(),
+            ]);
 
             Log::info('Action response email sent successfully', [
                 'action_id' => $this->action->id,
@@ -164,6 +188,6 @@ class SendActionResponse implements ShouldQueue
             }
         }
 
-        throw new \Exception('Could not extract sender email from message headers: ' . json_encode($headerMap));
+        throw new \Exception('Could not extract sender email from message headers: '.json_encode($headerMap));
     }
 }
