@@ -29,7 +29,7 @@ class ActionResponseMail extends Mailable
     public function envelope(): Envelope
     {
         // Build from / reply-to using AGENT_MAIL
-        $agentMail = (string) config('services.postmark.agent_mail', env('AGENT_MAIL'));
+        $agentMail = (string) config('mail.agent_mail', env('AGENT_MAIL'));
         // from address is AGENT_MAIL
         $fromAddress = $agentMail;
         // reply-to is AGENT_MAIL with +<thread_id>

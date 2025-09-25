@@ -115,4 +115,7 @@ return [
         'name' => env('MAIL_FROM_NAME', 'Example'),
     ],
 
+    // Generic agent mailbox for inbound/outbound threading (independent of provider)
+    'agent_mail' => env('AGENT_MAIL', null),
+
 ];
