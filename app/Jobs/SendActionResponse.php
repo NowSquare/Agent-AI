@@ -160,6 +160,11 @@ class SendActionResponse implements ShouldQueue
      */
     private function extractSenderEmail($message): string
     {
+        // Prefer stored normalized from_email first
+        if (! empty($message->from_email)) {
+            return $message->from_email;
+        }
+
         $headers = $message->headers_json ?? [];
 
         // Headers are stored as array of [Name => ..., Value => ...] pairs
@@ -186,11 +191,6 @@ class SendActionResponse implements ShouldQueue
                     return $matches[1];
                 }
             }
-        }
-
-        // Fallback: use normalized from_email on the email message if headers are missing
-        if (! empty($message->from_email)) {
-            return $message->from_email;
         }
 
         throw new \Exception('Could not extract sender email from message headers: '.json_encode($headerMap));
