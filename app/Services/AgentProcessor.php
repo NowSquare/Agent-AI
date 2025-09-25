@@ -173,10 +173,24 @@ class AgentProcessor
             // Targeted fallback: ask a single precise clarification based on inbound content
             $fallbackText = 'Could you clarify your request so we can proceed?';
             try {
+                $attachmentsNote = '';
+                try {
+                    $lastInbound = $task->thread?->emailMessages()
+                        ->where('direction', 'inbound')
+                        ->latest('created_at')
+                        ->first();
+                    if ($lastInbound) {
+                        $names = $lastInbound->attachments()->pluck('filename')->all();
+                        if (! empty($names)) {
+                            $attachmentsNote = ' Attachments: '.implode(', ', $names).'.';
+                        }
+                    }
+                } catch (\Throwable $ignored) {}
+
                 $cq = $this->llmClient->json('clarify_question', [
                     'detected_locale' => 'en_US',
                     'action_json' => json_encode(['action_type' => $input['action_type'] ?? 'info_request']),
-                    'clean_reply' => (string) ($input['action_payload']['question'] ?? ''),
+                    'clean_reply' => (string) ($input['action_payload']['question'] ?? '').$attachmentsNote,
                 ]);
                 if (! empty($cq['question'])) {
                     $fallbackText = 'To proceed: '.$cq['question'];
@@ -196,10 +210,24 @@ class AgentProcessor
         if (! isset($llmResponse['response']) || trim((string) $llmResponse['response']) === '') {
             $llmResponse['response'] = 'Could you clarify your request so we can proceed?';
             try {
+                $attachmentsNote = '';
+                try {
+                    $lastInbound = $task->thread?->emailMessages()
+                        ->where('direction', 'inbound')
+                        ->latest('created_at')
+                        ->first();
+                    if ($lastInbound) {
+                        $names = $lastInbound->attachments()->pluck('filename')->all();
+                        if (! empty($names)) {
+                            $attachmentsNote = ' Attachments: '.implode(', ', $names).'.';
+                        }
+                    }
+                } catch (\Throwable $ignored) {}
+
                 $cq = $this->llmClient->json('clarify_question', [
                     'detected_locale' => 'en_US',
                     'action_json' => json_encode(['action_type' => $input['action_type'] ?? 'info_request']),
-                    'clean_reply' => (string) ($input['action_payload']['question'] ?? ''),
+                    'clean_reply' => (string) ($input['action_payload']['question'] ?? '').$attachmentsNote,
                 ]);
                 if (! empty($cq['question'])) {
                     $llmResponse['response'] = 'To proceed: '.$cq['question'];
