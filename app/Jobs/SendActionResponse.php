@@ -5,6 +5,8 @@ namespace App\Jobs;
 use App\Mail\ActionResponseMail;
 use App\Models\Action;
 use App\Models\Thread;
+use App\Services\LanguageDetector;
+use App\Services\LlmClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -77,6 +79,38 @@ class SendActionResponse implements ShouldQueue
             $attachmentsQuery = $lastInbound->attachments();
             if ($attachmentsQuery->exists()) {
                 if ($attachmentsQuery->where('scan_status', 'infected')->exists()) {
+                    // Build personalized incident explanation via LLM
+                    $detector = app(LanguageDetector::class);
+                    $locale = $detector->detect($lastInbound->body_text ?? $lastInbound->subject ?? '');
+
+                    $files = $lastInbound->attachments()->get(['filename', 'scan_status', 'scan_result']);
+                    $fileList = collect($files)->map(function ($f) {
+                        $reason = $f->scan_status === 'infected' ? ($f->scan_result ?: 'infected') : ($f->scan_result ?: $f->scan_status);
+
+                        return $f->filename.': '.$reason;
+                    })->implode("\n");
+
+                    try {
+                        $llm = app(LlmClient::class);
+                        $json = $llm->json('incident_email_draft', [
+                            'detected_locale' => $locale,
+                            'issue' => 'attachments_infected',
+                            'original_subject' => (string) $lastInbound->subject,
+                            'file_list' => $fileList,
+                            'user_message' => (string) ($lastInbound->body_text ?? ''),
+                        ]);
+
+                        // Prefer text; ActionResponseMail uses responseContent
+                        if (isset($json['text']) && is_string($json['text']) && trim($json['text']) !== '') {
+                            return $json['text'];
+                        }
+                    } catch (\Throwable $e) {
+                        Log::warning('Incident email draft generation failed; falling back to static text', [
+                            'error' => $e->getMessage(),
+                        ]);
+                    }
+
+                    // Fallback static line if LLM fails
                     return "We couldn't process your attachments because they failed our virus scan. Please resend clean PDFs (or share a safe link) and we'll proceed right away.";
                 }
                 if ($attachmentsQuery->whereNull('scan_status')->exists()) {

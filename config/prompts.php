@@ -148,7 +148,7 @@ sample_lines: :sample_lines
 
 OUTPUT:
 {
-  "delimiter": ","|"|"|";"|"\t",
+  "delimiter": ","|"|";"|"\t",
   "has_header": true|false,
   "columns": [
     {"name":"string","type":"string|number|date|datetime|boolean","nullable":true|false}
@@ -194,6 +194,7 @@ IMPORTANT: Your response must be valid JSON. Do not include any text before or a
   "confidence": 0.8,
   "reasoning": "Brief explanation of your approach (optional)"
 }',
+    ],
 
     'clarification_subject' => [
         'temperature' => 0.3,
@@ -293,5 +294,27 @@ Can we continue with this, or do you want to change anything?',
 **Output:**
 "YES" or "NO"',
     ],
+
+    // New: Incident/problem email draft
+    'incident_email_draft' => [
+        'temperature' => 0.3,
+        'backstory' => 'Write a concise, polite problem notification in the user\'s language explaining issues with their email or attachments, including filenames and reasons.',
+        'template' => 'Write a short email in :detected_locale explaining there was an issue processing their message.
+If files are problematic, list each filename with a brief reason. Keep a friendly, helpful tone.
+Include a clear next step (e.g., resend clean PDFs or share a safe link). No chain-of-thought.
+
+Context:
+- issue: :issue
+- subject: :original_subject
+- file_list (one per line, like "filename: reason"):
+:file_list
+- original_message (may be empty): :user_message
+
+Return JSON with:
+{
+  "subject": "string (≤80 chars)",
+  "text": "plain text body (≤600 chars)",
+  "html": "basic HTML (≤800 chars)"
+}',
     ],
 ];
