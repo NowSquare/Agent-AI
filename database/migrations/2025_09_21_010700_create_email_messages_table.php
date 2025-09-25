@@ -53,14 +53,16 @@ return new class extends Migration
             $table->index('from_email');
         });
 
-        // Optional trigram index for fast substring search on message_id.
-        DB::statement('CREATE INDEX IF NOT EXISTS email_messages_message_id_trgm ON email_messages USING GIN (message_id gin_trgm_ops)');
+        if (DB::getDriverName() === 'pgsql') {
+            // Optional trigram index for fast substring search on message_id.
+            DB::statement('CREATE INDEX IF NOT EXISTS email_messages_message_id_trgm ON email_messages USING GIN (message_id gin_trgm_ops)');
 
-        // pgvector embedding column and optional IVFFlat index
-        $dim = (int) (config('llm.embeddings.dim', 1536));
-        DB::statement("ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS body_embedding vector($dim)");
-        DB::statement('CREATE INDEX IF NOT EXISTS email_messages_body_embedding_idx 
+            // pgvector embedding column and optional IVFFlat index
+            $dim = (int) (config('llm.embeddings.dim', 1536));
+            DB::statement("ALTER TABLE email_messages ADD COLUMN IF NOT EXISTS body_embedding vector($dim)");
+            DB::statement('CREATE INDEX IF NOT EXISTS email_messages_body_embedding_idx 
   ON email_messages USING ivfflat (body_embedding vector_cosine_ops) WITH (lists = 100)');
+        }
 
         // Add foreign key constraint to threads table now that email_messages exists
         Schema::table('threads', function (Blueprint $table) {
@@ -73,9 +75,11 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // Drop embedding index/column if present
-        DB::statement('DROP INDEX IF EXISTS email_messages_body_embedding_idx');
-        DB::statement('ALTER TABLE email_messages DROP COLUMN IF EXISTS body_embedding');
+        if (DB::getDriverName() === 'pgsql') {
+            // Drop embedding index/column if present
+            DB::statement('DROP INDEX IF EXISTS email_messages_body_embedding_idx');
+            DB::statement('ALTER TABLE email_messages DROP COLUMN IF EXISTS body_embedding');
+        }
         // Remove foreign key constraint from threads table first
         Schema::table('threads', function (Blueprint $table) {
             $table->dropForeign(['starter_message_id']);

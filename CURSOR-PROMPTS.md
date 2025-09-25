@@ -289,6 +289,7 @@ TESTING REQUIREMENTS
 - Unit, Feature, Integration
 - Mocks, Fixtures
 - End-to-end where needed
+- Use PostgreSQL for all tests (NEVER SQLite). Ensure test DB is PostgreSQL so pg_trgm/vector/GIN/IVFFlat and JSONB behaviors are exercised exactly as in production.
 
 VERIFICATION CHECKLIST
 - All tests/lint pass
