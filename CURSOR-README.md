@@ -1002,6 +1002,23 @@ Notes:
   - Input: `agent_id`, `user_query`, `context` (thread, instructions, locale)
   - Output: `response`, `confidence`, `processing_time`, `model_used`
 
+## MCP Tools (Server-Side) and Model Tool-Calling
+
+### Available Safe Tools (bounded)
+- get_datetime: current time in timezone/format
+- head_url: HEAD request (status + headers)
+- resolve_redirect: follow redirects and return final URL
+- fetch_url: GET up to 2 KB (status, content-type, truncated body)
+- extract_metadata: HTML <title> and meta description
+
+Network tools are SSRF‑guarded via `App\\Services\\UrlGuard` (http/https only; no private/reserved IPs; DNS resolve check).
+
+### How Agents Use These Tools
+- Registration: Tools live in `App\\Mcp\\Tools\\*` and are auto‑registered by the MCP server.
+- Model‑side tool‑calling: `App\\Services\\LlmClient` exposes function schemas when `json()` is invoked for a prompt with tools enabled (see `getToolFunctionForPrompt()` and role configuration).
+- Role exposure: enable tool‑calling for prompts mapped to GROUNDED when retrieval/metadata is likely; keep SYNTH for final drafting (typically without network calls).
+- Recommended pattern: head_url → resolve_redirect → fetch_url (≤ 2 KB) → extract_metadata for lightweight context; get_datetime for scheduling/deadlines.
+
 **MCP Prompts (Complex Orchestration):**
 - **`DefineAgentsPrompt`**: Complex requests → agent breakdown with tasks & dependencies
   - Arguments: `conversation_subject`, `conversation_plaintext_content`, `goal`, `available_tools`
