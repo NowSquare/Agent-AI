@@ -12,25 +12,21 @@ return [
     */
 
     'action_interpret' => [
-        'temperature' => 0.2,
-        'backstory' => 'You analyze user emails and determine the appropriate action.',
-        'template' => 'Analyze this user email and determine what action they want. Answer with just the action type from the list below.
+        'temperature' => 0.15,
+        'backstory' => null,
+        'template' => 'Detect exactly ONE action from the list. Return JSON only.
 
-User message: :clean_reply
+User: :clean_reply
 Context: :thread_summary
 
-Available actions:
-- info_request (asking for information/recipes/help)
-- approve (approving something)
-- reject (declining something)
-- revise (wanting to change something)
-- stop (wanting to end the conversation)
+ALLOWED: "info_request"|"approve"|"reject"|"revise"|"stop"
 
-What is the main action they want? Answer with just one word from the list above:',
+JSON:
+{ "action_type": "info_request|approve|reject|revise|stop", "parameters": {}, "confidence": 0.0-1.0 }',
     ],
 
     'clarify_question' => [
-        'temperature' => 0.3,
+        'temperature' => 0.25,
         'backstory' => 'You write one concise clarification question matching the user\'s language.',
         'template' => 'Write ONE short question to disambiguate the action below. Be specific, ≤140 chars, match locale.
 
@@ -43,7 +39,7 @@ Return JSON:
     ],
 
     'options_email_draft' => [
-        'temperature' => 0.4,
+        'temperature' => 0.3,
         'backstory' => 'You draft a brief options email in the user\'s language.',
         'template' => 'Write a brief email offering 2–4 likely actions with friendly tone. Use locale.
 Insert the provided placeholder tokens as-is for signed links.
@@ -90,7 +86,7 @@ OUTPUT:
     ],
 
     'thread_summarize' => [
-        'temperature' => 0.3,
+        'temperature' => 0.25,
         'backstory' => 'Summarize a thread for fast recall.',
         'template' => 'Summarize the thread concisely in locale. ≤120 words.
 
@@ -118,7 +114,7 @@ Language code:',
     ],
 
     'attachment_summarize' => [
-        'temperature' => 0.3,
+        'temperature' => 0.25,
         'backstory' => 'Summarize attachment text for decision-making.',
         'template' => 'Summarize the attachment in locale. Be concise. No chain-of-thought.
 
@@ -183,16 +179,15 @@ OUTPUT:
     ],
 
     'agent_response' => [
-        'temperature' => 0.7,
-        'backstory' => 'Generate a response from a specialized agent with specific role and expertise.',
+        'temperature' => 0.3,
+        'backstory' => null,
         'template' => ':prompt
 
-IMPORTANT: Your response must be valid JSON. Do not include any text before or after the JSON.
-
+Verify your answer against provided context; if unsupported, say "insufficient information" succinctly.
+Return JSON only:
 {
-  "response": "Your detailed response here, based on your expertise and role",
-  "confidence": 0.8,
-  "reasoning": "Brief explanation of your approach (optional)"
+  "response": "concise helpful answer (Markdown allowed)",
+  "confidence": 0.0-1.0
 }',
     ],
 
