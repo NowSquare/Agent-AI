@@ -557,7 +557,8 @@ Example: "It needs more..."
    - Unified response compilation with proper formatting
 
 7. **Email Dispatch** (`SendActionResponse` job)
-   - Sends an email only when there is real response content (no placeholders)
+   - Sends an email only when there is substantive content (no progress/receipt emails)
+   - Personalized incident emails are generated via tool-calling (e.g., infected attachments: filenames + reasons, localized)
    - Includes thread ID in reply-to header for continuity
    - If confidence < thresholds, separate Clarification/Options emails may be sent instead
    - Comprehensive logging and error handling

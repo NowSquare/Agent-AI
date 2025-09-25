@@ -39,8 +39,12 @@ class SendActionResponse implements ShouldQueue
 
         $responseContent = $this->getResponseContent($thread);
         if (trim($responseContent) === '') {
-            // Always respond with a concise progress update when no content yet
-            $responseContent = "We've received your request and are preparing a detailed response. You'll hear from us shortly.";
+            Log::info('No substantive response to send; skipping email dispatch', [
+                'action_id' => $this->action->id,
+                'type' => $this->action->type,
+            ]);
+
+            return;
         }
 
         Log::info('Sending action response', [
