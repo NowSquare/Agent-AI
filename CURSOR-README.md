@@ -557,9 +557,9 @@ Example: "It needs more..."
    - Unified response compilation with proper formatting
 
 7. **Email Dispatch** (`SendActionResponse` job)
-   - Generates response email via Postmark
+   - Sends an email only when there is real response content (no placeholders)
    - Includes thread ID in reply-to header for continuity
-   - Updates action status to `'completed'`
+   - If confidence < thresholds, separate Clarification/Options emails may be sent instead
    - Comprehensive logging and error handling
 
 ### Agent System Architecture

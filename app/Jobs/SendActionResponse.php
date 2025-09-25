@@ -30,17 +30,27 @@ class SendActionResponse implements ShouldQueue
      */
     public function handle(): void
     {
-        Log::info('Sending action response', [
-            'action_id' => $this->action->id,
-            'type' => $this->action->type,
-        ]);
-
         $thread = $this->action->thread;
         if (! $thread) {
             throw new \Exception('Action has no associated thread');
         }
 
         $responseContent = $this->getResponseContent();
+
+        // If we don't have real content, skip sending a placeholder email
+        if (trim($responseContent) === '') {
+            Log::info('Skipping action response email: no response content available', [
+                'action_id' => $this->action->id,
+                'type' => $this->action->type,
+            ]);
+
+            return;
+        }
+
+        Log::info('Sending action response', [
+            'action_id' => $this->action->id,
+            'type' => $this->action->type,
+        ]);
 
         // Send the response email
         $this->sendResponseEmail($thread, $responseContent);
@@ -67,13 +77,8 @@ class SendActionResponse implements ShouldQueue
             return $final;
         }
 
-        // Fallback for actions without agent processing
-        return match ($this->action->type) {
-            'info_request' => "Thank you for your question. I'll provide a detailed response shortly.",
-            'approve' => 'Your request has been approved.',
-            'reject' => 'Your request has been reviewed and declined.',
-            default => 'Your request has been processed.',
-        };
+        // No generic placeholders; only send when we have real content
+        return '';
     }
 
     /**
