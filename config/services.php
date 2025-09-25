@@ -18,6 +18,7 @@ return [
         'token' => env('POSTMARK_TOKEN'),
         'webhook_user' => env('WEBHOOK_USER'),
         'webhook_pass' => env('WEBHOOK_PASS'),
+        'agent_mail' => env('AGENT_MAIL'),
     ],
 
     'resend' => [

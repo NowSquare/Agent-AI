@@ -28,13 +28,22 @@ class ActionResponseMail extends Mailable
      */
     public function envelope(): Envelope
     {
-        // Create reply-to with thread ID for proper threading
-        $agentMail = config('services.postmark.agent_mail', 'agent@inbound.postmarkapp.com');
-        $replyToWithThread = str_replace('@', "+{$this->thread->id}@", $agentMail);
+        // Build from / reply-to using AGENT_MAIL
+        $agentMail = (string) config('services.postmark.agent_mail', env('AGENT_MAIL'));
+        // from address is AGENT_MAIL
+        $fromAddress = $agentMail;
+        // reply-to is AGENT_MAIL with +<thread_id>
+        if (str_contains($agentMail, '@')) {
+            [$local, $domain] = explode('@', $agentMail, 2);
+            $replyToWithThread = $local.'+'.$this->thread->id.'@'.$domain;
+        } else {
+            $replyToWithThread = $agentMail;
+        }
 
         return new Envelope(
             subject: "Re: {$this->thread->subject}",
-            replyTo: [$replyToWithThread],
+            from: new \Illuminate\Mail\Mailables\Address($fromAddress, config('mail.from.name')),
+            replyTo: [new \Illuminate\Mail\Mailables\Address($replyToWithThread)],
         );
     }
 
