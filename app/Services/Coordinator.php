@@ -76,7 +76,6 @@ class Coordinator
         $complexIndicators = [
             'multiple', 'several', 'plan', 'organize', 'schedule',
             'budget', 'compare', 'research', 'find', 'create',
-            'and', 'also', 'as well as', 'plus', 'with',
         ];
 
         // Attachment/workflow indicators: treat as complex so we can validate/repair a plan
@@ -99,8 +98,8 @@ class Coordinator
             }
         }
 
-        // Length indicator (>100 chars suggests complex request)
-        if (strlen($question) > 100) {
+        // Length indicator (>140 chars suggests complex request)
+        if (strlen($question) > 140) {
             $isComplex = true;
         }
 

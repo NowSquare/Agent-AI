@@ -104,6 +104,33 @@ class SendActionResponse implements ShouldQueue
                             'user_message' => (string) ($lastInbound->body_text ?? ''),
                         ]);
 
+                        // Log an agent step for transparency
+                        \App\Models\AgentStep::create([
+                            'account_id' => $thread->account_id,
+                            'thread_id' => $thread->id,
+                            'action_id' => $this->action->id,
+                            'role' => 'GROUNDED',
+                            'provider' => 'ollama',
+                            'model' => 'gpt-oss:20b',
+                            'step_type' => 'incident',
+                            'input_json' => [
+                                'prompt_key' => 'incident_email_draft',
+                                'detected_locale' => $locale,
+                                'issue' => 'attachments_infected',
+                                'file_list' => $fileList,
+                            ],
+                            'output_json' => [
+                                'subject' => $json['subject'] ?? null,
+                                'text' => $json['text'] ?? null,
+                            ],
+                            'tokens_input' => 0,
+                            'tokens_output' => 0,
+                            'tokens_total' => 0,
+                            'latency_ms' => 0,
+                            'agent_role' => 'Worker',
+                            'round_no' => 0,
+                        ]);
+
                         // Prefer text; ActionResponseMail uses responseContent
                         if (isset($json['text']) && is_string($json['text']) && trim($json['text']) !== '') {
                             return $json['text'];
