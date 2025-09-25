@@ -20,8 +20,10 @@ class ScenarioRun extends Command
     {
         $this->call('migrate:fresh', ['--seed' => true, '--no-interaction' => true]);
 
-        // a) Email with 2 attachments (PDFs)
-        $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_postmark.json']);
+        // a) Email with 2 attachments (infected)
+        $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_quote_attachments_infected.json']);
+        // a2) Email with 2 attachments (clean)
+        $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_quote_attachments.json']);
         // b) Single-agent recipe request (no attachments)
         $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_recipe_no_attachments.json']);
         // c) Complex multi-agent planning request (plan validation + auto-repair expected)
