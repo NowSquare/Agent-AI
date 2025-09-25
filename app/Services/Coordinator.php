@@ -201,6 +201,7 @@ class Coordinator
     {
         return [
             'thread_id' => $thread->id,
+            'account_id' => $thread->account_id,
             'subject' => $thread->subject,
             'summary' => $thread->context_json['summary'] ?? '',
             'recent_messages' => $this->getRecentMessages($thread, 5),

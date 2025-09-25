@@ -1,4 +1,5 @@
 <?php
+
 /**
  * What this file does — Finds relevant snippets in your data using embeddings.
  * Plain: Turns the question into numbers and searches nearby pieces of text.
@@ -30,44 +31,44 @@ use Illuminate\Support\Facades\DB;
  */
 class GroundingService
 {
-    public function __construct(private Embeddings $embeddings)
-    {
-    }
+    public function __construct(private Embeddings $embeddings) {}
 
     /**
      * Summary: Retrieve top-k snippets across email bodies, attachments, and memories.
-     * @param string $query  Natural language question
-     * @param int    $k      Number of items per source to return
-     * @return array[]       Each has src,id,text,similarity in [0,1]
+     *
+     * @param  string  $query  Natural language question
+     * @param  int  $k  Number of items per source to return
+     * @return array[] Each has src,id,text,similarity in [0,1]
      */
     public function retrieveTopK(string $query, int $k = 8): array
     {
         $vec = $this->embeddings->embedText($query);
         $literal = '['.implode(',', $vec).']';
 
-        $sql = <<<SQL
-SELECT id, 'email_messages' AS src, body_text AS text, 1 - (body_embedding <=> ?::vector) AS sim
-  FROM email_messages
- WHERE body_embedding IS NOT NULL
- ORDER BY body_embedding <=> ?::vector
- LIMIT ?
+        $sql = <<<'SQL'
+(SELECT id, 'email_messages' AS src, body_text AS text, 1 - (body_embedding <=> ?::vector) AS sim
+   FROM email_messages
+  WHERE body_embedding IS NOT NULL
+  ORDER BY body_embedding <=> ?::vector
+  LIMIT ?)
 UNION ALL
-SELECT id, 'attachment_extractions' AS src, text_excerpt AS text, 1 - (text_embedding <=> ?::vector) AS sim
-  FROM attachment_extractions
- WHERE text_embedding IS NOT NULL
- ORDER BY text_embedding <=> ?::vector
- LIMIT ?
+(SELECT id, 'attachment_extractions' AS src, text_excerpt AS text, 1 - (text_embedding <=> ?::vector) AS sim
+   FROM attachment_extractions
+  WHERE text_embedding IS NOT NULL
+  ORDER BY text_embedding <=> ?::vector
+  LIMIT ?)
 UNION ALL
-SELECT id, 'memories' AS src, value_json::text AS text, 1 - (content_embedding <=> ?::vector) AS sim
-  FROM memories
- WHERE content_embedding IS NOT NULL
- ORDER BY content_embedding <=> ?::vector
- LIMIT ?
+(SELECT id, 'memories' AS src, value_json::text AS text, 1 - (content_embedding <=> ?::vector) AS sim
+   FROM memories
+  WHERE content_embedding IS NOT NULL
+  ORDER BY content_embedding <=> ?::vector
+  LIMIT ?)
 SQL;
 
         $params = [$literal, $literal, $k, $literal, $literal, $k, $literal, $literal, $k];
         $rows = DB::select($sql, $params);
-        return array_map(fn($r) => [
+
+        return array_map(fn ($r) => [
             'src' => $r->src,
             'id' => $r->id,
             'text' => $r->text,
@@ -77,8 +78,9 @@ SQL;
 
     /**
      * Summary: Fraction of results above a minimum similarity bar (config/llm.routing.thresholds.grounding_hit_min analogue).
-     * @param array $results Retrieval results from retrieveTopK
-     * @return float         0..1
+     *
+     * @param  array  $results  Retrieval results from retrieveTopK
+     * @return float 0..1
      */
     public function hitRate(array $results): float
     {
@@ -91,6 +93,7 @@ SQL;
                 $hits++;
             }
         }
+
         return $hits / max(1, count($results));
     }
 
@@ -103,8 +106,7 @@ SQL;
         foreach ($results as $r) {
             $max = max($max, (float) ($r['similarity'] ?? 0));
         }
+
         return $max;
     }
 }
-
-
