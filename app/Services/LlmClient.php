@@ -149,9 +149,10 @@ class LlmClient
 
                 // For Ollama, use chat API with strict JSON mode and no streaming
                 if ($provider === 'ollama') {
-                    // Prefer tool-calling for structured outputs when available OR enabled at role-level
+                    // Prefer tool-calling only for prompts with dedicated schemas.
+                    // Explicitly DISABLE tools for agent_response to avoid tool-call parse errors on long Markdown.
                     $roleConfig = $this->config['routing']['roles'][$this->getRoleForPrompt($promptKey)] ?? [];
-                    $useTools = $this->hasToolForPrompt($promptKey) || (bool) ($roleConfig['tools'] ?? false);
+                    $useTools = $this->hasToolForPrompt($promptKey) && $promptKey !== 'agent_response';
 
                     $result = $this->callOllamaChatJson($prompt, $maxOutputTokens, $model, $promptKey, $useTools);
                 } else {
@@ -166,10 +167,22 @@ class LlmClient
                     'raw_preview' => mb_substr($result, 0, 400),
                 ]);
 
-                // Validate JSON response
+                // Validate JSON response (with salvage for agent_response)
                 $json = json_decode($result, true);
                 if (json_last_error() !== JSON_ERROR_NONE) {
-                    throw new \RuntimeException('Invalid JSON response: '.json_last_error_msg());
+                    if ($promptKey === 'agent_response') {
+                        // Salvage non-JSON content as a valid response to avoid apologetic fallbacks
+                        $json = [
+                            'response' => is_string($result) ? trim($result) : '',
+                        ];
+                        Log::warning('LLM JSON parse failed; salvaged raw content for agent_response', [
+                            'provider' => $provider,
+                            'model' => $model,
+                            'error' => json_last_error_msg(),
+                        ]);
+                    } else {
+                        throw new \RuntimeException('Invalid JSON response: '.json_last_error_msg());
+                    }
                 }
 
                 // Apply confidence calibration

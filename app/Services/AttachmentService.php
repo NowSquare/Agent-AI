@@ -143,7 +143,11 @@ class AttachmentService
             fclose($socket);
 
             $result = trim($response);
-            $isClean = str_starts_with($result, 'OK');
+            // ClamAV INSTREAM typically returns lines like "stream: OK" or "stream: Eicar-Test-Signature FOUND"
+            // Treat as clean when it contains OK and not FOUND; treat as infected when it contains FOUND
+            $containsOk = str_contains($result, 'OK');
+            $containsFound = str_contains($result, 'FOUND');
+            $isClean = $containsOk && ! $containsFound;
 
             $attachment->update([
                 'scan_status' => $isClean ? 'clean' : 'infected',

@@ -11,6 +11,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class SendActionResponse implements ShouldQueue
 {
@@ -39,12 +40,21 @@ class SendActionResponse implements ShouldQueue
 
         $responseContent = $this->getResponseContent($thread);
         if (trim($responseContent) === '') {
-            Log::info('No substantive response to send; skipping email dispatch', [
-                'action_id' => $this->action->id,
-                'type' => $this->action->type,
-            ]);
+            // Always respond: generate a concise clarification/options prompt in the detected locale
+            $lastInbound = $thread->emailMessages()->where('direction', 'inbound')->latest('created_at')->first();
+            $locale = app(LanguageDetector::class)->detect($lastInbound?->body_text ?? $lastInbound?->subject ?? '');
 
-            return;
+            try {
+                $llm = app(LlmClient::class);
+                $clarify = $llm->json('clarify_email_draft', [
+                    'detected_locale' => $locale,
+                    'question' => 'Could you clarify your request so we can proceed? For example, specify the goal, constraints, and any files we should consider.',
+                ]);
+
+                $responseContent = (string) ($clarify['text'] ?? 'Could you clarify your request so we can proceed?');
+            } catch (\Throwable $e) {
+                $responseContent = 'Could you clarify your request so we can proceed? Please add the goal, constraints, and any needed files or links.';
+            }
         }
 
         Log::info('Sending action response', [
@@ -202,10 +212,11 @@ class SendActionResponse implements ShouldQueue
                 'thread_id' => $thread->id,
                 'direction' => 'outbound',
                 'processing_status' => 'sent',
-                'message_id' => (string) \Str::ulid(),
+                'message_id' => (string) Str::ulid(),
                 'in_reply_to' => $lastInboundMessage->message_id,
                 'references' => trim(($lastInboundMessage->references ? $lastInboundMessage->references.' ' : '').$lastInboundMessage->message_id),
-                'from_email' => config('mail.from.address'),
+                // Persist the generic AGENT_MAIL as the from address for audit consistency
+                'from_email' => (string) config('mail.agent_mail', env('AGENT_MAIL')),
                 'from_name' => config('mail.from.name'),
                 'to_json' => [['email' => $recipientEmail, 'name' => '']],
                 'subject' => 'Re: '.$thread->subject,
