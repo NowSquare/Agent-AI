@@ -36,15 +36,9 @@ class SendActionResponse implements ShouldQueue
         }
 
         $responseContent = $this->getResponseContent($thread);
-
-        // If we don't have real content, skip sending a placeholder email
         if (trim($responseContent) === '') {
-            Log::info('Skipping action response email: no response content available', [
-                'action_id' => $this->action->id,
-                'type' => $this->action->type,
-            ]);
-
-            return;
+            // Always respond with a concise progress update when no content yet
+            $responseContent = "We've received your request and are preparing a detailed response. You'll hear from us shortly.";
         }
 
         Log::info('Sending action response', [
@@ -77,12 +71,17 @@ class SendActionResponse implements ShouldQueue
             return $final;
         }
 
-        // Outcome-based fallback: if attachments were infected, inform the sender
+        // Outcome-based fallbacks around attachments
         $lastInbound = $thread->emailMessages()->where('direction', 'inbound')->latest('created_at')->first();
         if ($lastInbound) {
-            $infected = $lastInbound->attachments()->where('scan_status', 'infected')->exists();
-            if ($infected) {
-                return "We couldn't process your attachments because they failed our virus scan. Please resend clean PDFs (or share a safe link) and we'll proceed right away.";
+            $attachmentsQuery = $lastInbound->attachments();
+            if ($attachmentsQuery->exists()) {
+                if ($attachmentsQuery->where('scan_status', 'infected')->exists()) {
+                    return "We couldn't process your attachments because they failed our virus scan. Please resend clean PDFs (or share a safe link) and we'll proceed right away.";
+                }
+                if ($attachmentsQuery->whereNull('scan_status')->exists()) {
+                    return "We received your attachments and are scanning them for safety. We'll follow up with a recommendation as soon as the scan completes.";
+                }
             }
         }
 
