@@ -170,8 +170,20 @@ class AgentProcessor
                 'error' => $e->getMessage(),
             ]);
 
-            // Deterministic, targeted fallback based on the user question
-            $fallbackText = $this->generateDeterministicTargetedResponse((string) ($input['action_payload']['question'] ?? ''));
+            // Targeted fallback: ask a single precise clarification based on inbound content
+            $fallbackText = 'Could you clarify your request so we can proceed?';
+            try {
+                $cq = $this->llmClient->json('clarify_question', [
+                    'detected_locale' => 'en_US',
+                    'action_json' => json_encode(['action_type' => $input['action_type'] ?? 'info_request']),
+                    'clean_reply' => (string) ($input['action_payload']['question'] ?? ''),
+                ]);
+                if (! empty($cq['question'])) {
+                    $fallbackText = 'To proceed: '.$cq['question'];
+                }
+            } catch (\Throwable $ignored) {
+                // keep default
+            }
 
             $llmResponse = [
                 'response' => $fallbackText,
@@ -182,7 +194,18 @@ class AgentProcessor
 
         // If empty response, still return a clarification text
         if (! isset($llmResponse['response']) || trim((string) $llmResponse['response']) === '') {
-            $llmResponse['response'] = $this->generateDeterministicTargetedResponse((string) ($input['action_payload']['question'] ?? ''));
+            $llmResponse['response'] = 'Could you clarify your request so we can proceed?';
+            try {
+                $cq = $this->llmClient->json('clarify_question', [
+                    'detected_locale' => 'en_US',
+                    'action_json' => json_encode(['action_type' => $input['action_type'] ?? 'info_request']),
+                    'clean_reply' => (string) ($input['action_payload']['question'] ?? ''),
+                ]);
+                if (! empty($cq['question'])) {
+                    $llmResponse['response'] = 'To proceed: '.$cq['question'];
+                }
+            } catch (\Throwable $ignored) {
+            }
             $llmResponse['confidence'] = $llmResponse['confidence'] ?? 0.6;
         }
 
@@ -196,53 +219,7 @@ class AgentProcessor
         ];
     }
 
-    /**
-     * Deterministic fallback for simple/common queries when the LLM fails or returns empty.
-     */
-    private function generateDeterministicTargetedResponse(string $question): string
-    {
-        $q = strtolower($question);
-
-        // Recipe-style requests
-        if (str_contains($q, 'recipe') || str_contains($q, 'cook') || str_contains($q, 'greek')) {
-            return trim(
-                "Here is a traditional Greek recipe for 6 people: Moussaka\n\n".
-                "### Ingredients\n".
-                "- 1.5 kg potatoes, sliced\n".
-                "- 2 large eggplants, sliced\n".
-                "- 800 g ground beef or lamb\n".
-                "- 1 onion (diced), 2 cloves garlic (minced)\n".
-                "- 400 g tomato passata, 100 ml red wine (optional)\n".
-                "- 1 tsp cinnamon; salt & pepper; olive oil\n".
-                "- 60 g butter, 60 g flour, 600 ml milk, 80 g grated cheese (béchamel)\n\n".
-                "### Steps\n".
-                "1. Roast eggplant and potato slices at 200°C until tender.\n".
-                "2. Brown meat with onion/garlic; add passata (+wine), cinnamon, salt/pepper; simmer 15 min.\n".
-                "3. Béchamel: melt butter, whisk flour; add warm milk to thicken; season; add cheese.\n".
-                "4. Layer potatoes, meat sauce, eggplant; top with béchamel.\n".
-                "5. Bake 35–40 min at 190°C; rest 15 min; serve.\n\n".
-                'Reply with dietary needs or available ingredients and I’ll adapt it.'
-            );
-        }
-
-        // Workshop planning requests
-        if (str_contains($q, 'workshop') || str_contains($q, 'agenda') || str_contains($q, 'budget') || str_contains($q, 'vendor')) {
-            return trim(
-                "Here’s a draft 3‑day technical workshop plan and budget.\n\n".
-                "### Agenda (Draft)\n".
-                "- Day 1: Keynote; Microservices workshop; Trends panel; Kubernetes lab.\n".
-                "- Day 2: Cloud architecture deep dive; DevOps automation; Serverless lab.\n".
-                "- Day 3: Data governance; Cost optimization panel; Analytics lab.\n\n".
-                "### Rough Budget (50 attendees, USD)\n".
-                "- Venue (3 days): $3,000\n- Catering (3 days): $3,500\n- A/V & Tech: $1,200\n- Materials/Swag: $800\n- Speakers/Travel: $2,500\n- Misc (10%): $1,000\n- Total: ~$12k–$14k (city dependent)\n\n".
-                "### To Tailor This, Please Confirm\n".
-                "1) City/venue options and dates\n2) Headcount & dietary needs\n3) Budget range (min/target/max)\n4) Any preferred vendors to compare (catering, venue)"
-            );
-        }
-
-        // Generic targeted clarification
-        return 'Could you share more detail (goal, constraints, headcount/city, files or links) so I can proceed precisely?';
-    }
+    // Removed hardcoded deterministic content; use LLM-generated targeted clarifications instead.
 
     /**
      * Generate a fallback response when LLM processing fails.
