@@ -37,7 +37,7 @@ class OrchestrationPlanValidationTest extends TestCase
         $this->assertNotNull($arb->vote_score, 'vote_score should be set');
 
         // Decision memory saved with provenance
-        $mem = \App\Models\Memory::query()->latest('created_at')->first();
+        $mem = \App\Models\Memory::query()->where('type', 'Decision')->latest('created_at')->first();
         $this->assertNotNull($mem, 'Memory expected');
         $prov = $mem->provenance_ids ?? [];
         $this->assertIsArray($prov, 'provenance_ids should be array');

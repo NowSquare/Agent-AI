@@ -1,4 +1,5 @@
 <?php
+
 /**
  * What this file does — Decides simple vs multi‑agent path and runs it.
  * Plain: Chooses whether one agent can answer or if we need several.
@@ -16,11 +17,11 @@
 
 namespace App\Services;
 
+use App\Models\Account;
 use App\Models\Action;
 use App\Models\Agent;
 use App\Models\Task;
 use App\Models\Thread;
-use App\Models\Account;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -51,7 +52,7 @@ class Coordinator
         $thread = $action->thread;
         $account = $action->account;
 
-        if (!$thread || !$account) {
+        if (! $thread || ! $account) {
             throw new \Exception('Action missing required thread or account relationship');
         }
 
@@ -278,6 +279,16 @@ class Coordinator
                 'agent_id' => $task->agent_id,
                 'response_length' => strlen($result['response'] ?? ''),
             ]);
+
+            // Send response email to the original sender
+            try {
+                \App\Jobs\SendActionResponse::dispatch($action);
+            } catch (\Throwable $e) {
+                Log::warning('Coordinator: Failed to dispatch SendActionResponse job', [
+                    'action_id' => $action->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
         } else {
             // Task failed
             $action->update([
