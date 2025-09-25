@@ -20,7 +20,12 @@ class ScenarioRun extends Command
     {
         $this->call('migrate:fresh', ['--seed' => true, '--no-interaction' => true]);
 
+        // a) Email with 2 attachments (PDFs)
         $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_postmark.json']);
+        // b) Single-agent recipe request (no attachments)
+        $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_recipe_no_attachments.json']);
+        // c) Complex multi-agent planning request (plan validation + auto-repair expected)
+        $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_multiagent_complex.json']);
 
         // Optional: embeddings backfill if you have a command for it
         if (class_exists(\App\Console\Commands\EmbeddingsBackfill::class)) {
@@ -43,5 +48,3 @@ class ScenarioRun extends Command
         return 0;
     }
 }
-
-

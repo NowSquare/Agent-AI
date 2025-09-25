@@ -144,7 +144,7 @@ Guidance: put business logic in Services/Jobs, not Controllers. Write unit and f
 
 ## Security & privacy
 - Multi-agent protocol (Plan → Allocate → Work → Debate → Decide → Curate): Planner creates tasks; Workers produce drafts; Critics debate for K rounds (2 by default); Arbiter selects a winner, logging `vote_score` and `decision_reason`; Memory Curator persists a summary with provenance.
-- Because this is your own data, Agent-AI shows the full content of steps for your threads.
+- Because this is your own data, Agent AI shows the full content of steps for your threads.
 - Tenant boundary is enforced by `accounts` and `memberships`.
 
 ## Multi-agent enhancements
