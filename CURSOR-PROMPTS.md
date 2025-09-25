@@ -16,6 +16,7 @@ php artisan boost:mcp
 # Terminal A: npm run dev
 # Terminal B: php artisan horizon
 # Terminal C: ngrok http --url=abc123.ngrok-free.app 80 --host-header=agent-ai.test
+# Terminal D: brew services start clamav (macOS)
 ```
 
 ## Make a Plan Prompt
