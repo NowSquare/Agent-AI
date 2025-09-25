@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Models\Action;
 use App\Models\Attachment;
 use App\Services\AttachmentService;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -54,6 +55,20 @@ class ScanAttachment implements ShouldQueue
                 'attachment_id' => $attachment->id,
                 'scan_result' => $attachment->scan_result,
             ]);
+
+            // Ensure the user receives an incident response email.
+            // If no outbound message has been sent on this thread yet, dispatch SendActionResponse
+            // using the latest action for the thread.
+            $thread = $attachment->emailMessage?->thread;
+            if ($thread && ! $thread->emailMessages()->where('direction', 'outbound')->exists()) {
+                $action = Action::where('thread_id', $thread->id)
+                    ->latest('created_at')
+                    ->first();
+
+                if ($action) {
+                    SendActionResponse::dispatch($action);
+                }
+            }
         }
     }
 }
