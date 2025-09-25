@@ -478,6 +478,15 @@ class LlmClient
                     ],
                     'required' => ['subject', 'text', 'html'],
                 ]];
+            case 'agent_response':
+                return ['agent_response', [
+                    'type' => 'object',
+                    'properties' => [
+                        'response' => ['type' => 'string', 'description' => 'Final assistant response text (Markdown allowed)'],
+                        'confidence' => ['type' => 'number', 'minimum' => 0, 'maximum' => 1],
+                    ],
+                    'required' => ['response'],
+                ]];
             default:
                 return [$promptKey, ['type' => 'object']];
         }
