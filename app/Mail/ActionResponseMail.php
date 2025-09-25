@@ -48,6 +48,9 @@ class ActionResponseMail extends Mailable
             with: [
                 'action' => $this->action,
                 'thread' => $this->thread,
+                // Outcome-driven flags/fields for the view
+                'success' => $this->action->status === 'completed',
+                'detailsUrl' => null,
                 'responseContent' => $this->responseContent,
             ],
         );
