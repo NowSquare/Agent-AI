@@ -1,0 +1,13 @@
+{
+  "MessageID": "demo-message-002",
+  "From": "Nikos Papadopoulos <nikos@example.com>",
+  "To": "agent@example.test",
+  "Subject": "I need a Greek recipe for 6 persons",
+  "TextBody": "Hi, could you suggest a traditional Greek recipe for 6 people, with an ingredient list and steps?",
+  "HtmlBody": "<p>Hi, could you suggest a traditional Greek recipe for 6 people, with an ingredient list and steps?<\/p>",
+  "Headers": [
+    { "Name": "X-Thread-ID", "Value": "demo-thread-002" }
+  ],
+  "Attachments": []
+}
+

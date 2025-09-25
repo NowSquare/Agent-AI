@@ -149,9 +149,9 @@ class LlmClient
 
                 // For Ollama, use chat API with strict JSON mode and no streaming
                 if ($provider === 'ollama') {
-                    // Prefer tool-calling for structured outputs when enabled for the prompt's role
+                    // Prefer tool-calling for structured outputs when available OR enabled at role-level
                     $roleConfig = $this->config['routing']['roles'][$this->getRoleForPrompt($promptKey)] ?? [];
-                    $useTools = (bool) ($roleConfig['tools'] ?? false);
+                    $useTools = $this->hasToolForPrompt($promptKey) || (bool) ($roleConfig['tools'] ?? false);
 
                     $result = $this->callOllamaChatJson($prompt, $maxOutputTokens, $model, $promptKey, $useTools);
                 } else {
@@ -468,9 +468,32 @@ class LlmClient
                     ],
                     'required' => ['items'],
                 ]];
+            case 'incident_email_draft':
+                return ['incident_email_draft', [
+                    'type' => 'object',
+                    'properties' => [
+                        'subject' => ['type' => 'string', 'description' => 'Email subject line (≤80 chars)'],
+                        'text' => ['type' => 'string', 'description' => 'Plain text body (≤600 chars)'],
+                        'html' => ['type' => 'string', 'description' => 'Basic HTML body (≤800 chars)'],
+                    ],
+                    'required' => ['subject', 'text', 'html'],
+                ]];
             default:
                 return [$promptKey, ['type' => 'object']];
         }
+    }
+
+    /**
+     * Summary: Determine if a prompt key has a dedicated tool schema.
+     */
+    private function hasToolForPrompt(string $promptKey): bool
+    {
+        return in_array($promptKey, [
+            'language_detect',
+            'thread_summarize',
+            'memory_extract',
+            'incident_email_draft',
+        ], true);
     }
 
     private function getRoleForPrompt(string $promptKey): string
