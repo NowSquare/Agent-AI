@@ -188,6 +188,11 @@ class SendActionResponse implements ShouldQueue
             }
         }
 
+        // Fallback: use normalized from_email on the email message if headers are missing
+        if (! empty($message->from_email)) {
+            return $message->from_email;
+        }
+
         throw new \Exception('Could not extract sender email from message headers: '.json_encode($headerMap));
     }
 }
