@@ -16,7 +16,7 @@ return [
     | Core Request Settings
     |--------------------------------------------------------------------------
     */
-    'timeout_ms' => (int) env('LLM_TIMEOUT_MS', 120000), // HOW LONG to wait before declaring a timeout
+    'timeout_ms' => (int) env('LLM_TIMEOUT_MS', 240000), // HOW LONG to wait before declaring a timeout
     'retry' => [
         'max' => (int) env('LLM_RETRY_MAX', 1),
         'on' => [408, 429, 500, 502, 503, 504], // WHEN to retry (network/timeouts/rate limits)
@@ -56,19 +56,19 @@ return [
         'roles' => [
             'CLASSIFY' => [
                 'provider' => env('LLM_CLASSIFY_PROVIDER', 'ollama'),
-                'model' => env('LLM_CLASSIFY_MODEL', 'llama3.1:8b'),
+                'model' => env('LLM_CLASSIFY_MODEL', 'gpt-oss:20b'),
                 'tools' => (bool) env('LLM_CLASSIFY_TOOLS', true),
                 'reasoning' => (bool) env('LLM_CLASSIFY_REASONING', false),
             ],
             'GROUNDED' => [
                 'provider' => env('LLM_GROUNDED_PROVIDER', 'ollama'),
-                'model' => env('LLM_GROUNDED_MODEL', 'llama3.1:8b'),
+                'model' => env('LLM_GROUNDED_MODEL', 'gpt-oss:20b'),
                 'tools' => (bool) env('LLM_GROUNDED_TOOLS', true),
                 'reasoning' => (bool) env('LLM_GROUNDED_REASONING', false),
             ],
             'SYNTH' => [
                 'provider' => env('LLM_SYNTH_PROVIDER', 'ollama'),
-                'model' => env('LLM_SYNTH_MODEL', 'llama3.1:8b'),
+                'model' => env('LLM_SYNTH_MODEL', 'gpt-oss:120b'),
                 'tools' => (bool) env('LLM_SYNTH_TOOLS', true),
                 'reasoning' => (bool) env('LLM_SYNTH_REASONING', true),
             ],

@@ -74,7 +74,8 @@ class MultiAgentOrchestrator
         // Step 1: Plan (Planner role)
         $plan = $this->planner->plan($action, $thread);
         $run->update(['state->plan' => $plan, 'state->phase' => 'planned']);
-        \App\Models\AgentStep::create([
+        $provenanceStepIds = [];
+        $plannerStep = \App\Models\AgentStep::create([
             'account_id' => $account->id,
             'thread_id' => $thread->id,
             'action_id' => $action->id,
@@ -88,6 +89,7 @@ class MultiAgentOrchestrator
             'agent_role' => 'Planner',
             'round_no' => 0,
         ]);
+        $provenanceStepIds[] = (string) $plannerStep->id;
 
         Log::info('MultiAgentOrchestrator: Plan created', [
             'action_id' => $action->id,
@@ -118,7 +120,7 @@ class MultiAgentOrchestrator
         }
         if ($symbolicPlan) {
             $report = $planValidator->validate($symbolicPlan, $initialFacts);
-            \App\Models\AgentStep::create([
+            $validatorStep = \App\Models\AgentStep::create([
                 'account_id' => $account->id,
                 'thread_id' => $thread->id,
                 'action_id' => $action->id,
@@ -132,6 +134,7 @@ class MultiAgentOrchestrator
                 'agent_role' => 'Critic',
                 'round_no' => 0,
             ]);
+            $provenanceStepIds[] = (string) $validatorStep->id;
 
             if (! $report['valid']) {
                 // Try simple auto-repair based on failed precondition
@@ -160,6 +163,17 @@ class MultiAgentOrchestrator
                     'plan_report' => $report,
                     'plan_valid' => $allowsSend,
                 ])]);
+
+                // If plan is not valid after repair/debate hint, branch to safer fallback and stop
+                if (! $allowsSend) {
+                    \Log::info('MultiAgentOrchestrator: Plan invalid after validation; routing to options/clarification', [
+                        'action_id' => $action->id,
+                    ]);
+                    $action->update(['status' => 'awaiting_input']);
+                    \App\Jobs\SendOptionsEmail::dispatch($action);
+
+                    return;
+                }
             }
         }
 
@@ -169,7 +183,7 @@ class MultiAgentOrchestrator
 
         // Log Arbiter decision
         if ($winner) {
-            \App\Models\AgentStep::create([
+            $arbiterStep = \App\Models\AgentStep::create([
                 'account_id' => $account->id,
                 'thread_id' => $thread->id,
                 'action_id' => $action->id,
@@ -185,11 +199,12 @@ class MultiAgentOrchestrator
                 'vote_score' => isset($winner['score']) ? round((float) $winner['score'], 2) : null,
                 'decision_reason' => $decision['reasons'][array_key_last($decision['reasons'])] ?? null,
             ]);
+            $provenanceStepIds[] = (string) $arbiterStep->id;
         }
 
         // Step 4: Curate memory of the outcome
         $finalAnswer = (string) ($winner['text'] ?? '');
-        $this->curator->persistOutcome($run->id, $thread, $account, $finalAnswer, provenanceIds: []);
+        $this->curator->persistOutcome($run->id, $thread, $account, $finalAnswer, provenanceIds: $provenanceStepIds);
 
         // Mark action as completed with final answer
         $action->update([
