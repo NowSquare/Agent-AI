@@ -1,4 +1,5 @@
 <?php
+
 /**
  * What this file does — Runs a task with a chosen agent and logs the step.
  * Plain: Given a job and an agent, it asks the AI for a draft and stores the result.
@@ -16,10 +17,9 @@
 
 namespace App\Services;
 
-use App\Models\Task;
 use App\Models\Agent;
 use App\Models\Memory;
-use App\Services\MemoryService;
+use App\Models\Task;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -40,17 +40,19 @@ class AgentProcessor
 
     /**
      * Summary: Process a task with the assigned agent and persist results.
-     * @param Task $task  The work unit to execute (contains inputs/context)
-     * @return void       Updates the Task and writes an AgentStep
+     *
+     * @param  Task  $task  The work unit to execute (contains inputs/context)
+     * @return void Updates the Task and writes an AgentStep
+     *
      * @throws \Exception If the task has no agent or LLM call irrecoverably fails
-     * Example:
-     *   $processor->processTask($task);
+     *                    Example:
+     *                    $processor->processTask($task);
      */
     public function processTask(Task $task): void
     {
         $agent = $task->agent;
 
-        if (!$agent) {
+        if (! $agent) {
             throw new \Exception('Task has no assigned agent');
         }
 
@@ -102,9 +104,10 @@ class AgentProcessor
 
     /**
      * Summary: Generate an agent response via LLM using grounding and routing.
-     * @param Agent $agent  The selected agent
-     * @param Task  $task   The task being processed
-     * @return array        ['response','confidence','agent_id','agent_name','processing_time','model_used']
+     *
+     * @param  Agent  $agent  The selected agent
+     * @param  Task  $task  The task being processed
+     * @return array ['response','confidence','agent_id','agent_name','processing_time','model_used']
      */
     private function generateAgentResponse(Agent $agent, Task $task): array
     {
@@ -118,12 +121,12 @@ class AgentProcessor
         $tokensIn = strlen($prompt) / 4; // rough estimate
         $results = $this->grounding->retrieveTopK($input['action_payload']['question'] ?? ($input['user_query'] ?? ''), 8);
         $hitRate = $this->grounding->hitRate($results);
-        $topSim  = $this->grounding->topSimilarity($results);
-        $role    = $this->router->chooseRole((int) $tokensIn, $hitRate, $topSim);
-        $modelCfg= $this->router->resolveProviderModel($role);
+        $topSim = $this->grounding->topSimilarity($results);
+        $role = $this->router->chooseRole((int) $tokensIn, $hitRate, $topSim);
+        $modelCfg = $this->router->resolveProviderModel($role);
 
         // If GROUNDED, prepend retrieved snippets
-        if ($role === 'GROUNDED' && !empty($results)) {
+        if ($role === 'GROUNDED' && ! empty($results)) {
             $ctx = "\n\nContext (retrieved):\n";
             foreach (array_slice($results, 0, 6) as $r) {
                 $ctx .= "- [{$r['src']}:{$r['id']}] {$r['text']}\n";
@@ -135,11 +138,11 @@ class AgentProcessor
         try {
             $llmResponse = $this->llmClient->json('agent_response', [
                 'prompt' => $prompt,
-                'role'   => $role,
+                'role' => $role,
                 'provider' => $modelCfg['provider'],
-                'model'    => $modelCfg['model'],
-                'tools'    => $modelCfg['tools'],
-                'reasoning'=> $modelCfg['reasoning'],
+                'model' => $modelCfg['model'],
+                'tools' => $modelCfg['tools'],
+                'reasoning' => $modelCfg['reasoning'],
             ]);
 
             // Log agent step
@@ -159,7 +162,7 @@ class AgentProcessor
                 'latency_ms' => 0,
                 'confidence' => $llmResponse['confidence'] ?? null,
                 'agent_role' => 'Worker',
-                'round_no' => (int)($input['round_no'] ?? 0),
+                'round_no' => (int) ($input['round_no'] ?? 0),
             ]);
         } catch (\Exception $e) {
             Log::warning('Agent LLM JSON parsing failed, using fallback response', [
@@ -167,12 +170,37 @@ class AgentProcessor
                 'error' => $e->getMessage(),
             ]);
 
-            // Use fallback response when LLM fails
+            // Generate a helpful clarification/options message instead of an apology
+            try {
+                $clarify = $this->llmClient->json('clarify_email_draft', [
+                    'detected_locale' => 'en_US',
+                    'question' => 'Could you clarify details so we can proceed (goal, constraints, files/links)?',
+                ]);
+                $fallbackText = (string) ($clarify['text'] ?? 'Could you clarify your request so we can proceed?');
+            } catch (\Throwable $te) {
+                $fallbackText = 'Could you clarify your request so we can proceed? Please add the goal, constraints, and any needed files or links.';
+            }
+
             $llmResponse = [
-                'response' => $this->generateFallbackResponse($agent, $input),
-                'confidence' => 0.5,
-                'reasoning' => 'Fallback due to LLM processing error',
+                'response' => $fallbackText,
+                'confidence' => 0.6,
+                'reasoning' => 'Fallback clarification due to LLM processing error',
             ];
+        }
+
+        // If empty response, still return a clarification text
+        if (! isset($llmResponse['response']) || trim((string) $llmResponse['response']) === '') {
+            try {
+                $clarify = $this->llmClient->json('clarify_email_draft', [
+                    'detected_locale' => 'en_US',
+                    'question' => 'Could you clarify details so we can proceed (goal, constraints, files/links)?',
+                ]);
+                $llmResponse['response'] = (string) ($clarify['text'] ?? 'Could you clarify your request so we can proceed?');
+                $llmResponse['confidence'] = $llmResponse['confidence'] ?? 0.6;
+            } catch (\Throwable $te) {
+                $llmResponse['response'] = 'Could you clarify your request so we can proceed? Please add the goal, constraints, and any needed files or links.';
+                $llmResponse['confidence'] = $llmResponse['confidence'] ?? 0.6;
+            }
         }
 
         return [
@@ -240,7 +268,7 @@ class AgentProcessor
 
         // Add expertise areas
         if (isset($capabilities['expertise']) && is_array($capabilities['expertise'])) {
-            $prompt .= "Your areas of expertise: " . implode(', ', $capabilities['expertise']) . ".\n\n";
+            $prompt .= 'Your areas of expertise: '.implode(', ', $capabilities['expertise']).".\n\n";
         }
 
         // Add specific instructions
@@ -250,7 +278,7 @@ class AgentProcessor
             if (is_string($instruction)) {
                 $prompt .= "- {$instruction}\n";
             } elseif (is_string($key) && is_array($instruction)) {
-                $prompt .= "- {$key}: " . implode(', ', $instruction) . "\n";
+                $prompt .= "- {$key}: ".implode(', ', $instruction)."\n";
             } elseif (is_string($key) && is_string($instruction)) {
                 $prompt .= "- {$key}: {$instruction}\n";
             }
@@ -261,16 +289,16 @@ class AgentProcessor
         $threadContext = $input['thread_context'];
         $prompt .= "THREAD CONTEXT:\n";
         $prompt .= "Subject: {$threadContext['subject']}\n";
-        if (!empty($threadContext['summary'])) {
+        if (! empty($threadContext['summary'])) {
             $prompt .= "Summary: {$threadContext['summary']}\n";
         }
-        
+
         // Add memory context if available
         $memoryExcerpt = $this->getMemoryContext($threadContext['thread_id'], $threadContext['account_id']);
-        if (!empty($memoryExcerpt)) {
+        if (! empty($memoryExcerpt)) {
             $prompt .= "\nRELEVANT MEMORIES:\n{$memoryExcerpt}\n";
         }
-        
+
         $prompt .= "\nRecent conversation:\n";
         foreach ($threadContext['recent_messages'] as $message) {
             $direction = $message['direction'] === 'inbound' ? 'User' : 'Assistant';
@@ -290,7 +318,7 @@ class AgentProcessor
         $prompt .= "Respond in a natural, conversational tone that matches your personality.\n";
         $prompt .= "Draw from your experience and knowledge to provide valuable insights.\n\n";
 
-        $prompt .= "RESPONSE:";
+        $prompt .= 'RESPONSE:';
 
         return $prompt;
     }
@@ -302,7 +330,7 @@ class AgentProcessor
     {
         // Get memories from all scopes, ordered by relevance
         $memories = collect([]);
-        
+
         // Thread-specific memories
         $threadMemories = $this->memoryService->retrieve(
             Memory::SCOPE_CONVERSATION,
@@ -311,7 +339,7 @@ class AgentProcessor
             3
         );
         $memories = $memories->merge($threadMemories);
-        
+
         // Account-level memories
         $accountMemories = $this->memoryService->retrieve(
             Memory::SCOPE_ACCOUNT,
@@ -320,23 +348,23 @@ class AgentProcessor
             3
         );
         $memories = $memories->merge($accountMemories);
-        
+
         // Format memories for prompt context
         if ($memories->isEmpty()) {
             return '';
         }
-        
+
         $excerpt = '';
         foreach ($memories as $memory) {
             $value = is_array($memory->value_json) ? json_encode($memory->value_json) : $memory->value_json;
             $excerpt .= "- {$memory->key}: {$value}\n";
         }
-        
+
         // Truncate if too long (keep under typical token limits)
         if (strlen($excerpt) > config('memory.max_excerpt_chars', 1200)) {
-            $excerpt = substr($excerpt, 0, config('memory.max_excerpt_chars', 1200)) . "...\n";
+            $excerpt = substr($excerpt, 0, config('memory.max_excerpt_chars', 1200))."...\n";
         }
-        
+
         return $excerpt;
     }
 }
