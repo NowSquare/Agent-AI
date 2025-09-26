@@ -241,6 +241,7 @@ FEATURE IMPLEMENTATION RULES
 4) Handle errors
 5) Logging
 6) i18n support
+7) Add detailed comments like:
 /**
  * What this section does — Adds a clear, safe, symbolic plan validation loop.
  * Plain: Before doing work, write a small checklist (a plan). Check it. If a step is missing, fix it, then go.
