@@ -183,6 +183,15 @@ class ProcessInboundEmail implements ShouldQueue
         ]);
 
         // Phase 2: LLM interpretation and action processing
+        // If attachments exist, defer LLM until extraction/summarization completes
+        if ($emailMessage->attachments()->exists()) {
+            $emailMessage->update(['processing_status' => 'awaiting_attachments']);
+            Log::info('Deferring LLM processing until attachments are ready', [
+                'message_id' => $emailMessage->id,
+            ]);
+            return;
+        }
+
         $emailMessage->update(['processing_status' => 'processing']);
         $this->processWithLLM($llmClient, $emailMessage, $thread, $cleanReply, $account);
     }
