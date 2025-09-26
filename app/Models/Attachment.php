@@ -87,20 +87,24 @@ class Attachment extends Model
 
     public function getAttachmentsExcerpt(): string
     {
-        if (! $this->isSummarized()) {
-            return '';
+        // Prefer LLM summary if available
+        if ($this->isSummarized()) {
+            $summary = $this->summarize_json;
+
+            $excerpt = $summary['gist'] ?? '';
+            if (! empty($summary['key_points']) && is_array($summary['key_points'])) {
+                $bullets = array_slice($summary['key_points'], 0, 3); // First 3 bullets
+                $excerpt .= ' '.implode(' ', $bullets);
+            }
+
+            $excerpt = trim($excerpt);
+            if ($excerpt !== '') {
+                return substr($excerpt, 0, 800);
+            }
         }
 
-        $summary = $this->summarize_json;
-
-        // Build excerpt from gist + bullets, capped at ~600 chars
-        $excerpt = $summary['gist'] ?? '';
-
-        if (! empty($summary['key_points']) && is_array($summary['key_points'])) {
-            $bullets = array_slice($summary['key_points'], 0, 3); // First 3 bullets
-            $excerpt .= ' '.implode(' ', $bullets);
-        }
-
-        return substr($excerpt, 0, 600);
+        // Fallback to raw extracted text excerpt when summary is not present
+        $raw = $this->extract_result_json['excerpt'] ?? '';
+        return substr((string) $raw, 0, 800);
     }
 }

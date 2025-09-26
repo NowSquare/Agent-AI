@@ -38,22 +38,23 @@ class SendActionResponse implements ShouldQueue
             throw new \Exception('Action has no associated thread');
         }
 
-        // Gate responses: if latest inbound has attachments and any are not fully scanned, requeue later
+        // Gate responses: if latest inbound has attachments and any are not fully ready (scan+extract+some excerpt), requeue later
         $lastInbound = $thread->emailMessages()->where('direction', 'inbound')->latest('created_at')->first();
         if ($lastInbound && $lastInbound->attachments()->exists()) {
-            // Only block while pending/null; 'skipped' is allowed and 'failed' does not block
-            $hasPendingScans = $lastInbound->attachments()
-                ->where(function ($q) {
-                    $q->whereNull('scan_status')
-                        ->orWhere('scan_status', 'pending');
-                })
-                ->exists();
-            if ($hasPendingScans) {
-                Log::info('Deferring action response until attachments scan completes', [
+            $attachments = $lastInbound->attachments()->get();
+            $notReady = $attachments->first(function ($att) {
+                $hasSummary = ! empty($att->summarize_json['gist'] ?? null);
+                $hasRawExcerpt = ! empty($att->extract_result_json['excerpt'] ?? '');
+                $hasAnyExcerpt = $hasSummary || $hasRawExcerpt;
+                $scanPending = is_null($att->scan_status) || $att->scan_status === 'pending';
+                $extractPending = $att->extract_status !== 'done';
+                return $scanPending || $extractPending || ! $hasAnyExcerpt;
+            });
+            if ($notReady) {
+                Log::info('Deferring action response until attachments excerpts ready', [
                     'action_id' => $this->action->id,
                     'thread_id' => $thread->id,
                 ]);
-                // Re-dispatch this job with a small delay so we only send once scans are done
                 self::dispatch($this->action)->delay(now()->addSeconds(30));
 
                 return;
@@ -114,7 +115,8 @@ class SendActionResponse implements ShouldQueue
         if ($lastInbound) {
             $attachmentsQuery = $lastInbound->attachments();
             if ($attachmentsQuery->exists()) {
-                if ($attachmentsQuery->where('scan_status', 'infected')->exists()) {
+                // Only send incident if CLAMAV is enabled; otherwise don't generate infected reports
+                if (config('attachments.clamav.enabled', true) && $attachmentsQuery->where('scan_status', 'infected')->exists()) {
                     // Build personalized incident explanation via LLM
                     $detector = app(LanguageDetector::class);
                     $locale = $detector->detect($lastInbound->body_text ?? $lastInbound->subject ?? '');
