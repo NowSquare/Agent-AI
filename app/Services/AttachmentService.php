@@ -114,6 +114,19 @@ class AttachmentService
         try {
             $attachment->update(['scan_status' => 'pending']);
 
+            // Skip scan entirely when disabled
+            if (! config('attachments.clamav.enabled', true)) {
+                Log::warning('Attachment scan skipped (ClamAV disabled)', [
+                    'attachment_id' => $attachment->id,
+                ]);
+                $attachment->update([
+                    'scan_status' => 'skipped',
+                    'scan_result' => 'Scan disabled',
+                    'scanned_at' => now(),
+                ]);
+                return true; // Treat as clean for processing flow
+            }
+
             $clamavHost = config('attachments.clamav.host', '127.0.0.1');
             $clamavPort = config('attachments.clamav.port', 3310);
 
@@ -173,15 +186,30 @@ class AttachmentService
             return $isClean;
 
         } catch (Exception $e) {
+            Log::error('Attachment scan failed', [
+                'attachment_id' => $attachment->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            // If ClamAV is optional, continue the pipeline with a warning
+            if (config('attachments.clamav.optional', true)) {
+                $attachment->update([
+                    'scan_status' => 'skipped',
+                    'scan_result' => 'Scan failed: '.$e->getMessage(),
+                    'scanned_at' => now(),
+                ]);
+
+                Log::warning('Attachment scan skipped due to failure (optional mode)', [
+                    'attachment_id' => $attachment->id,
+                ]);
+
+                return true; // Treat as clean for processing flow
+            }
+
             $attachment->update([
                 'scan_status' => 'failed',
                 'scan_result' => $e->getMessage(),
                 'scanned_at' => now(),
-            ]);
-
-            Log::error('Attachment scan failed', [
-                'attachment_id' => $attachment->id,
-                'error' => $e->getMessage(),
             ]);
 
             return false;

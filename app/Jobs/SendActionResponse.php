@@ -41,8 +41,18 @@ class SendActionResponse implements ShouldQueue
         // Gate responses: if latest inbound has attachments and any are not fully scanned, requeue later
         $lastInbound = $thread->emailMessages()->where('direction', 'inbound')->latest('created_at')->first();
         if ($lastInbound && $lastInbound->attachments()->exists()) {
+            // Consider optional scan mode: 'skipped' is acceptable
             $hasPendingScans = $lastInbound->attachments()
-                ->whereIn('scan_status', ['pending', 'failed', null])
+                ->where(function ($q) {
+                    $q->whereNull('scan_status')
+                        ->orWhereIn('scan_status', ['pending'])
+                        ->orWhere(function ($qq) {
+                            // Only block on 'failed' when ClamAV is required
+                            if (! config('attachments.clamav.optional', true)) {
+                                $qq->where('scan_status', 'failed');
+                            }
+                        });
+                })
                 ->exists();
             if ($hasPendingScans) {
                 Log::info('Deferring action response until attachments scan completes', [
@@ -51,6 +61,7 @@ class SendActionResponse implements ShouldQueue
                 ]);
                 // Re-dispatch this job with a small delay so we only send once scans are done
                 self::dispatch($this->action)->delay(now()->addSeconds(30));
+
                 return;
             }
         }
