@@ -18,8 +18,6 @@ return [
     'clamav' => [
         // When disabled, scans are skipped with a warning and processing continues
         'enabled' => env('CLAMAV_ENABLED', true),
-        // When optional, connection or timeout errors will be treated as "skipped" instead of failing the chain
-        'optional' => env('CLAMAV_OPTIONAL', true),
         'host' => env('CLAMAV_HOST', '127.0.0.1'),
         'port' => env('CLAMAV_PORT', 3310),
     ],

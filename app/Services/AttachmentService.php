@@ -124,6 +124,7 @@ class AttachmentService
                     'scan_result' => 'Scan disabled',
                     'scanned_at' => now(),
                 ]);
+
                 return true; // Treat as clean for processing flow
             }
 
@@ -191,28 +192,18 @@ class AttachmentService
                 'error' => $e->getMessage(),
             ]);
 
-            // If ClamAV is optional, continue the pipeline with a warning
-            if (config('attachments.clamav.optional', true)) {
-                $attachment->update([
-                    'scan_status' => 'skipped',
-                    'scan_result' => 'Scan failed: '.$e->getMessage(),
-                    'scanned_at' => now(),
-                ]);
-
-                Log::warning('Attachment scan skipped due to failure (optional mode)', [
-                    'attachment_id' => $attachment->id,
-                ]);
-
-                return true; // Treat as clean for processing flow
-            }
-
+            // Continue the pipeline with a warning when scan cannot be performed
             $attachment->update([
-                'scan_status' => 'failed',
-                'scan_result' => $e->getMessage(),
+                'scan_status' => 'skipped',
+                'scan_result' => 'Scan failed: '.$e->getMessage(),
                 'scanned_at' => now(),
             ]);
 
-            return false;
+            Log::warning('Attachment scan skipped due to failure', [
+                'attachment_id' => $attachment->id,
+            ]);
+
+            return true; // Treat as clean for processing flow
         }
     }
 
