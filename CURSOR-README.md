@@ -1004,6 +1004,8 @@ Notes:
 
 ## MCP Tools (Server-Side) and Model Tool-Calling
 
+> Hard requirement: Any prompt that expects a structured JSON response MUST use model-side tool-calling (function schema) or an equivalent schema-bound mechanism. Do not rely on natural-language instructions like "Return JSON: { ... }" alone; reasoning-capable models will sometimes emit prose or partial JSON. Enforce schemas via `App\Services\LlmClient` (see `getToolFunctionForPrompt()` + `hasToolForPrompt()`).
+
 ### Available Safe Tools (bounded)
 - get_datetime: current time in timezone/format
 - head_url: HEAD request (status + headers)
