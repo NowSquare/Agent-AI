@@ -439,9 +439,43 @@ class LlmClient
         return $data['message']['content'] ?? '';
     }
 
+    /**
+     * What this section does — Define function schemas for model-side tool-calling.
+     * Plain: For prompts that must return structured JSON, expose a single function schema; the model returns the
+     *         function arguments as the JSON payload, avoiding free-form prose.
+     * How this fits in:
+     * - Prevents invalid JSON by letting the model fill a schema instead of following natural-language instructions
+     * - Central place to add/adjust schemas when prompts evolve
+     * - Tied to hasToolForPrompt() to enable tool-calling on supported prompts
+     * Key terms: tool-calling, function schema, prompt key, structured JSON
+     *
+     * For engineers:
+     * - Add a case per prompt key that returns [toolName, jsonSchema]
+     * - Include required fields and brief descriptions; avoid over-constraining optional fields
+     * - When adding a new JSON prompt: add a schema here and whitelist the key in hasToolForPrompt()
+     */
     private function getToolFunctionForPrompt(string $promptKey): array
     {
         switch ($promptKey) {
+            case 'action_interpret':
+                return ['action_interpret', [
+                    'type' => 'object',
+                    'properties' => [
+                        'action_type' => [
+                            'type' => 'string',
+                            'enum' => [
+                                'approve', 'reject', 'revise', 'select_option', 'provide_value',
+                                'schedule_propose_times', 'schedule_confirm', 'unsubscribe', 'info_request', 'stop',
+                            ],
+                        ],
+                        'parameters' => ['type' => 'object'],
+                        'scope_hint' => ['type' => ['string', 'null'], 'enum' => ['conversation', 'user', 'account', null]],
+                        'confidence' => ['type' => 'number', 'minimum' => 0, 'maximum' => 1],
+                        'needs_clarification' => ['type' => 'boolean'],
+                        'clarification_prompt' => ['type' => ['string', 'null']],
+                    ],
+                    'required' => ['action_type', 'parameters', 'confidence', 'needs_clarification'],
+                ]];
             case 'language_detect':
                 return ['language_detect', [
                     'type' => 'object',
@@ -490,6 +524,65 @@ class LlmClient
                     ],
                     'required' => ['subject', 'text', 'html'],
                 ]];
+            case 'clarify_email_draft':
+                return ['clarify_email_draft', [
+                    'type' => 'object',
+                    'properties' => [
+                        'subject' => ['type' => 'string', 'description' => 'Email subject line (≤80 chars)'],
+                        'text' => ['type' => 'string', 'description' => 'Plain text body (≤400 chars)'],
+                        'html' => ['type' => 'string', 'description' => 'Basic HTML body (≤600 chars)'],
+                    ],
+                    'required' => ['subject', 'text', 'html'],
+                ]];
+            case 'options_email_draft':
+                return ['options_email_draft', [
+                    'type' => 'object',
+                    'properties' => [
+                        'subject' => ['type' => 'string', 'description' => 'Email subject line (≤80 chars)'],
+                        'text' => ['type' => 'string', 'description' => 'Plain text body (≤600 chars)'],
+                        'html' => ['type' => 'string', 'description' => 'Basic HTML body (≤800 chars)'],
+                    ],
+                    'required' => ['subject', 'text', 'html'],
+                ]];
+            case 'poll_email_draft':
+                return ['poll_email_draft', [
+                    'type' => 'object',
+                    'properties' => [
+                        'subject' => ['type' => 'string', 'description' => 'Email subject line (≤80 chars)'],
+                        'text' => ['type' => 'string', 'description' => 'Plain text body (≤600 chars)'],
+                        'html' => ['type' => 'string', 'description' => 'Basic HTML body (≤800 chars)'],
+                    ],
+                    'required' => ['subject', 'text', 'html'],
+                ]];
+            case 'csv_schema_detect':
+                return ['csv_schema_detect', [
+                    'type' => 'object',
+                    'properties' => [
+                        'delimiter' => ['type' => 'string', 'enum' => [',', '|', ';', "\t"]],
+                        'has_header' => ['type' => 'boolean'],
+                        'columns' => [
+                            'type' => 'array',
+                            'items' => [
+                                'type' => 'object',
+                                'properties' => [
+                                    'name' => ['type' => 'string'],
+                                    'type' => ['type' => 'string', 'enum' => ['string', 'number', 'date', 'datetime', 'boolean']],
+                                    'nullable' => ['type' => 'boolean'],
+                                ],
+                                'required' => ['name', 'type', 'nullable'],
+                            ],
+                        ],
+                    ],
+                    'required' => ['delimiter', 'has_header', 'columns'],
+                ]];
+            case 'clarify_question':
+                return ['clarify_question', [
+                    'type' => 'object',
+                    'properties' => [
+                        'question' => ['type' => 'string', 'description' => 'A single clarification question (≤140 chars)'],
+                    ],
+                    'required' => ['question'],
+                ]];
             case 'attachment_summarize':
                 return ['attachment_summarize', [
                     'type' => 'object',
@@ -527,10 +620,16 @@ class LlmClient
     private function hasToolForPrompt(string $promptKey): bool
     {
         return in_array($promptKey, [
+            'action_interpret',
             'language_detect',
             'thread_summarize',
             'memory_extract',
             'incident_email_draft',
+            'clarify_email_draft',
+            'options_email_draft',
+            'poll_email_draft',
+            'csv_schema_detect',
+            'clarify_question',
             'attachment_summarize',
             'agent_response',
         ], true);
