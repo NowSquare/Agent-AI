@@ -132,30 +132,68 @@ class AttachmentService
             $clamavPort = config('attachments.clamav.port', 3310);
 
             // Connect to ClamAV daemon
+            Log::debug('ClamAV: connecting to daemon', [
+                'attachment_id' => $attachment->id,
+                'host' => $clamavHost,
+                'port' => $clamavPort,
+                'connect_timeout_sec' => 10,
+            ]);
             $socket = @fsockopen($clamavHost, $clamavPort, $errno, $errstr, 10);
             if (! $socket) {
                 throw new Exception("Cannot connect to ClamAV: {$errstr} ({$errno})");
             }
+            Log::debug('ClamAV: connection established', [
+                'attachment_id' => $attachment->id,
+            ]);
 
             // Set a hard read/write timeout to avoid hanging jobs
             stream_set_timeout($socket, 15);
+            Log::debug('ClamAV: socket timeout set', [
+                'attachment_id' => $attachment->id,
+                'rw_timeout_sec' => 15,
+            ]);
 
             // Send INSTREAM command (per clamd protocol)
+            Log::debug('ClamAV: sending INSTREAM command', [
+                'attachment_id' => $attachment->id,
+            ]);
             fwrite($socket, "INSTREAM\n");
 
             // Send file content in chunks
             $handle = Storage::disk($attachment->storage_disk)->readStream($attachment->storage_path);
+            $totalBytes = 0;
+            $chunkCount = 0;
             while (! feof($handle)) {
                 $chunk = fread($handle, 8192);
                 $chunkSize = pack('N', strlen($chunk));
                 fwrite($socket, $chunkSize.$chunk);
+                $totalBytes += strlen($chunk);
+                $chunkCount++;
+                if ($chunkCount % 16 === 0) {
+                    Log::debug('ClamAV: streamed chunks progress', [
+                        'attachment_id' => $attachment->id,
+                        'chunks' => $chunkCount,
+                        'bytes' => $totalBytes,
+                    ]);
+                }
             }
             fclose($handle);
+            Log::debug('ClamAV: finished streaming file', [
+                'attachment_id' => $attachment->id,
+                'total_chunks' => $chunkCount,
+                'total_bytes' => $totalBytes,
+            ]);
 
             // Send zero-length chunk to end stream
             fwrite($socket, pack('N', 0));
+            Log::debug('ClamAV: sent stream terminator', [
+                'attachment_id' => $attachment->id,
+            ]);
 
             // Read response
+            Log::debug('ClamAV: waiting for response', [
+                'attachment_id' => $attachment->id,
+            ]);
             $response = fgets($socket);
             if ($response === false) {
                 $meta = stream_get_meta_data($socket);
@@ -164,6 +202,10 @@ class AttachmentService
                 throw new Exception("ClamAV scan failed: {$reason}");
             }
             fclose($socket);
+            Log::debug('ClamAV: received response', [
+                'attachment_id' => $attachment->id,
+                'raw' => trim((string) $response),
+            ]);
 
             $result = trim($response);
             // ClamAV INSTREAM typically returns lines like "stream: OK" or "stream: Eicar-Test-Signature FOUND"

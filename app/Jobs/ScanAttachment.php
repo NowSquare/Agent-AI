@@ -7,11 +7,12 @@ use App\Models\Attachment;
 use App\Services\AttachmentService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 
 class ScanAttachment implements ShouldQueue
 {
-    use Queueable;
+    use Queueable, InteractsWithQueue;
 
     public int $tries = 3;
 
@@ -29,6 +30,7 @@ class ScanAttachment implements ShouldQueue
      */
     public function handle(AttachmentService $attachmentService): void
     {
+        $startedAt = microtime(true);
         $attachment = Attachment::find($this->attachmentId);
 
         if (! $attachment) {
@@ -39,13 +41,27 @@ class ScanAttachment implements ShouldQueue
             return;
         }
 
+        Log::info('Job start: ScanAttachment', [
+            'attachment_id' => $attachment->id,
+            'queue' => method_exists($this->job ?? null, 'getQueue') ? $this->job->getQueue() : null,
+            'connection' => method_exists($this->job ?? null, 'getConnectionName') ? $this->job->getConnectionName() : null,
+            'attempts' => method_exists($this->job ?? null, 'attempts') ? $this->job->attempts() : null,
+        ]);
         Log::info('Starting attachment scan', [
             'attachment_id' => $attachment->id,
             'filename' => $attachment->filename,
             'size_bytes' => $attachment->size_bytes,
         ]);
 
+        Log::debug('ScanAttachment: calling scan()', [
+            'attachment_id' => $attachment->id,
+        ]);
         $isClean = $attachmentService->scan($attachment);
+        Log::debug('ScanAttachment: scan() returned', [
+            'attachment_id' => $attachment->id,
+            'result' => $isClean,
+            'scan_status' => $attachment->scan_status,
+        ]);
 
         if ($isClean) {
             // Dispatch next job in chain: extract text (use configured queue)
@@ -71,5 +87,11 @@ class ScanAttachment implements ShouldQueue
                 }
             }
         }
+
+        $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
+        Log::info('Job end: ScanAttachment', [
+            'attachment_id' => $this->attachmentId,
+            'duration_ms' => $durationMs,
+        ]);
     }
 }

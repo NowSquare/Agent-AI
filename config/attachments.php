@@ -35,7 +35,7 @@ return [
     ],
 
     'processing' => [
-        'queue' => 'attachments',
+        'queue' => env('ATTACHMENTS_QUEUE', 'default'),
         'text_extraction_timeout' => 30, // seconds
         'max_extracted_text_length' => 50000, // characters
         'max_excerpt_length' => 1000, // characters for LLM context
