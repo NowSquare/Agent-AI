@@ -48,8 +48,9 @@ class ScanAttachment implements ShouldQueue
         $isClean = $attachmentService->scan($attachment);
 
         if ($isClean) {
-            // Dispatch next job in chain: extract text
-            ExtractAttachmentText::dispatch($attachment->id)->onQueue('attachments');
+            // Dispatch next job in chain: extract text (use configured queue)
+            $attachmentsQueue = config('attachments.processing.queue', 'attachments');
+            ExtractAttachmentText::dispatch($attachment->id)->onQueue($attachmentsQueue);
         } else {
             Log::warning('Attachment scan found infection, stopping processing chain', [
                 'attachment_id' => $attachment->id,

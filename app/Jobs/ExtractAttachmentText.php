@@ -56,8 +56,9 @@ class ExtractAttachmentText implements ShouldQueue
         $extracted = $attachmentService->extractText($attachment);
 
         if ($extracted) {
-            // Dispatch next job in chain: summarize
-            SummarizeAttachment::dispatch($attachment->id)->onQueue('attachments');
+            // Dispatch next job in chain: summarize (use configured queue)
+            $attachmentsQueue = config('attachments.processing.queue', 'attachments');
+            SummarizeAttachment::dispatch($attachment->id)->onQueue($attachmentsQueue);
         } else {
             Log::warning('Attachment text extraction failed, stopping summarization', [
                 'attachment_id' => $attachment->id,

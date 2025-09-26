@@ -123,8 +123,11 @@ class AttachmentService
                 throw new Exception("Cannot connect to ClamAV: {$errstr} ({$errno})");
             }
 
-            // Send INSTREAM command
-            fwrite($socket, "nINSTREAM\n");
+            // Set a hard read/write timeout to avoid hanging jobs
+            stream_set_timeout($socket, 15);
+
+            // Send INSTREAM command (per clamd protocol)
+            fwrite($socket, "INSTREAM\n");
 
             // Send file content in chunks
             $handle = Storage::disk($attachment->storage_disk)->readStream($attachment->storage_path);
@@ -140,6 +143,12 @@ class AttachmentService
 
             // Read response
             $response = fgets($socket);
+            if ($response === false) {
+                $meta = stream_get_meta_data($socket);
+                $reason = ($meta['timed_out'] ?? false) ? 'timeout waiting for response' : 'no response from clamd';
+                fclose($socket);
+                throw new Exception("ClamAV scan failed: {$reason}");
+            }
             fclose($socket);
 
             $result = trim($response);

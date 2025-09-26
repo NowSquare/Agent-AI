@@ -343,8 +343,9 @@ class ProcessInboundEmail implements ShouldQueue
                 $totalSize += $fileSize;
                 $storedCount++;
 
-                // Dispatch scan job
-                ScanAttachment::dispatch($attachment->id)->onQueue('attachments');
+                // Dispatch scan job on configured attachments queue
+                $attachmentsQueue = config('attachments.processing.queue', 'attachments');
+                ScanAttachment::dispatch($attachment->id)->onQueue($attachmentsQueue);
 
                 Log::info('Attachment stored and scan dispatched', [
                     'message_id' => $emailMessage->id,

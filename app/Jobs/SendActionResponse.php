@@ -38,6 +38,23 @@ class SendActionResponse implements ShouldQueue
             throw new \Exception('Action has no associated thread');
         }
 
+        // Gate responses: if latest inbound has attachments and any are not fully scanned, requeue later
+        $lastInbound = $thread->emailMessages()->where('direction', 'inbound')->latest('created_at')->first();
+        if ($lastInbound && $lastInbound->attachments()->exists()) {
+            $hasPendingScans = $lastInbound->attachments()
+                ->whereIn('scan_status', ['pending', 'failed', null])
+                ->exists();
+            if ($hasPendingScans) {
+                Log::info('Deferring action response until attachments scan completes', [
+                    'action_id' => $this->action->id,
+                    'thread_id' => $thread->id,
+                ]);
+                // Re-dispatch this job with a small delay so we only send once scans are done
+                self::dispatch($this->action)->delay(now()->addSeconds(30));
+                return;
+            }
+        }
+
         $responseContent = $this->getResponseContent($thread);
         if (trim($responseContent) === '') {
             // Always respond: generate a concise clarification/options prompt in the detected locale
