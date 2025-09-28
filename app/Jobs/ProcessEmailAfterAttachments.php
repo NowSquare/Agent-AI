@@ -134,10 +134,15 @@ class ProcessEmailAfterAttachments implements ShouldQueue
 
             $confidence = (float) ($interp['confidence'] ?? 0.0);
 
-            // Generate a direct final response using FULL attachment content to avoid clarifications
+            // Generate a direct final response using FULL attachment content (general-purpose)
             try {
-                $prompt = "Analyze the user's email and the FULL attachment content below. Produce a concise side-by-side comparison (as a clear list or simple table in Markdown) between the proposals, covering scope, paper, turnaround, pricing (with totals), and terms (warranty, payment, validity). Then recommend one, and justify briefly. Do not ask questions. Use the full texts, not summaries.\n\nEmail:\n".
-                    (string) ($email->body_text ?? '')."\n\nAttachments (full):\n".$attachmentsFull;
+                $prompt =
+                    "Analyze the user's email and the FULL attachment content below.\n".
+                    "Produce the most helpful response for the user. This can be an answer, a clarifying question, or constructive feedback.\n".
+                    "If anything is unclear, ask for the minimum missing information to proceed.\n".
+                    "Use the full texts (not summaries) when citing facts.\n\n".
+                    "Email:\n".(string) ($email->body_text ?? '')."\n\n".
+                    "Attachments (full):\n".$attachmentsFull;
                 $json = app(LlmClient::class)->json('agent_response', [
                     'prompt' => $prompt,
                 ]);
