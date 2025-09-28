@@ -113,9 +113,9 @@ class AttachmentService
     {
         try {
             $attachment->update(['scan_status' => 'pending']);
-
+    
             // Skip scan entirely when disabled
-            if (! config('attachments.clamav.enabled', true)) {
+            if (!config('attachments.clamav.enabled', true)) {
                 Log::warning('Attachment scan skipped (ClamAV disabled)', [
                     'attachment_id' => $attachment->id,
                 ]);
@@ -124,127 +124,114 @@ class AttachmentService
                     'scan_result' => 'Scan disabled',
                     'scanned_at' => now(),
                 ]);
-
-                return true; // Treat as clean for processing flow
+                return true;
             }
-
+    
             $clamavHost = config('attachments.clamav.host', '127.0.0.1');
             $clamavPort = config('attachments.clamav.port', 3310);
-
-            // Connect to ClamAV daemon
-            Log::debug('ClamAV: connecting to daemon', [
-                'attachment_id' => $attachment->id,
-                'host' => $clamavHost,
-                'port' => $clamavPort,
-                'connect_timeout_sec' => 10,
-            ]);
-            $socket = @fsockopen($clamavHost, $clamavPort, $errno, $errstr, 10);
-            if (! $socket) {
-                throw new Exception("Cannot connect to ClamAV: {$errstr} ({$errno})");
-            }
-            Log::debug('ClamAV: connection established', [
-                'attachment_id' => $attachment->id,
-            ]);
-
-            // Set a hard read/write timeout to avoid hanging jobs
-            stream_set_timeout($socket, 15);
-            Log::debug('ClamAV: socket timeout set', [
-                'attachment_id' => $attachment->id,
-                'rw_timeout_sec' => 15,
-            ]);
-
-            // Send INSTREAM command (per clamd protocol)
-            Log::debug('ClamAV: sending INSTREAM command', [
-                'attachment_id' => $attachment->id,
-            ]);
-            fwrite($socket, "INSTREAM\n");
-
-            // Send file content in chunks
-            $handle = Storage::disk($attachment->storage_disk)->readStream($attachment->storage_path);
-            $totalBytes = 0;
-            $chunkCount = 0;
-            while (! feof($handle)) {
-                $chunk = fread($handle, 8192);
-                $chunkSize = pack('N', strlen($chunk));
-                fwrite($socket, $chunkSize.$chunk);
-                $totalBytes += strlen($chunk);
-                $chunkCount++;
-                if ($chunkCount % 16 === 0) {
-                    Log::debug('ClamAV: streamed chunks progress', [
+    
+            // Maak een tijdelijk bestand voor scanning
+            $tempPath = sys_get_temp_dir() . '/clamav_' . uniqid() . '_' . basename($attachment->filename);
+            
+            try {
+                // Kopieer bestand naar temp locatie
+                $content = Storage::disk($attachment->storage_disk)->get($attachment->storage_path);
+                file_put_contents($tempPath, $content);
+    
+                Log::debug('ClamAV: Created temp file for scanning', [
+                    'attachment_id' => $attachment->id,
+                    'temp_path' => $tempPath,
+                    'size' => filesize($tempPath),
+                ]);
+    
+                // Connect to ClamAV daemon
+                $socket = @fsockopen($clamavHost, $clamavPort, $errno, $errstr, 10);
+                if (!$socket) {
+                    throw new Exception("Cannot connect to ClamAV: {$errstr} ({$errno})");
+                }
+    
+                // Set timeout
+                stream_set_timeout($socket, 15);
+    
+                // Use SCAN command instead of INSTREAM
+                $command = "SCAN {$tempPath}\n";
+                fwrite($socket, $command);
+    
+                Log::debug('ClamAV: Sent SCAN command', [
+                    'attachment_id' => $attachment->id,
+                    'command' => trim($command),
+                ]);
+    
+                // Read response
+                $response = fgets($socket);
+                fclose($socket);
+    
+                if ($response === false) {
+                    throw new Exception("ClamAV scan failed: no response from daemon");
+                }
+    
+                $result = trim($response);
+                
+                Log::debug('ClamAV: Received response', [
+                    'attachment_id' => $attachment->id,
+                    'response' => $result,
+                ]);
+    
+                // Parse response: "/path/to/file: OK" or "/path/to/file: Virus-Name FOUND"
+                $isClean = str_contains($result, ': OK');
+                $isInfected = str_contains($result, 'FOUND');
+    
+                if ($isInfected) {
+                    // Extract virus name
+                    preg_match('/:\s+(.+)\s+FOUND/', $result, $matches);
+                    $virusName = $matches[1] ?? 'Unknown virus';
+                    $scanResult = "Virus detected: {$virusName}";
+                } else {
+                    $scanResult = null;
+                }
+    
+                $attachment->update([
+                    'scan_status' => $isClean ? 'clean' : 'infected',
+                    'scan_result' => $scanResult,
+                    'scanned_at' => now(),
+                ]);
+    
+                Log::info('Attachment scan completed', [
+                    'attachment_id' => $attachment->id,
+                    'scan_status' => $attachment->scan_status,
+                    'result' => $result,
+                ]);
+    
+                return $isClean;
+    
+            } finally {
+                // Cleanup temp file
+                if (file_exists($tempPath)) {
+                    unlink($tempPath);
+                    Log::debug('ClamAV: Cleaned up temp file', [
                         'attachment_id' => $attachment->id,
-                        'chunks' => $chunkCount,
-                        'bytes' => $totalBytes,
+                        'temp_path' => $tempPath,
                     ]);
                 }
             }
-            fclose($handle);
-            Log::debug('ClamAV: finished streaming file', [
-                'attachment_id' => $attachment->id,
-                'total_chunks' => $chunkCount,
-                'total_bytes' => $totalBytes,
-            ]);
-
-            // Send zero-length chunk to end stream
-            fwrite($socket, pack('N', 0));
-            Log::debug('ClamAV: sent stream terminator', [
-                'attachment_id' => $attachment->id,
-            ]);
-
-            // Read response
-            Log::debug('ClamAV: waiting for response', [
-                'attachment_id' => $attachment->id,
-            ]);
-            $response = fgets($socket);
-            if ($response === false) {
-                $meta = stream_get_meta_data($socket);
-                $reason = ($meta['timed_out'] ?? false) ? 'timeout waiting for response' : 'no response from clamd';
-                fclose($socket);
-                throw new Exception("ClamAV scan failed: {$reason}");
-            }
-            fclose($socket);
-            Log::debug('ClamAV: received response', [
-                'attachment_id' => $attachment->id,
-                'raw' => trim((string) $response),
-            ]);
-
-            $result = trim($response);
-            // ClamAV INSTREAM typically returns lines like "stream: OK" or "stream: Eicar-Test-Signature FOUND"
-            // Treat as clean when it contains OK and not FOUND; treat as infected when it contains FOUND
-            $containsOk = str_contains($result, 'OK');
-            $containsFound = str_contains($result, 'FOUND');
-            $isClean = $containsOk && ! $containsFound;
-
-            $attachment->update([
-                'scan_status' => $isClean ? 'clean' : 'infected',
-                'scan_result' => $isClean ? null : $result,
-                'scanned_at' => now(),
-            ]);
-
-            Log::info('Attachment scan completed', [
-                'attachment_id' => $attachment->id,
-                'scan_status' => $attachment->scan_status,
-                'result' => $result,
-            ]);
-
-            return $isClean;
-
+    
         } catch (Exception $e) {
             Log::error('Attachment scan failed', [
                 'attachment_id' => $attachment->id,
                 'error' => $e->getMessage(),
             ]);
-
+    
             // Continue the pipeline with a warning when scan cannot be performed
             $attachment->update([
                 'scan_status' => 'skipped',
-                'scan_result' => 'Scan failed: '.$e->getMessage(),
+                'scan_result' => 'Scan failed: ' . $e->getMessage(),
                 'scanned_at' => now(),
             ]);
-
+    
             Log::warning('Attachment scan skipped due to failure', [
                 'attachment_id' => $attachment->id,
             ]);
-
+    
             return true; // Treat as clean for processing flow
         }
     }
