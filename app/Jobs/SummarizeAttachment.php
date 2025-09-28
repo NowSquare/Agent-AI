@@ -83,24 +83,50 @@ class SummarizeAttachment implements ShouldQueue
             ]);
         }
 
-        // If all attachments now have at least a raw excerpt or summary, run LLM processing for the email
+        // Check if all attachments are fully processed (scanned and extracted), then route accordingly
         $email = $attachment->emailMessage;
         if ($email) {
             $all = $email->attachments()->get();
-            $allReady = $all->every(function ($att) {
-                $hasSummary = ! empty($att->summarize_json['gist'] ?? null);
-                $hasRawExcerpt = ! empty($att->extract_result_json['excerpt'] ?? '');
-                return $att->extract_status === 'done' && ($hasSummary || $hasRawExcerpt);
+            
+            // Check if all attachments are fully processed (scanned + extracted)
+            $allProcessed = $all->every(function ($att) {
+                $scanDone = in_array($att->scan_status, ['clean', 'infected', 'skipped']);
+                $extractDone = $att->extract_status === 'done';
+                return $scanDone && $extractDone;
             });
-            if ($allReady && $email->processing_status === 'awaiting_attachments') {
-                Log::info('All attachments ready, dispatching deferred LLM processing', [
-                    'email_message_id' => $email->id,
-                ]);
-                // Flip status to processing to avoid double enqueue from multiple summarize completions
-                $email->update(['processing_status' => 'processing']);
-                // Dispatch on the same configured processing queue used for attachments (defaults to 'default')
-                \App\Jobs\ProcessEmailAfterAttachments::dispatch($email->id)
-                    ->onQueue(config('attachments.processing.queue', 'default'));
+
+            if ($allProcessed && $email->processing_status === 'awaiting_attachments') {
+                // Check for infected attachments first
+                $infectedAttachments = $all->where('scan_status', 'infected');
+                
+                if ($infectedAttachments->isNotEmpty()) {
+                    // Send infected attachments notification instead of normal processing
+                    Log::info('Infected attachments detected, dispatching security notification', [
+                        'email_message_id' => $email->id,
+                        'infected_count' => $infectedAttachments->count(),
+                        'infected_files' => $infectedAttachments->pluck('filename')->toArray(),
+                    ]);
+                    
+                    $email->update(['processing_status' => 'processing']);
+                    SendInfectedAttachmentsNotification::dispatch($email->id)
+                        ->onQueue(config('attachments.processing.queue', 'default'));
+                } else {
+                    // All attachments are processed (scanned + extracted), proceed with LLM processing
+                    // Note: Some attachments may have failed extraction/summarization, but we proceed with whatever content we have
+                    Log::info('All attachments processed, dispatching deferred LLM processing', [
+                        'email_message_id' => $email->id,
+                        'attachments_with_content' => $all->filter(function ($att) {
+                            $hasSummary = ! empty($att->summarize_json['gist'] ?? null);
+                            $hasRawExcerpt = ! empty($att->extract_result_json['excerpt'] ?? '');
+                            return $hasSummary || $hasRawExcerpt;
+                        })->count(),
+                        'total_attachments' => $all->count(),
+                    ]);
+                    
+                    $email->update(['processing_status' => 'processing']);
+                    \App\Jobs\ProcessEmailAfterAttachments::dispatch($email->id)
+                        ->onQueue(config('attachments.processing.queue', 'default'));
+                }
             }
         }
         $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
