@@ -63,29 +63,17 @@ class ScanAttachment implements ShouldQueue
             'scan_status' => $attachment->scan_status,
         ]);
 
-        if ($isClean) {
-            // Dispatch next job in chain: extract text (use configured queue)
-            $attachmentsQueue = config('attachments.processing.queue', 'attachments');
-            ExtractAttachmentText::dispatch($attachment->id)->onQueue($attachmentsQueue);
-        } else {
-            Log::warning('Attachment scan found infection, stopping processing chain', [
+        // Always continue processing chain for text extraction, regardless of scan result.
+        // We want to extract text even from infected files for analysis (safely, in isolation).
+        // The infected attachment notification will be handled later when all attachments are processed.
+        $attachmentsQueue = config('attachments.processing.queue', 'attachments');
+        ExtractAttachmentText::dispatch($attachment->id)->onQueue($attachmentsQueue);
+
+        if (!$isClean) {
+            Log::warning('Attachment scan found infection, but continuing processing chain', [
                 'attachment_id' => $attachment->id,
                 'scan_result' => $attachment->scan_result,
             ]);
-
-            // Ensure the user receives an incident response email.
-            // If no outbound message has been sent on this thread yet, dispatch SendActionResponse
-            // using the latest action for the thread.
-            $thread = $attachment->emailMessage?->thread;
-            if ($thread && ! $thread->emailMessages()->where('direction', 'outbound')->exists()) {
-                $action = Action::where('thread_id', $thread->id)
-                    ->latest('created_at')
-                    ->first();
-
-                if ($action) {
-                    SendActionResponse::dispatch($action);
-                }
-            }
         }
 
         $durationMs = (int) round((microtime(true) - $startedAt) * 1000);
