@@ -39,25 +39,28 @@ class SendActionResponse implements ShouldQueue
         }
 
         // Gate responses: if latest inbound has attachments and any are not fully ready (scan+extract+some excerpt), requeue later
-        $lastInbound = $thread->emailMessages()->where('direction', 'inbound')->latest('created_at')->first();
-        if ($lastInbound && $lastInbound->attachments()->exists()) {
-            $attachments = $lastInbound->attachments()->get();
-            $notReady = $attachments->first(function ($att) {
-                $hasSummary = ! empty($att->summarize_json['gist'] ?? null);
-                $hasRawExcerpt = ! empty($att->extract_result_json['excerpt'] ?? '');
-                $hasAnyExcerpt = $hasSummary || $hasRawExcerpt;
-                $scanPending = is_null($att->scan_status) || $att->scan_status === 'pending';
-                $extractPending = $att->extract_status !== 'done';
-                return $scanPending || $extractPending || ! $hasAnyExcerpt;
-            });
-            if ($notReady) {
-                Log::info('Deferring action response until attachments excerpts ready', [
-                    'action_id' => $this->action->id,
-                    'thread_id' => $thread->id,
-                ]);
-                self::dispatch($this->action)->delay(now()->addSeconds(30));
+        // Exception: infected_attachments actions should be sent immediately for security
+        if ($this->action->type !== 'infected_attachments') {
+            $lastInbound = $thread->emailMessages()->where('direction', 'inbound')->latest('created_at')->first();
+            if ($lastInbound && $lastInbound->attachments()->exists()) {
+                $attachments = $lastInbound->attachments()->get();
+                $notReady = $attachments->first(function ($att) {
+                    $hasSummary = ! empty($att->summarize_json['gist'] ?? null);
+                    $hasRawExcerpt = ! empty($att->extract_result_json['excerpt'] ?? '');
+                    $hasAnyExcerpt = $hasSummary || $hasRawExcerpt;
+                    $scanPending = is_null($att->scan_status) || $att->scan_status === 'pending';
+                    $extractPending = $att->extract_status !== 'done';
+                    return $scanPending || $extractPending || ! $hasAnyExcerpt;
+                });
+                if ($notReady) {
+                    Log::info('Deferring action response until attachments excerpts ready', [
+                        'action_id' => $this->action->id,
+                        'thread_id' => $thread->id,
+                    ]);
+                    self::dispatch($this->action)->delay(now()->addSeconds(30));
 
-                return;
+                    return;
+                }
             }
         }
 
@@ -95,10 +98,94 @@ class SendActionResponse implements ShouldQueue
     }
 
     /**
+     * Generate infected attachments notification response.
+     */
+    private function getInfectedAttachmentsResponse(Thread $thread): string
+    {
+        $payload = $this->action->payload_json;
+        $infectedFiles = $payload['infected_files'] ?? [];
+        $infectedDetails = $payload['infected_details'] ?? [];
+        
+        if (empty($infectedFiles)) {
+            return "We detected a security issue with your attachments and couldn't process your request. Please resend with clean files.";
+        }
+
+        $lastInbound = $thread->emailMessages()->where('direction', 'inbound')->latest('created_at')->first();
+        if (!$lastInbound) {
+            return "We detected infected attachments and couldn't process your request. Please resend with clean files.";
+        }
+
+        // Build file list for LLM
+        $fileList = collect($infectedDetails)->map(function ($detail) {
+            $threat = $detail['threat'] ?? 'infected';
+            return $detail['filename'].': '.$threat;
+        })->implode("\n");
+
+        try {
+            $detector = app(LanguageDetector::class);
+            $locale = $detector->detect($lastInbound->body_text ?? $lastInbound->subject ?? '');
+            
+            $llm = app(LlmClient::class);
+            $json = $llm->json('incident_email_draft', [
+                'detected_locale' => $locale,
+                'issue' => 'attachments_infected',
+                'original_subject' => (string) $lastInbound->subject,
+                'file_list' => $fileList,
+                'user_message' => (string) ($lastInbound->body_text ?? ''),
+            ]);
+
+            // Log agent step for transparency
+            \App\Models\AgentStep::create([
+                'account_id' => $thread->account_id,
+                'thread_id' => $thread->id,
+                'action_id' => $this->action->id,
+                'role' => 'GROUNDED',
+                'provider' => 'ollama',
+                'model' => 'gpt-oss:20b',
+                'step_type' => 'incident',
+                'input_json' => [
+                    'prompt_key' => 'incident_email_draft',
+                    'detected_locale' => $locale,
+                    'issue' => 'attachments_infected',
+                    'file_list' => $fileList,
+                ],
+                'output_json' => [
+                    'subject' => $json['subject'] ?? null,
+                    'text' => $json['text'] ?? null,
+                ],
+                'tokens_input' => 0,
+                'tokens_output' => 0,
+                'tokens_total' => 0,
+                'latency_ms' => 0,
+                'agent_role' => 'Worker',
+                'round_no' => 0,
+            ]);
+
+            if (isset($json['text']) && is_string($json['text']) && trim($json['text']) !== '') {
+                return $json['text'];
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Infected attachments email draft generation failed; using fallback', [
+                'action_id' => $this->action->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+
+        // Fallback message
+        $fileNames = implode(', ', $infectedFiles);
+        return "We couldn't process your attachments because they failed our virus scan (infected files: {$fileNames}). Please resend clean files and we'll proceed right away.";
+    }
+
+    /**
      * Get the response content from the agent processing.
      */
     private function getResponseContent(Thread $thread): string
     {
+        // Handle infected_attachments actions with dedicated response
+        if ($this->action->type === 'infected_attachments') {
+            return $this->getInfectedAttachmentsResponse($thread);
+        }
+
         // The agent response is now stored in the action payload
         $agentResponse = $this->action->payload_json['agent_response'] ?? '';
         $final = $this->action->payload_json['final_response'] ?? '';
