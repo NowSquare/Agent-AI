@@ -48,8 +48,8 @@ Agent-AI (Laravel 12, PHP 8.4) ingests inbound emails through **Postmark**, thre
 
 ### 3.1 High-Level Flow
 
-1. **Inbound**: Postmark webhook → `/webhooks/inbound-email` (HTTP Basic + HMAC).
-2. **Persist**: Encrypted payload; queue `ProcessWebhookPayload` → `ProcessInboundEmail`.
+1. **Inbound**: Postmark webhook → `/webhooks/inbound-email` (HTTP Basic).
+2. **Persist**: Store encrypted payload; queue `ProcessWebhookPayload` → `ProcessInboundEmail`.
 3. **Thread**: RFC 5322 threading (`Message-ID`, `In-Reply-To`, `References`).
 4. **Attachments**: Scan (ClamAV) → Extract → Summarize (LLM tool) on `attachments` queue.
 5. **Interpret**: `action_interpret` (tool-enforced JSON) classifies intent + confidence + parameters.
@@ -62,7 +62,7 @@ Agent-AI (Laravel 12, PHP 8.4) ingests inbound emails through **Postmark**, thre
 Text diagram
 
 ```
-Inbound → Webhook (/webhooks/postmark-inbound)
+Inbound → Webhook (/webhooks/inbound-email)
   → Queue: ProcessWebhookPayload → ProcessInboundEmail
     → Threading (RFC headers + X-Thread-ID) → Store Email/Attachments
     → Scan (ClamAV) → Extract → Summarize
@@ -228,10 +228,10 @@ Agent-AI/
 │  │  │  │  ├─ ActionsController.php        # Internal action dispatch (UI forms)
 │  │  │  │  └─ ThreadsController.php        # Thread detail API (UI fetch)
 │  │  │  └─ Webhook/
-│  │  │     └─ PostmarkInboundController.php# Validates Basic Auth + HMAC; stores encrypted payload; enqueues
+│  │  │     └─ PostmarkInboundController.php# Validates HTTP Basic Auth; enqueues processing
 │  │  ├─ Middleware/
 │  │  │  ├─ DetectLanguage.php              # Locale from URL/session/header/content; sets Content-Language
-│  │  │  └─ VerifyWebhookSignature.php      # HMAC check for inbound (defense in depth)
+│  │  │  └─                                  
 │  │  ├─ Requests/                          # FormRequest validators (auth/actions)
 │  │  └─ Resources/                         # (optional) API transformers
 │  ├─ Jobs/
@@ -397,7 +397,7 @@ Agent-AI/
 
 | Method | Path                           | Auth              | Purpose                               |
 | -----: | ------------------------------ | ----------------- | ------------------------------------- |
-|   POST | `/webhooks/inbound-email`      | HTTP Basic + HMAC | Receive inbound emails (JSON)         |
+|   POST | `/webhooks/inbound-email`      | HTTP Basic        | Receive inbound emails (JSON)         |
 |    GET | `/a/{action}`                  | **Signed**        | One-click confirmation page           |
 |   POST | `/a/{action}`                  | **Signed**        | Execute confirmed action (idempotent) |
 |    GET | `/attachments/{id}`            | **Signed**        | Download clean attachment             |
@@ -666,7 +666,7 @@ php artisan boost:mcp
 * **“Missing model tags”** (Ollama) → pull the tag you configured; or switch role provider/model in `.env`.
 * **“No retrieval matches”** → ensure embeddings exist; increase `top_k`; lower `LLM_GROUNDING_HIT_MIN`.
 * **“ClamAV refused / not found”** → start daemon, verify host/port; check logs for `clamd` readiness.
-* **“Webhook HMAC failed”** → verify Basic Auth & raw body use; check Postmark settings; re-post sample.
+* **“Webhook auth failed”** → verify Basic Auth credentials and webhook URL; re-post sample.
 * **“Thread splits / dupes”** → inspect headers; normalize subject; use X-Thread-ID if available.
 
 ## 19) Action Whitelist v1 (server executes only these)
@@ -1169,8 +1169,7 @@ Discovered by scanning `app/Models`. Key type inferred by `HasUlids` and DB type
    - `https://WEBHOOK_USER:WEBHOOK_PASS@your-domain.test/webhooks/inbound-email`
    - Use the exact Basic Auth creds from `.env` (`WEBHOOK_USER`, `WEBHOOK_PASS`).
 
-2) Enable HMAC signing in Postmark. Server must verify against the raw request body.
-   - Our `VerifyWebhookSignature` middleware validates Basic Auth + HMAC (raw body required).
+2) Authentication: Use HTTP Basic Auth with the credentials from `.env`.
 
 3) Threading pattern for replies:
    - Set Reply-To as: `local+<thread_id>@inbound.postmarkapp.com`.
@@ -1198,7 +1197,7 @@ Attachments
 
 Webhook
 
-- Signature fails: check `.env` creds; ensure raw body used for HMAC.
+- Signature fails: check `.env` creds and URL.
 
 Queue
 

@@ -571,6 +571,6 @@ $result = $llm->json(
 * **Model tag missing (Ollama)** → pull the tag or switch role provider/model.
 * **No retrieval hits** → lower `LLM_GROUNDING_HIT_MIN` or `top_k ↑`; ensure embeddings exist.
 * **ClamAV refused** → ensure daemon running on `127.0.0.1:3310`; check logs.
-* **Webhook HMAC failed** → verify Basic Auth + raw body; reconfigure Postmark.
+* **Webhook auth failed** → verify Basic Auth credentials and webhook URL.
 * **Split threads** → inspect headers; subject normalization; X-Thread-ID if available.
 * **Invalid JSON from LLM** → you forgot tool-calling; add schema + `tool_choice=required`.

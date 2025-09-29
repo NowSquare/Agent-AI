@@ -219,7 +219,7 @@ Lower LLM_SYNTH_COMPLEXITY_TOKENS or improve retrieval settings.
 Ensure daemon runs on 127.0.0.1:3310. Check container logs.
 
 **Webhook authentication failing**
-Verify WEBHOOK_USER/PASS and that raw request body is used for HMAC.
+Verify WEBHOOK_USER/PASS.
 
 ## Roadmap
 
