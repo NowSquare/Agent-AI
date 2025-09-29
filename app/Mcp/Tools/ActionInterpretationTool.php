@@ -43,7 +43,10 @@ class ActionInterpretationTool extends Tool
         $validator = Validator::make($interpretation, [
             'action_type' => ['required', 'string'],
             'parameters' => ['required', 'array'],
-            'confidence' => ['required', 'numeric'],
+            'scope_hint' => ['nullable', 'string'],
+            'confidence' => ['required', 'numeric', 'min:0', 'max:1'],
+            'needs_clarification' => ['required', 'boolean'],
+            'clarification_prompt' => ['nullable', 'string'],
         ]);
         if ($validator->fails()) {
             throw new ValidationException($validator);
@@ -86,15 +89,15 @@ class ActionInterpretationTool extends Tool
         $prompt = $this->buildInterpretationPrompt($cleanReply, $threadSummary, $attachmentsExcerpt, $recentMemories);
 
         try {
-            $result = $this->llmClient->call('action_interpret', [
+            // Strict: require tool-enforced structured output via json()
+            $json = $this->llmClient->json('action_interpret', [
                 'clean_reply' => $cleanReply,
                 'thread_summary' => $threadSummary,
                 'attachments_excerpt' => $attachmentsExcerpt,
                 'recent_memories' => json_encode($recentMemories),
             ]);
 
-            // Parse the simple response into structured data
-            return $this->parseActionResponse($result, $cleanReply);
+            return $json;
         } catch (\Exception $e) {
             // Fallback to safe defaults
             return [
@@ -117,7 +120,10 @@ class ActionInterpretationTool extends Tool
         $validator = Validator::make($interpretation, [
             'action_type' => ['required', 'string'],
             'parameters' => ['required', 'array'],
-            'confidence' => ['required', 'numeric'],
+            'scope_hint' => ['nullable', 'string'],
+            'confidence' => ['required', 'numeric', 'min:0', 'max:1'],
+            'needs_clarification' => ['required', 'boolean'],
+            'clarification_prompt' => ['nullable', 'string'],
         ]);
         if ($validator->fails()) {
             throw new ValidationException($validator);

@@ -205,7 +205,7 @@ TESTS + VERIFY (after each logical unit)
 - Minimal Demo: php artisan scenario:run (ok to run once per feature)
 - Log quick metrics: php artisan agent:metrics --since=7d --limit=10
 
-COMMITS (after each unit)
+COMMITS (after each unit, use line breaks, no \n)
 <scope>: short summary
 WHAT: what changed
 WHY: why it matters
