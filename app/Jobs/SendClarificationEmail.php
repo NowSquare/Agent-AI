@@ -2,9 +2,11 @@
 
 namespace App\Jobs;
 
-use App\Mail\ActionClarificationMail;
+use App\Mail\ActionResponseMail;
 use App\Models\Action;
 use App\Models\Thread;
+use App\Services\LanguageDetector;
+use App\Services\LlmClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -53,8 +55,28 @@ class SendClarificationEmail implements ShouldQueue
         $recipientEmail = $this->getRecipientEmail($thread);
 
         try {
-            // Send the clarification email (Mailer will use ActionResponse flow to preserve Re: subject and language)
-            Mail::to($recipientEmail)->send(new ActionClarificationMail($this->action, $thread));
+            // Draft a localized clarification email via LLM and send as a threaded reply (Re: <subject>)
+            $lastInbound = $thread->emailMessages()->where('direction', 'inbound')->latest('created_at')->first();
+            $detector = app(LanguageDetector::class);
+            $locale = $detector->detect($lastInbound?->body_text ?? $lastInbound?->subject ?? '');
+
+            $question = (string) ($this->action->payload_json['question'] ?? ($lastInbound?->body_text ?? ''));
+            $llm = app(LlmClient::class);
+            $draft = $llm->json('clarify_email_draft', [
+                'detected_locale' => $locale,
+                'question' => $question,
+            ]);
+
+            $bodyText = (string) ($draft['text'] ?? '');
+            if (trim($bodyText) === '') {
+                // If LLM failed to produce text, skip sending (avoid hardcoded boilerplate)
+                Log::warning('Clarification draft empty; skipping send to avoid boilerplate', [
+                    'action_id' => $this->action->id,
+                ]);
+                return;
+            }
+
+            Mail::to($recipientEmail)->send(new ActionResponseMail($this->action, $thread, $bodyText));
 
             // Mark as sent for idempotence
             $this->action->update([

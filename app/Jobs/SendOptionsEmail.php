@@ -2,9 +2,11 @@
 
 namespace App\Jobs;
 
-use App\Mail\ActionOptionsMail;
+use App\Mail\ActionResponseMail;
 use App\Models\Action;
 use App\Models\Thread;
+use App\Services\LanguageDetector;
+use App\Services\LlmClient;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Log;
@@ -53,13 +55,32 @@ class SendOptionsEmail implements ShouldQueue
         $recipientEmail = $this->getRecipientEmail($thread);
 
         try {
-            // Send the options email
-            Mail::to($recipientEmail)->send(new ActionOptionsMail($this->action, $thread));
+            // Draft a localized options email via LLM and send as threaded reply (Re: <subject>)
+            $lastInbound = $thread->emailMessages()->where('direction', 'inbound')->latest('created_at')->first();
+            $detector = app(LanguageDetector::class);
+            $locale = $detector->detect($lastInbound?->body_text ?? $lastInbound?->subject ?? '');
+
+            $llm = app(LlmClient::class);
+            $draft = $llm->json('options_email_draft', [
+                'detected_locale' => $locale,
+                'original_subject' => (string) ($lastInbound?->subject ?? ''),
+                'context_hint' => (string) ($this->action->payload_json['question'] ?? ''),
+            ]);
+
+            $bodyText = (string) ($draft['text'] ?? '');
+            if (trim($bodyText) === '') {
+                Log::warning('Options draft empty; skipping send to avoid boilerplate', [
+                    'action_id' => $this->action->id,
+                ]);
+                return;
+            }
+
+            Mail::to($recipientEmail)->send(new ActionResponseMail($this->action, $thread, $bodyText));
 
             // Mark as sent for idempotence
             $this->action->update([
                 'meta_json' => array_merge($this->action->meta_json ?? [], [
-                    'options_sent_at' => now(),
+                'options_sent_at' => now(),
                 ]),
             ]);
 
