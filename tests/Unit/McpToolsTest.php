@@ -2,11 +2,16 @@
 
 namespace Tests\Unit;
 
+use App\Mcp\Tools\ActionInterpretationTool;
+use App\Mcp\Tools\HttpHeadTool;
 use App\Mcp\Tools\LanguageDetectTool;
 use App\Mcp\Tools\MemoryExtractTool;
 use App\Mcp\Tools\ThreadSummarizeTool;
 use App\Services\LlmClient;
+use App\Services\UrlGuard;
+use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
+use Laravel\Mcp\Request;
 use Mockery as m;
 use Tests\TestCase;
 
@@ -77,18 +82,56 @@ class McpToolsTest extends TestCase
         $this->assertArrayHasKey('key', $result['items'][0]);
     }
 
-    public function test_language_detect_tool_throws_on_invalid_shape(): void
+    public function test_language_detect_tool_normalizes_keys(): void
     {
-        $this->expectException(ValidationException::class);
-
+        // Model returns non-canonical key 'lang'; tool should normalize to 'language'.
         $mock = m::mock(LlmClient::class);
         $mock->shouldReceive('json')->once()->andReturn([
-            'lang' => 'en', // wrong key
+            'lang' => 'en',
         ]);
         $this->app->instance(LlmClient::class, $mock);
 
         $tool = $this->app->make(LanguageDetectTool::class);
-        $tool->runReturningArray('Hello world');
+        $result = $tool->runReturningArray('Hello world');
+
+        $this->assertSame('en', $result['language']);
+        $this->assertArrayHasKey('confidence', $result); // defaulted
+    }
+
+    public function test_action_interpretation_tool_uses_tool_enforced_json_and_validates(): void
+    {
+        $mock = m::mock(LlmClient::class);
+        $mock->shouldReceive('json')->once()->andReturn([
+            'action_type' => 'approve',
+            'parameters' => ['reason' => 'ok'],
+            'scope_hint' => null,
+            'confidence' => 0.8,
+            'needs_clarification' => false,
+            'clarification_prompt' => null,
+        ]);
+        $this->app->instance(LlmClient::class, $mock);
+
+        $tool = $this->app->make(ActionInterpretationTool::class);
+        $result = $tool->runReturningArray('Sounds good');
+
+        $this->assertSame('approve', $result['action_type']);
+        $this->assertSame(false, $result['needs_clarification']);
+        $this->assertIsArray($result['parameters']);
+        $this->assertGreaterThanOrEqual(0, $result['confidence']);
+        $this->assertLessThanOrEqual(1, $result['confidence']);
+    }
+
+    public function test_http_head_tool_blocks_private_ip_via_url_guard(): void
+    {
+        $this->expectException(\InvalidArgumentException::class);
+
+        $tool = $this->app->make(HttpHeadTool::class);
+
+        $req = new Request(['url' => 'http://127.0.0.1/internal']);
+        // Real UrlGuard should throw here
+        UrlGuard::assertSafeUrl('http://127.0.0.1/internal');
+
+        $tool->handle($req);
     }
 }
 
