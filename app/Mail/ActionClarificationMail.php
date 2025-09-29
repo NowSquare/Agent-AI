@@ -29,7 +29,7 @@ class ActionClarificationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: $this->buildSubject(),
+            subject: $this->subjectText(),
             replyTo: $this->buildReplyToAddress(),
         );
     }
@@ -111,7 +111,7 @@ class ActionClarificationMail extends Mailable
         };
     }
 
-    private function buildSubject(): string
+    private function subjectText(): string
     {
         $type = $this->action->type;
         return match ($type) {

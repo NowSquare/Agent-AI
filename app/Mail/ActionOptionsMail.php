@@ -29,7 +29,7 @@ class ActionOptionsMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'We need your input (options inside)',
+            subject: $this->subjectText(),
             replyTo: $this->buildReplyToAddress(),
         );
     }
@@ -136,5 +136,17 @@ class ActionOptionsMail extends Mailable
     private function getReplyUrl(): string
     {
         return $this->buildReplyToAddress();
+    }
+
+    /**
+     * Build a contextual subject for options email.
+     */
+    private function subjectText(): string
+    {
+        $originalQuestion = $this->action->payload_json['question'] ?? '';
+        if ($originalQuestion !== '') {
+            return 'We need your input: choose an option';
+        }
+        return 'We need your input (options inside)';
     }
 }
