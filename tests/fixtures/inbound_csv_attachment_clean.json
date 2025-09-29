@@ -1,0 +1,21 @@
+{
+  "MessageID": "demo-message-csv-001",
+  "From": "Dana Ops <dana@example.com>",
+  "To": "agent@example.test",
+  "Subject": "Extract emails from attached CSV",
+  "TextBody": "Please extract and format the email addresses from the attached file.",
+  "HtmlBody": "<p>Please extract and format the email addresses from the attached file.</p>",
+  "Headers": [
+    { "Name": "X-Thread-ID", "Value": "demo-thread-csv-001" }
+  ],
+  "Attachments": [
+    {
+      "Name": "contacts.csv",
+      "ContentType": "text/csv",
+      "ContentID": "cid:contacts",
+      "Content": "ZW1haWwscm9sZQphQGV4YW1wbGUuY29tLG93bmVyCmJAZXhhbXBsZS5jb20sdXNlcg=="
+    }
+  ]
+}
+
+

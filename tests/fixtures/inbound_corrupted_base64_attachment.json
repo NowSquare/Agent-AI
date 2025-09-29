@@ -1,0 +1,21 @@
+{
+  "MessageID": "demo-message-corrupt-001",
+  "From": "Eve QA <eve@example.com>",
+  "To": "agent@example.test",
+  "Subject": "Attachment fails to decode",
+  "TextBody": "This has a broken attachment to test error handling.",
+  "HtmlBody": "<p>This has a broken attachment to test error handling.</p>",
+  "Headers": [
+    { "Name": "X-Thread-ID", "Value": "demo-thread-corrupt-001" }
+  ],
+  "Attachments": [
+    {
+      "Name": "broken.txt",
+      "ContentType": "text/plain",
+      "ContentID": "cid:broken",
+      "Content": "!!!not-base64$$$"
+    }
+  ]
+}
+
+

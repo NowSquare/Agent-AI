@@ -1,0 +1,14 @@
+{
+  "MessageID": "demo-message-es-001",
+  "From": "María López <maria@example.com>",
+  "To": "agent@example.test",
+  "Subject": "Necesito una receta vegetariana para 4 personas",
+  "TextBody": "Hola, ¿podrías sugerir una receta vegetariana tradicional para 4 personas, con ingredientes y pasos?",
+  "HtmlBody": "<p>Hola, ¿podrías sugerir una receta vegetariana tradicional para 4 personas, con ingredientes y pasos?</p>",
+  "Headers": [
+    { "Name": "X-Thread-ID", "Value": "demo-thread-es-001" }
+  ],
+  "Attachments": []
+}
+
+

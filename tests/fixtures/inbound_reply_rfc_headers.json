@@ -1,0 +1,15 @@
+{
+  "MessageID": "<reply-1001@example.test>",
+  "From": "Bob Reply <bob@example.com>",
+  "To": "agent@example.test",
+  "Subject": "Re: Please compare attached quotes",
+  "TextBody": "Following up on the earlier thread, see my comments inline.",
+  "HtmlBody": "<p>Following up on the earlier thread, see my comments inline.</p>",
+  "Headers": [
+    { "Name": "In-Reply-To", "Value": "<demo-message-004@example.test>" },
+    { "Name": "References", "Value": "<demo-message-004@example.test> <intermediate@example.test>" }
+  ],
+  "Attachments": []
+}
+
+
