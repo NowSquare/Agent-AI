@@ -257,7 +257,7 @@ Agent-AI/
 │  │  │  └─ McpController.php               # Single endpoint to execute MCP tools (server-side)
 │  │  └─ Tools/
 │  │     ├─ FetchUrlTool.php                # GET up to 2KB (public http/https only)
-│  │     ├─ HeadUrlTool.php                 # HEAD request
+│  │     ├─ HttpHeadTool.php                # HEAD request (SSRF-guarded)
 │  │     ├─ ResolveRedirectTool.php         # Follows redirects safely
 │  │     ├─ ExtractMetadataTool.php         # <title> and meta description from HTML
 │  │     └─ GetDatetimeTool.php             # Time in timezone/format
