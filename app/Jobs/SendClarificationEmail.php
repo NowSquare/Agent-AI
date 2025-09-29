@@ -93,6 +93,12 @@ class SendClarificationEmail implements ShouldQueue
             throw new \Exception('No inbound message found in thread');
         }
 
+        // First, prefer normalized column if available
+        $from = trim((string) ($lastInboundMessage->from_email ?? ''));
+        if ($from !== '' && filter_var($from, FILTER_VALIDATE_EMAIL)) {
+            return $from;
+        }
+
         $headers = $lastInboundMessage->headers_json ?? [];
 
         // Headers are stored as array of [Name => ..., Value => ...] pairs

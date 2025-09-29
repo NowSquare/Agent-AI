@@ -144,26 +144,6 @@ class AgentProcessor
                 'tools' => $modelCfg['tools'],
                 'reasoning' => $modelCfg['reasoning'],
             ]);
-
-            // Log agent step
-            \App\Models\AgentStep::create([
-                'account_id' => $task->thread?->account_id,
-                'thread_id' => $task->thread_id,
-                'action_id' => null,
-                'role' => $role,
-                'provider' => $modelCfg['provider'],
-                'model' => $modelCfg['model'],
-                'step_type' => 'chat',
-                'input_json' => ['prompt' => mb_substr($prompt, 0, 4000)],
-                'output_json' => ['response' => $llmResponse['response'] ?? null],
-                'tokens_input' => 0,
-                'tokens_output' => 0,
-                'tokens_total' => 0,
-                'latency_ms' => 0,
-                'confidence' => $llmResponse['confidence'] ?? null,
-                'agent_role' => 'Worker',
-                'round_no' => (int) ($input['round_no'] ?? 0),
-            ]);
         } catch (\Exception $e) {
             Log::warning('Agent LLM JSON parsing failed, using fallback response', [
                 'agent_id' => $agent->id,
@@ -205,6 +185,28 @@ class AgentProcessor
                 'reasoning' => 'Fallback clarification due to LLM processing error',
             ];
         }
+
+        // Always log an agent step (even when falling back)
+        try {
+            \App\Models\AgentStep::create([
+                'account_id' => $task->thread?->account_id,
+                'thread_id' => $task->thread_id,
+                'action_id' => null,
+                'role' => $role,
+                'provider' => $modelCfg['provider'] ?? 'ollama',
+                'model' => $modelCfg['model'] ?? 'llama3.1:8b',
+                'step_type' => 'chat',
+                'input_json' => ['prompt' => mb_substr($prompt, 0, 4000)],
+                'output_json' => ['response' => $llmResponse['response'] ?? null],
+                'tokens_input' => 0,
+                'tokens_output' => 0,
+                'tokens_total' => 0,
+                'latency_ms' => 0,
+                'confidence' => $llmResponse['confidence'] ?? null,
+                'agent_role' => 'Worker',
+                'round_no' => (int) ($input['round_no'] ?? 0),
+            ]);
+        } catch (\Throwable $ignored) {}
 
         // If empty response, still return a clarification text
         if (! isset($llmResponse['response']) || trim((string) $llmResponse['response']) === '') {

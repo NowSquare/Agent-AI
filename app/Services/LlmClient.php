@@ -67,7 +67,7 @@ class LlmClient
         $prompt = $this->buildPrompt($promptKey, $vars);
         $maxOutputTokens = $maxOutputTokens ?: $this->config['caps']['output_tokens'];
 
-        $providers = $this->getProviderPriority();
+        $providers = $this->getRolePreferredProviders($promptKey);
         $lastError = null;
 
         foreach ($providers as $provider) {
@@ -131,7 +131,7 @@ class LlmClient
         $requestedProvider = $vars['provider'] ?? null;
         $requestedModel = $vars['model'] ?? null;
 
-        $providers = $requestedProvider ? [$requestedProvider] : $this->getProviderPriority();
+        $providers = $requestedProvider ? [$requestedProvider] : $this->getRolePreferredProviders($promptKey);
         $lastError = null;
 
         $lastModel = null;
@@ -285,6 +285,23 @@ class LlmClient
         }
 
         return $providers;
+    }
+
+    /**
+     * Prefer the role's configured provider first, then fall back to global order.
+     */
+    private function getRolePreferredProviders(string $promptKey): array
+    {
+        $roles = $this->config['routing']['roles'] ?? [];
+        $role = $this->getRoleForPrompt($promptKey);
+        $preferred = $roles[$role]['provider'] ?? null;
+
+        $list = $this->getProviderPriority();
+        if (is_string($preferred) && $preferred !== '') {
+            // Move preferred to the front, keep unique order
+            $list = array_values(array_unique(array_merge([$preferred], $list)));
+        }
+        return $list;
     }
 
     /**
