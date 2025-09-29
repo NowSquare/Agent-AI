@@ -29,7 +29,7 @@ class ActionClarificationMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: "Please confirm: {$this->action->type} request",
+            subject: $this->buildSubject(),
             replyTo: $this->buildReplyToAddress(),
         );
     }
@@ -39,8 +39,10 @@ class ActionClarificationMail extends Mailable
      */
     public function content(): Content
     {
+        // Prefer HTML view with text fallback so clients render properly
         return new Content(
-            text: 'emails.clarification',
+            html: 'emails.clarification',
+            text: 'emails.clarification-text',
             with: [
                 'action' => $this->action,
                 'thread' => $this->thread,
@@ -106,6 +108,19 @@ class ActionClarificationMail extends Mailable
             'revise' => 'Request for changes',
             'stop' => 'Request to end conversation',
             default => "Action: {$type}",
+        };
+    }
+
+    private function buildSubject(): string
+    {
+        $type = $this->action->type;
+        return match ($type) {
+            'info_request' => 'We need your input to proceed',
+            'approve' => 'Please confirm approval',
+            'reject' => 'Please confirm rejection',
+            'revise' => 'Please confirm requested changes',
+            'stop' => 'Confirm: end conversation',
+            default => 'Please confirm',
         };
     }
 }

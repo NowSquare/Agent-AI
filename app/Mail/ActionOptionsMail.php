@@ -29,7 +29,7 @@ class ActionOptionsMail extends Mailable
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Please clarify your request',
+            subject: 'We need your input (options inside)',
             replyTo: $this->buildReplyToAddress(),
         );
     }
@@ -40,7 +40,8 @@ class ActionOptionsMail extends Mailable
     public function content(): Content
     {
         return new Content(
-            text: 'emails.options',
+            html: 'emails.options',
+            text: 'emails.options-text',
             with: [
                 'action' => $this->action,
                 'thread' => $this->thread,
