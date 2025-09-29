@@ -28,6 +28,12 @@ class ScenarioRun extends Command
         $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_recipe_no_attachments.json']);
         // c) Complex multi-agent planning request (plan validation + auto-repair expected)
         $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_multiagent_complex.json']);
+        // d) RFC reply threading (no attachments)
+        $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_reply_rfc_headers.json']);
+        // e) Non-English inbound (ES)
+        $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_non_english_es_no_attachments.json']);
+        // f) CSV attachment flow
+        $this->call('inbound:simulate', ['--file' => 'tests/fixtures/inbound_csv_attachment_clean.json']);
 
         // Optional: embeddings backfill if you have a command for it
         if (class_exists(\App\Console\Commands\EmbeddingsBackfill::class)) {
