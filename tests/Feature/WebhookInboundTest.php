@@ -10,6 +10,13 @@ use Tests\TestCase;
 
 class WebhookInboundTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        if (config('database.default') !== 'pgsql') {
+            $this->markTestSkipped('PostgreSQL required for inbound pipeline tests.');
+        }
+    }
     public function test_rfc_reply_headers_threading(): void
     {
         Artisan::call('migrate:fresh', ['--no-interaction' => true]);
