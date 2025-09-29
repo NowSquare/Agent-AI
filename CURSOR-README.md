@@ -48,7 +48,7 @@ Agent-AI (Laravel 12, PHP 8.4) ingests inbound emails through **Postmark**, thre
 
 ### 3.1 High-Level Flow
 
-1. **Inbound**: Postmark webhook → `/webhooks/postmark-inbound` (HTTP Basic + HMAC).
+1. **Inbound**: Postmark webhook → `/webhooks/inbound-email` (HTTP Basic + HMAC).
 2. **Persist**: Encrypted payload; queue `ProcessWebhookPayload` → `ProcessInboundEmail`.
 3. **Thread**: RFC 5322 threading (`Message-ID`, `In-Reply-To`, `References`).
 4. **Attachments**: Scan (ClamAV) → Extract → Summarize (LLM tool) on `attachments` queue.
@@ -397,7 +397,7 @@ Agent-AI/
 
 | Method | Path                           | Auth              | Purpose                               |
 | -----: | ------------------------------ | ----------------- | ------------------------------------- |
-|   POST | `/webhooks/postmark-inbound`   | HTTP Basic + HMAC | Receive inbound emails (JSON)         |
+|   POST | `/webhooks/inbound-email`      | HTTP Basic + HMAC | Receive inbound emails (JSON)         |
 |    GET | `/a/{action}`                  | **Signed**        | One-click confirmation page           |
 |   POST | `/a/{action}`                  | **Signed**        | Execute confirmed action (idempotent) |
 |    GET | `/attachments/{id}`            | **Signed**        | Download clean attachment             |
@@ -607,7 +607,7 @@ php artisan queue:work --queue=default,attachments
 # ngrok for webhook (dev)
 ngrok http --url=abc123.ngrok-free.app 80 --host-header=agent-ai.test
 # Configure Postmark inbound to:
-# https://WEBHOOK_USER:WEBHOOK_PASS@abc123.ngrok-free.app/webhooks/postmark-inbound
+# https://WEBHOOK_USER:WEBHOOK_PASS@abc123.ngrok-free.app/webhooks/inbound-email
 ```
 
 **ClamAV**
@@ -1166,7 +1166,7 @@ Discovered by scanning `app/Models`. Key type inferred by `HasUlids` and DB type
 ## Postmark Setup (Inbound & Threading)
 
 1) Create an Inbound Stream in Postmark and set the Webhook URL to:
-   - `https://WEBHOOK_USER:WEBHOOK_PASS@your-domain.test/webhooks/postmark-inbound`
+   - `https://WEBHOOK_USER:WEBHOOK_PASS@your-domain.test/webhooks/inbound-email`
    - Use the exact Basic Auth creds from `.env` (`WEBHOOK_USER`, `WEBHOOK_PASS`).
 
 2) Enable HMAC signing in Postmark. Server must verify against the raw request body.
