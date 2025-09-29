@@ -97,6 +97,15 @@ class ActionInterpretationTool extends Tool
                 'recent_memories' => json_encode($recentMemories),
             ]);
 
+            // Ensure required defaults to avoid downstream validation failures
+            if (! isset($json['parameters']) || ! is_array($json['parameters'])) {
+                $json['parameters'] = [];
+            }
+            // If the tool classifies as info_request, ensure a 'question' is present
+            if (($json['action_type'] ?? null) === 'info_request' && ! isset($json['parameters']['question'])) {
+                $json['parameters']['question'] = $cleanReply;
+            }
+
             return $json;
         } catch (\Exception $e) {
             // Fallback to safe defaults

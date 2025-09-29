@@ -53,7 +53,7 @@ class SendClarificationEmail implements ShouldQueue
         $recipientEmail = $this->getRecipientEmail($thread);
 
         try {
-            // Send the clarification email
+            // Send the clarification email (Mailer will use ActionResponse flow to preserve Re: subject and language)
             Mail::to($recipientEmail)->send(new ActionClarificationMail($this->action, $thread));
 
             // Mark as sent for idempotence
