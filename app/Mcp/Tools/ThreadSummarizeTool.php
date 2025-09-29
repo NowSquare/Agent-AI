@@ -56,6 +56,16 @@ class ThreadSummarizeTool extends Tool
         if (isset($result['questions']) && ! isset($result['open_questions'])) {
             $result['open_questions'] = $result['questions'];
         }
+        // Normalize camelCase variants
+        if (isset($result['keyEntities']) && ! isset($result['key_entities'])) {
+            $result['key_entities'] = $result['keyEntities'];
+        }
+        if (isset($result['openQuestions']) && ! isset($result['open_questions'])) {
+            $result['open_questions'] = $result['openQuestions'];
+        }
+        // Default arrays if missing to satisfy validation while staying safe
+        $result['key_entities'] = $result['key_entities'] ?? [];
+        $result['open_questions'] = $result['open_questions'] ?? [];
 
         $validator = Validator::make($result, ThreadSummarizeSchema::rules());
         if ($validator->fails()) {

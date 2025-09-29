@@ -510,7 +510,7 @@ class LlmClient
                         'key_entities' => ['type' => 'array', 'items' => ['type' => 'string']],
                         'open_questions' => ['type' => 'array', 'items' => ['type' => 'string']],
                     ],
-                    'required' => ['summary'],
+                    'required' => ['summary', 'key_entities', 'open_questions'],
                 ]];
             case 'memory_extract':
                 return ['memory_extract', [
