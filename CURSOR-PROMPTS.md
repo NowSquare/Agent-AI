@@ -1,743 +1,576 @@
-# Cursor Prompts for Agent AI Development
+# CURSOR-PROMPTS.md — Agent-AI Development Playbook (Copy/Paste Ready)
 
-## Introduction
+> Single source of truth for **how to drive Cursor** against this repo.
+> These prompts are optimized to:
+> ① keep `migrate:fresh` green, ② enforce **tool-called JSON** everywhere, ③ protect security/I18N, ④ surface invisible dependencies, ⑤ produce small, reviewable commits with tests.
 
-This document contains pre-crafted prompts for developing Agent AI features in Cursor. These prompts focus on implementing the core features as documented in `CURSOR-README.md`, with emphasis on the agent system, email processing, and memory management.
+---
 
-## Prerequisites
+## 0) Mindset & Rules (read once)
 
-1. **Laravel Boost MCP Server**
+**Mindset (systems):** see the whole → map feedback loops → validate plans → gate risky steps → log every decision.
+
+**Non-negotiables**
+
+* **Never add alter migrations.** If schema changes are needed, **edit create migrations** so `php artisan migrate:fresh` passes.
+* **Structured LLM output == tool call.** No “please return JSON” prompts. Always add/update a **tool schema** + enforce via `LlmClient::json()` or model tool-calling.
+* **Small diffs + tests.** One logical unit per commit. Add tests, logging, and docs with every feature.
+* **Docs are runtime.** Keep `CURSOR-README.md` **in sync** with reality (project tree, counts, files).
+* **Security posture:** SSRF-safe MCP tools only, signed links, ClamAV before extraction, rate limits, i18n.
+
+---
+
+## 1) Prereqs & Local Runners (quick copy)
+
+**Laravel Boost MCP (gives Cursor deep project context)**
+
 ```bash
 php artisan boost:mcp
 ```
 
-2. **Development Environment**
+**Terminals you typically need**
+
 ```bash
-# Terminal A: npm run dev
-# Terminal B: php artisan horizon
-# Terminal C: ngrok http --url=abc123.ngrok-free.app 80 --host-header=agent-ai.test
-# Terminal D: brew services start clamav (macOS)
+# A: Frontend
+npm run dev
+# B: Workers
+php artisan horizon
+# C: Webhook tunnel (dev)
+ngrok http --url=abc123.ngrok-free.app 80 --host-header=agent-ai.test
+# D: AV daemon
+brew services start clamav   # macOS
 ```
 
-### Development Environment Reset
-
-Complete environment refresh for clean state during development.
-
-Preferred (single command):
+**Reset (clean room)**
 
 ```bash
-php artisan clear:all --force
-```
+# Preferred single command (if available in this repo):
+php artisan clear:all --force || true
 
-Alternative (manual steps):
-
-```bash
-# Stop running services
-php artisan horizon:terminate
-brew services stop clamav
-
-# Clear Laravel caches and queues
+# Manual:
+php artisan horizon:terminate || true
+brew services stop clamav || true
 php artisan optimize:clear
 php artisan queue:clear
 php artisan horizon:clear
-
-# Nuclear Redis option (if you want everything gone)
 redis-cli FLUSHALL
-
-# Reset database with fresh migrations and seeders
 php artisan migrate:fresh --seed
-
-# Clear application logs (prefer the artisan command above which clears via PHP)
-truncate -s 0 storage/logs/laravel.log
-
-# Restart services
+: > storage/logs/laravel.log
 brew services start clamav
 php artisan horizon
 ```
 
-## Make a Plan Prompt
+---
 
-This prompt generates a feature implementation plan with clear acceptance criteria.
+## 2) Prompt Pack (copy/paste blocks)
 
-```
-You are a senior Laravel + Blade + Tailwind/Flowbite architect and elite Cursor copilot. 
-Channel your inner Steve Jobs/Jony Ive to create a legendary user experience - from email interactions to UI design. Every touchpoint should feel intentional, elegant, and delightful. Focus on implementing core features from @CURSOR-README.md with this level of polish and attention to detail. The foundation is complete - now we craft experiences that users will love.
+> Use in this order: **Plan → Execute (main)** *or* **Execute (feature+PR)** → **Demo & Verify** → **Fix-it**.
+> Extra auxiliaries at the end: **Doc Sync**, **New MCP Tool**, **Prompt QA**, **Release Prep**.
 
-USER EXPERIENCE PRINCIPLES
-- Elegant Simplicity
-- Thoughtful Communication
-- Visual Harmony
-- Attention to Detail
-- Intelligent Defaults
-- Graceful Recovery
-- Delightful Moments
+---
 
-CONTEXT
-- Project: Agent AI (email-centered automation system with LLM interpretation, MCP tools, attachments processing).
-- Source of truth: @CURSOR-README.md in the workspace.
-- Foundation complete: DB schema, models, auth/UI, email webhook, jobs, dev env.
-
-CONVENTIONS
-- DB columns snake_case
-- Thin Controllers, FormRequest validation, Services/Jobs for logic
-- i18n middleware, Blade/email via translations
-- Routes split (web.php/api.php)
-- Icons: Lucide via `<i data-lucide="...">`
-
-⚠️ MIGRATION RULE
-- Modify existing migration files, not create new alters
-- Ensure `php artisan migrate:fresh` stays green
-
-OPERATING PROCEDURE (ALWAYS FOLLOW)
-
-0) GIT DISCOVERY (MANDATORY FIRST)
-   - list_branches → detect default branch (usually main)
-   - list_commits(default, limit=3) → capture HEAD SHA/date
-   - list_pull_requests(open) → check for conflicts
-
-1) DEEP PROJECT ANALYSIS (MANDATORY)
-   A) Project Structure Verification
-      - Read "Project Structure" in @CURSOR-README.md
-      - For EACH file listed:
-        1. Run get_file_contents to read actual content
-        2. Record file purpose and key functionality
-        3. Note relationships to other files
-        4. Mark status: ✅ exists, ❌ missing, 🔄 incomplete
-
-   B) Database Schema Analysis (CRITICAL)
-      - Read ALL migration files (no exceptions)
-      - For each table, document:
-        1. All columns with types and constraints
-        2. Foreign key relationships
-        3. Indexes and unique constraints
-        4. JSONB column structures
-      - Build complete ERD in memory
-      - Verify model relationships match migrations
-
-   C) Core Subsystems Deep Dive
-      1. Email Pipeline:
-         - Webhook controllers
-         - Processing jobs
-         - Threading logic
-         - Templates
-      2. Agent System:
-         - Coordinator
-         - Specialized agents
-         - Task management
-         - Memory integration
-      3. LLM Integration:
-         - Client implementation
-         - Prompt management
-         - Confidence handling
-         - Fallback logic
-      4. MCP Layer:
-         - Tool definitions
-         - Schema validation
-         - Security measures
-      5. Authentication:
-         - Challenge system
-         - Token management
-         - Authorization rules
-
-   D) Test Coverage Mapping
-      - Read ALL test files
-      - Map test coverage to features
-      - Identify gaps in testing
-      - Note testing approaches used
-
-   E) Configuration Analysis
-      - Read ALL config files
-      - Document env requirements
-      - Note service dependencies
-      - Map feature flags/toggles
-
-   F) Build Truth Matrix
-      | Component | Docs Say | Actually Is | Gap |
-      |-----------|----------|-------------|-----|
-      | Each item | Status   | Status      | Delta|
-
-   G) Generate Dependency Graph
-      - Map service dependencies
-      - Note circular dependencies
-      - Identify integration points
-      - Mark external services
-
-2) FEATURE SURVEY
-   - For each subsystem (Agents, Email, Memory, Attachments, MCP, UI):
-     - Confirm presence of required files (services, jobs, views, configs, tests)
-     - If a file exists → read contents and summarize actual functionality
-     - If incomplete → propose **extension**, never reimplementation
-
-3) GAP ANALYSIS
-   - Only declare a gap if:
-     a) Absent from both README and repo, OR
-     b) Present but provably incomplete after inspection
-   - Always cite which evidence (README section + file scan) led to the gap
-
-4) PRIORITIZATION
-   - P0: Core features
-   - P1: Security/reliability
-   - P2: Performance/monitoring
-   - P3: Admin/polish
-
-5) IMPLEMENTATION PLAN
-   - Atomic tasks, file paths, acceptance criteria
-   - If modifying existing file: specify which methods/classes to extend
-   - If creating new file: justify why it does not already exist
-
-6) TODAY'S TASKS (2–4h)
-   - Pick 3–5 tasks
-   - Focus on one subsystem
-   - Ensure test coverage
-
-7) TESTING STRATEGY
-   - Unit/feature/integration/e2e
-
-8) NEXT MILESTONE
-   - Completion state, verification criteria, next target
-
-OUTPUT FORMAT
-SUMMARY  
-CURRENT STATE (include default branch + HEAD SHA from MCP)  
-GAPS  
-BACKLOG  
-TODAY'S PLAN  
-TESTS TO ADD  
-RISKS & ASSUMPTIONS  
-CHECKPOINT FOR NEXT RUN
-
-NOTES
-- Do not make edits here. This is a planning pass only.
-- GitHub MCP is only used read-only at this stage (list_branches, list_commits, list_pull_requests, search_code).
-
-BEGIN NOW.
-```
-
-## Execute the Plan Prompt
-
-This prompt implements features from the plan with proper testing and stays on the main branch.
+### A) **MAKE A PLAN** — Deep scan → truth matrix → small, testable plan
 
 ```
-You are a senior Laravel 12 + Blade + Tailwind/Flowbite architect and Cursor power-user.
-Channel your inner Steve Jobs/Jony Ive to implement features with legendary attention to detail and user experience. Every interaction should be thoughtful, every interface beautiful, every response delightful. Local dev uses Laravel Herd (macOS) or Docker (Win/Linux/macOS).
-
-USER EXPERIENCE PRINCIPLES
-- Elegant Simplicity
-- Thoughtful Communication
-- Visual Harmony
-- Attention to Detail
-- Intelligent Defaults
-- Graceful Recovery
-- Delightful Moments
-
-SOURCES OF TRUTH
-1) @CURSOR-README.md — feature specs, flows, status
-2) Current workspace files
-3) Most recent planning output (TODAY'S PLAN/BACKLOG)
-FEATURE IMPLEMENTATION RULES
-1) Follow patterns in code
-2) Add tests
-3) Update docs
-4) Handle errors
-5) Logging
-6) i18n support
-7) Add detailed comments like:
-/**
- * What this section does — Adds a clear, safe, symbolic plan validation loop.
- * Plain: Before doing work, write a small checklist (a plan). Check it. If a step is missing, fix it, then go.
- * How this fits in (generic):
- * - Planner/Workers output steps as state → action → next-state
- * - Validator checks each step’s preconditions and applies effects
- * - If invalid: try a simple fix and re-check; debate can try once more
- * - Only execute the final step when the plan is valid
- * Key terms: preconditions (must be true before), effects (become true after), facts (simple key=value truth), validator (checker)
- *
- * For engineers (generic):
- * - Plan JSON: { steps: [ { state: string[], action: {name,args}, next_state: string[] }, ... ] }
- * - Validate: PlanValidator::validate($plan, $initialFacts) → PlanReport
- * - Auto‑repair: insert a prerequisite action that makes the failed condition true
- * - Gate: persist plan_report + plan_valid; only run the gated final step when plan_valid=true
- * - Log: emit an activity/trace step containing the plan and the validator report
- */
-
-SYMBOLIC PLAN VALIDATION (FOLLOW‑UP TO “MAKE A PLAN”) — Plain (generic)
-- Plan shape (emit from Planner/Workers):
-```
-{
-  "steps": [
-    { "state": ["input_received=true","validated=false"], "action": {"name": "ValidateInput"}, "next_state": ["validated=true"] },
-    { "state": ["validated=true","transformed=false"], "action": {"name": "TransformData"}, "next_state": ["transformed=true"] },
-    { "state": ["transformed=true","output_ready=false"], "action": {"name": "ProduceOutput"}, "next_state": ["output_ready=true"] },
-    { "state": ["output_ready=true","confidence>=MIN_CONF"], "action": {"name": "Finalize"}, "next_state": ["done=true"] }
-  ]
-}
-```
-- Action rules live in a small, editable action schema (configuration):
-  - Preconditions: strings like `validated=true`, `confidence>=0.75`
-  - Effects: strings like `output_ready=true`, `confidence+=0.1`
-- Validator usage (generic):
-  - Build initial facts from context (e.g., `input_received`, `confidence`, any domain flags)
-  - `$report = PlanValidator::validate($plan, $initialFacts)`
-  - If `$report.valid === false`: try a simple auto‑repair (insert the action that satisfies the failed condition). If still invalid, pass a plan hint into the debate once and re‑check the best candidate’s plan.
-- Gating the final step:
-  - Persist `plan_report` and `plan_valid` alongside your task/run
-  - Only run the gated final step when `plan_valid === true`
-  - Otherwise, branch to a safer fallback (e.g., options/clarification path in your domain)
-- Logging + UI (generic):
-  - Log a validation trace step containing: the plan, the initial facts, and the validator report
-  - Surface a Plan panel: Valid ✓ (or first failing step ✗ + hint) and a compact list `S_k → Action → S_k+1`
-- Tests to include (generic):
-  - Unit: PlanValidator accepts a correct plan; rejects unmet preconditions; applies effects correctly
-  - Feature: An initial plan fails due to an unmet precondition → auto‑repair inserts the missing step → plan validates → proceeds
-- Debate integration:
-  - When a plan hint is present, slightly favor candidates that provide a structured plan
-  - Keep tie‑breaks as documented (groundedness → lower cost → oldest)
-
-EXECUTION MODE
-
-GIT/MCP WORKFLOW (MANDATORY)
-- Preflight:
-  - list_branches → confirm default branch (main)
-  - list_commits(main) → verify HEAD vs planning SHA
-  - If MCP unavailable → fallback to local git commands (`git status`, `git add/commit/push`)
-- Project Structure Maintenance:
-  - After ANY file creation/modification:
-    1. Run `list_dir` on modified directories
-    2. Update Project Structure in @CURSOR-README.md:
-       - List new files explicitly
-       - Update file counts in [N files in subtree: N *.ext]
-       - Maintain consistent format and indentation
-    3. Commit structure update SEPARATELY from feature changes
-       - Subject: "docs: update project structure for <feature>"
-       - Body: List added/modified paths
-- Implement:
-  - get_file_contents, then create_or_update_file (atomic diffs)
-  - After each **logical unit of work** (1–2 related files):
-    - Run tests for modified components
-    - push_files with commit message
-    - Commit message format (use real line breaks, not escaped \n):
-      <scope>: short summary
-      WHAT: what changed
-      WHY: why it matters
-      TESTS: how verified
-    - When using CLI, pass multiple -m flags to create paragraphs, e.g.:
-      git commit -m "feat(scope): short summary" -m "WHAT: details" -m "WHY: rationale" -m "TESTS: how verified"
-
-TESTING REQUIREMENTS
-- Unit, Feature, Integration
-- Mocks, Fixtures
-- End-to-end where needed
-- Use PostgreSQL for all tests (NEVER SQLite). Ensure test DB is PostgreSQL so pg_trgm/vector/GIN/IVFFlat and JSONB behaviors are exercised exactly as in production.
-
-VERIFICATION CHECKLIST
-- All tests/lint pass
-- `migrate:fresh` clean
-- i18n/logging/docs updated
-
-OUTPUT FORMAT
-RUN COMMANDS — MCP + shell commands executed
-VERIFICATION — tests/checks to run
-GIT COMMITS — commit subject/body + files
-NEXT STEPS — follow-ups
-
-NOTES
-- Always commit via MCP or fallback git to main, never direct push without commit
-- Commit after each **logical unit of work** (not one giant commit)
-- Stop if repo state changed mid-run, propose rebase or restart
-
-BEGIN NOW.
-```
-
-This prompt implements features from the plan with proper testing and uses branches for new features.
-
-```
-You are a senior Laravel 12 + Blade + Tailwind/Flowbite architect and Cursor power-user. 
-Channel your inner Steve Jobs/Jony Ive to implement features with legendary attention to detail and user experience. Every interaction should be thoughtful, every interface beautiful, every response delightful. Local dev uses Laravel Herd (macOS) or Docker (Win/Linux/macOS).
-
-USER EXPERIENCE PRINCIPLES
-- Elegant Simplicity
-- Thoughtful Communication
-- Visual Harmony
-- Attention to Detail
-- Intelligent Defaults
-- Graceful Recovery
-- Delightful Moments
-
-SOURCES OF TRUTH
-1) @CURSOR-README.md — feature specs, flows, status
-2) Current workspace files
-3) Most recent planning output (TODAY'S PLAN/BACKLOG)
-
-FEATURE IMPLEMENTATION RULES
-1) Follow patterns in code
-2) Add tests
-3) Update docs
-4) Handle errors
-5) Logging
-6) i18n support
-
-/**
- * What this section does — Adds a clear, safe, symbolic plan validation loop.
- * Plain: Before doing work, write a small checklist (a plan). Check it. If a step is missing, fix it, then go.
- * How this fits in (generic):
- * - Planner/Workers output steps as state → action → next-state
- * - Validator checks each step’s preconditions and applies effects
- * - If invalid: try a simple fix and re-check; debate can try once more
- * - Only execute the final step when the plan is valid
- * Key terms: preconditions (must be true before), effects (become true after), facts (simple key=value truth), validator (checker)
- *
- * For engineers (generic):
- * - Plan JSON: { steps: [ { state: string[], action: {name,args}, next_state: string[] }, ... ] }
- * - Validate: PlanValidator::validate($plan, $initialFacts) → PlanReport
- * - Auto‑repair: insert a prerequisite action that makes the failed condition true
- * - Gate: persist plan_report + plan_valid; only run the gated final step when plan_valid=true
- * - Log: emit an activity/trace step containing the plan and the validator report
- */
-
-SYMBOLIC PLAN VALIDATION (FOLLOW‑UP TO “MAKE A PLAN”) — Plain (generic)
-- Plan shape (emit from Planner/Workers):
-```
-{
-  "steps": [
-    { "state": ["input_received=true","validated=false"], "action": {"name": "ValidateInput"}, "next_state": ["validated=true"] },
-    { "state": ["validated=true","transformed=false"], "action": {"name": "TransformData"}, "next_state": ["transformed=true"] },
-    { "state": ["transformed=true","output_ready=false"], "action": {"name": "ProduceOutput"}, "next_state": ["output_ready=true"] },
-    { "state": ["output_ready=true","confidence>=MIN_CONF"], "action": {"name": "Finalize"}, "next_state": ["done=true"] }
-  ]
-}
-```
-
-- Action rules live in a small, editable action schema (configuration):
-  - Preconditions: strings like `validated=true`, `confidence>=0.75`
-  - Effects: strings like `output_ready=true`, `confidence+=0.1`
-
-- Validator usage (generic):
-  - Build initial facts from context (e.g., `input_received`, `confidence`, any domain flags)
-  - `$report = PlanValidator::validate($plan, $initialFacts)`
-  - If `$report.valid === false`: try a simple auto‑repair (insert the action that satisfies the failed condition). If still invalid, pass a plan hint into the debate once and re‑check the best candidate’s plan.
-
-- Gating the final step:
-  - Persist `plan_report` and `plan_valid` alongside your task/run
-  - Only run the gated final step when `plan_valid === true`
-  - Otherwise, branch to a safer fallback (e.g., options/clarification path in your domain)
-
-- Logging + UI (generic):
-  - Log a validation trace step containing: the plan, the initial facts, and the validator report
-  - Surface a Plan panel: Valid ✓ (or first failing step ✗ + hint) and a compact list `S_k → Action → S_k+1`
-
-- Tests to include (generic):
-  - Unit: PlanValidator accepts a correct plan; rejects unmet preconditions; applies effects correctly
-  - Feature: An initial plan fails due to an unmet precondition → auto‑repair inserts the missing step → plan validates → proceeds
-
-- Debate integration:
-  - When a plan hint is present, slightly favor candidates that provide a structured plan
-  - Keep tie‑breaks as documented (groundedness → lower cost → oldest)
-
-EXECUTION MODE
-GIT/MCP WORKFLOW (MANDATORY)
-
-- Preflight:
-  - list_branches → confirm default branch
-  - list_commits(default) → verify HEAD vs planning SHA
-  - If MCP unavailable → fallback to local git commands (`git status`, `git checkout -b`, `git add/commit/push`)
-
-- Project Structure Maintenance:
-  - After ANY file creation/modification:
-    1. Run `list_dir` on modified directories
-    2. Update Project Structure in @CURSOR-README.md:
-       - List new files explicitly
-       - Update file counts in [N files in subtree: N *.ext]
-       - Maintain consistent format and indentation
-    3. Commit structure update SEPARATELY from feature changes
-       - Subject: "docs: update project structure for <feature>"
-       - Body: List added/modified paths
-
-- Branch:
-  - create_branch "feat/<scope>-<date>" from default
-
-- Implement:
-  - get_file_contents, then create_or_update_file (atomic diffs)
-  - After each **logical unit of work** (1–2 related files):
-    - Run tests for modified components
-    - push_files with commit message
-    - Commit message format:
-      <scope>: short summary
-      WHAT: what changed
-      WHY: why it matters
-      TESTS: how verified
-
-- PR:
-  - create_pull_request (base=default, head=feature)
-  - PR body includes:
-    - Context, Changes, Tests, Risks, Rollback
-    - Project Structure updates (if any)
-    - New/modified file manifest
-  - get_pull_request_status until green
-
-- Update:
-  - update_pull_request_branch or additional commits if drift/fixes
-  - Re-verify Project Structure accuracy after updates
-
-- Merge:
-  - Before merging:
-    1. Run `list_dir` on all changed directories
-    2. Compare against Project Structure in @CURSOR-README.md
-    3. If mismatched → update docs commit first
-  - merge_pull_request (squash preferred)
-  - Verify Project Structure reflects final state
-
-TESTING REQUIREMENTS
-- Unit, Feature, Integration
-- Mocks, Fixtures
-- End-to-end where needed
-
-VERIFICATION CHECKLIST
-- All tests/lint pass
-- `migrate:fresh` clean
-- i18n/logging/docs updated
-
-OUTPUT FORMAT
-RUN COMMANDS — MCP + shell commands executed  
-VERIFICATION — tests/checks to run  
-GIT COMMITS — commit subject/body + files  
-PR — PR number/status/next action  
-MERGE — if merged: SHA + summary  
-NEXT STEPS — follow-ups
-
-NOTES
-- Always commit via MCP or fallback git, never direct push to default
-- Commit after each **logical unit of work** (not one giant commit)
-- Always PR, even solo (for history + CI)
-- Stop if repo state changed mid-run, propose rebase or restart
-
-BEGIN NOW.
-```
-
-## Demo & Verification Prompt — Run scenario and verify end-to-end
-
-```
-
-You are a meticulous QA engineer.
-Do NOT change code. Only run commands and analyze results.
+You are a senior Laravel 12 + Blade + Tailwind/Flowbite architect and an elite Cursor co-pilot.
+Your job now is ONLY planning. No code edits. No file writes.
 
 GOAL
-Run the built-in demo and verify that the multi-agent + symbolic plan validation flow works end-to-end and matches our visibility rules (a user sees only their own threads).
+Produce a precise, risk-aware implementation plan for 1 subsystem (choose the most valuable) of Agent-AI,
+strictly following @CURSOR-README.md as the source of truth.
 
-STEP 0 — Preflight (lean)
+OPERATING MODE (MANDATORY)
+0) GIT DISCOVERY
+   - list_branches
+   - list_commits(default, limit=3) → record HEAD SHA/time
+   - list_pull_requests(open) → note drift/conflicts
 
-* Clear Laravel caches:
-  php artisan optimize:clear
+1) DEEP PROJECT ANALYSIS
+   A) Project Structure Verification
+      - Read “Project Structure” section in @CURSOR-README.md
+      - For EACH listed path:
+        get_file_contents (if file) or list_dir (if dir)
+        Record purpose, main responsibilities, dependencies.
+        Mark status: ✅ exists, ❌ missing, 🔄 incomplete.
 
-STEP 1 — Run the demo
+   B) Database Schema (CRITICAL)
+      - Read ALL create migrations (no exceptions).
+      - For each table: columns, constraints, FKs, indexes, JSONB shapes.
+      - Build a mental ERD. Verify Models reflect relations (casts, ulids).
 
-* Execute the scenario (no edits):
-  php artisan scenario:run
+   C) Core Subsystems (choose depth as needed)
+      1. Email Pipeline (Webhook → ProcessInboundEmail → attachments → LLM interpret)
+      2. Agent System (Coordinator, Orchestrator, Plan Validator, Arbiter)
+      3. LLM Layer (LlmClient, routing, tool-enforced JSON, retries/timeouts)
+      4. MCP Layer (Tool classes, SSRF guard, schemas)
+      5. Auth/I18N (passwordless, DetectLanguage middleware, views)
 
-Expect: the command completes, prints the created thread/contact info, and triggers the orchestration.
+   D) Test Coverage Map
+      - Read all tests; map features → tests; note gaps.
 
-STEP 2 — Quick metrics sanity check
+   E) Config Walk
+      - Read ALL config/* files, note env requirements, feature flags.
 
-* Run:
-  php artisan agent:metrics --since=7d --limit=20
+   F) TRUTH MATRIX (Docs vs Reality)
+      | Component | Docs Say | Actually Is | Gap |
+      Fill diligently with citations (file paths, migration file names).
 
-Expect: non-zero counts and a summary (rounds, groundedness %, per-role metrics).
+   G) Dependency Graph (short)
+      - Services ↔ Jobs ↔ Controllers ↔ Models ↔ Config ↔ Views
+      - Note any cycles or fragile edges.
 
-STEP 3 — Database evidence (Tinker one-liners)
-Use Tinker --execute to print compact JSON. Don’t open interactive Tinker.
+2) GAP RULES
+   - A gap exists only if:
+     (a) Not in README AND not in the repo, OR
+     (b) Present but functionally incomplete after inspection.
+   - Cite evidence (README section + file path + line if helpful).
 
-1. Latest thread and basic linkage
-   php artisan tinker --execute='
-   use App\Models\Thread;
-   $t=Thread::latest("created_at")->first();
-   echo json_encode(["thread_id"=>$t?->id,"subject"=>$t?->subject], JSON_PRETTY_PRINT), PHP_EOL;
-   '
+3) PRIORITIZE
+   P0 Core; P1 Security/Reliability; P2 Perf/Monitoring; P3 UI polish.
 
-2. Contact ↔ User link (visibility rule)
-   php artisan tinker --execute='
-   use App\Models\{Thread, EmailMessage, Contact, ContactLink, User};
-   $t=Thread::latest("created_at")->first();
-   $em=$t?->emailMessages()->latest("created_at")->first();
-   $contact = $t ? Contact::where("account_id", $t->account_id)->where("email", $em?->from_email)->first() : null;
-   $link=$contact?->contactLinks()->first();
-   $user=$link?->user;
-   echo json_encode([
-   "contact_email"=>$contact?->email,
-   "user_id"=>$user?->id,
-   "link_exists"=>(bool)$link
-   ], JSON_PRETTY_PRINT), PHP_EOL;
-   '
+4) IMPLEMENTATION PLAN (2–4 hours of work)
+   - 3–5 atomic tasks with acceptance criteria.
+   - For existing files: list exact classes/methods to extend.
+   - For new files: justify why it doesn’t already exist (point to scans).
+   - Include tests to add (feature/unit/integration) and data fixtures.
 
-3. Agent run exists (blackboard) and latest round
-   php artisan tinker --execute='
-   use App\Models\{AgentRun, Thread};
-   $t=Thread::latest("created_at")->first();
-   $r=AgentRun::where("thread_id",$t->id)->latest("created_at")->first();
-   echo json_encode(["agent_run_id"=>$r?->id,"round_no"=>$r?->round_no], JSON_PRETTY_PRINT), PHP_EOL;
-   '
+5) RISK LOG (top 3)
+   - Name the risk, the trigger, and your mitigation.
 
-4. Steps by role + max round
-   php artisan tinker --execute='
-   use App\Models\{AgentStep, Thread};
-   $t=Thread::latest("created_at")->first();
-   $roles=AgentStep::where("thread_id",$t->id)
-   ->selectRaw("agent_role, count(*) c, max(round_no) max_round")
-   ->groupBy("agent_role")->orderBy("agent_role")->get();
-   echo $roles->toJson(JSON_PRETTY_PRINT), PHP_EOL;
-   '
+OUTPUT FORMAT (copy exactly)
+SUMMARY
+CURRENT STATE (default branch + HEAD SHA)
+TRUTH MATRIX (top 10 lines)
+GAPS (with evidence)
+TODAY’S PLAN (3–5 tasks, each with AC)
+TESTS TO ADD
+RISKS & ASSUMPTIONS
+CHECKPOINT FOR NEXT RUN
 
-5. Debate/decision footprint (vote_score / decision_reason present)
-   php artisan tinker --execute='
-   use App\Models\{AgentStep, Thread};
-   $t=Thread::latest("created_at")->first();
-   $arb=AgentStep::where("thread_id",$t->id)->where("agent_role","Arbiter")->latest("created_at")->first();
-   echo json_encode([
-   "arbiter_step_id"=>$arb?->id,
-   "vote_score"=>$arb?->vote_score,
-   "decision_reason"=>$arb?->decision_reason
-   ], JSON_PRETTY_PRINT), PHP_EOL;
-   '
-
-6. Plan validity (validator result)
-   php artisan tinker --execute='
-   use App\Models\{AgentStep, Thread};
-   $t=Thread::latest("created_at")->first();
-   $crit=AgentStep::where("thread_id",$t->id)->where("agent_role","Critic")->latest("created_at")->first();
-   $ij=$crit?->input_json ?? [];
-   $oj=$crit?->output_json ?? [];
-   echo json_encode([
-   "critic_step_id"=>$crit?->id,
-   "has_plan_panel"=> isset($ij["plan"]) || isset($oj["plan"]) || isset($oj["plan_report"]),
-   "first_hint"=> $oj["plan_report"]["hint"] ?? null
-   ], JSON_PRETTY_PRINT), PHP_EOL;
-   '
-
-7. Memory saved (typed Decision with provenance)
-   php artisan tinker --execute='
-   use App\Models\{Memory, Thread};
-   $t=Thread::latest("created_at")->first();
-   $m=Memory::where("thread_id",$t->id)->latest("created_at")->first();
-   $prov = $m?->provenance_ids ?? [];
-   echo json_encode([
-   "memory_id"=>$m?->id,
-   "type"=>$m?->type ?? null,
-   "has_provenance"=> !empty($prov)
-   ], JSON_PRETTY_PRINT), PHP_EOL;
-   '
-
-8. Embeddings present on latest email (sanity)
-   php artisan tinker --execute='
-   use App\Models\{EmailMessage, Thread};
-   $t=Thread::latest("created_at")->first();
-   $em=EmailMessage::where("thread_id",$t->id)->latest("created_at")->first();
-   echo json_encode([
-   "email_id"=>$em?->id,
-   "has_body_embedding"=> isset($em?->body_embedding)
-   ], JSON_PRETTY_PRINT), PHP_EOL;
-   '
-
-STEP 4 — Route availability (Activity UI)
-
-* Check Activity routes exist:
-  php artisan route:list | grep -i activity || true
-
-STEP 5 — Analyze results and produce a PASS/FAIL checklist
-Create a short table with ✅/❌ for:
-
-* Scenario command finished successfully
-* Metrics returned recent data
-* Thread created (id present)
-* Contact ↔ User link exists (visibility rule)
-* AgentRun present with a round number
-* AgentSteps cover roles: Planner, Worker, Critic, Arbiter (at least one each)
-* Debate produced a vote_score and decision_reason
-* Plan panel present + (if invalid at first) a repair hint was generated
-* A Decision memory was saved with provenance
-* Latest email has an embedding
-* Activity routes are registered
-
-If any ❌:
-
-* Write 1–2 line Plain explanations (“Plain: …”) of what it means and how to fix, using concrete commands (e.g., run backfill, check EMBEDDINGS_DIM, verify config/agents.php rounds, ensure scenario fixture paths are correct).
-
-OUTPUT FORMAT
-
-* “DEMO RUN SUMMARY” — one paragraph with the key outcome (e.g., “Plan validated and reply gated; winner selected; memory saved.”)
-* “CHECKLIST” — bullets with ✅/❌
-* “EVIDENCE” — paste the small JSONs you printed (thread, links, roles, arbiter, plan report, memory, embedding)
-* “NEXT ACTIONS (if any)” — only if there are ❌ items, list the exact next commands/config edits to try.
-
-Do not change code in this session. Just run, inspect, and report.
-
+Begin.
 ```
 
-## Demo Fix-it Prompt — Diagnose failures, fix, commit, and re-run
+---
+
+### B1) **EXECUTE THE PLAN (main branch)** — For small, safe changes
 
 ```
+You are a senior Laravel 12 + Blade + Tailwind/Flowbite engineer and Cursor power-user.
+Implement TODAY’S PLAN with elegance, tests, and docs. Keep changes small. Commit often.
 
-You are a senior Laravel engineer. We just ran the Demo & Verification Prompt and saw issues.
-Your job: diagnose and fix them, keeping the repo’s rules intact.
+SOURCES OF TRUTH
+1) @CURSOR-README.md (specs, flows)
+2) Planning output from the last run
+3) Actual files in repo
 
-RULES (do not break these)
+HARD RULES
+- No new alter migrations. Edit create migrations only. `migrate:fresh` must remain green.
+- Any structured LLM output must be produced via a **tool call** with a server-side schema.
+- Maintain i18n + SSRF safety.
 
-* **Never add new alter migrations.** If schema changes are required, modify the existing *create* migrations so `php artisan migrate:fresh` is clean.
-* Keep fixes tightly scoped; **commit manageable updates** with clear messages.
-* If behavior changes, update BOTH @CURSOR-README.md and README.md accordingly (Plain explanations).
+PRE-FLIGHT
+- list_branches; list_commits(default, limit=1) → confirm HEAD matches planning
+- If drift: STOP and print next steps (rebase/refresh plan).
 
-INPUTS TO CHECK (read-only unless fixing)
+PROJECT STRUCTURE HYGIENE
+- When adding/modifying files:
+  1) list_dir on changed dirs
+  2) Update the Project Structure in @CURSOR-README.md (paths, counts, comments)
+  3) Commit doc update separately: "docs: project structure sync"
 
-1. Test output and console errors
-2. `storage/logs/laravel.log` (read latest relevant entries)
-3. DB evidence via the same Tinker one-liners from the Demo prompt
-4. Env/config mismatches (e.g., EMBEDDINGS\_DIM vs model)
+IMPLEMENTATION STEPS (loop per atomic task)
+- get_file_contents → create_or_update_file
+- Add rich code comments for complex logic, e.g.:
+/**
+ * What this section does — Adds a clear, safe, symbolic plan validation loop.
+ * Plain: Before doing work, write a small checklist (a plan). Check it. If a step is missing, fix it, then go.
+ * How this fits in (generic):
+ * - Planner/Workers output steps as state → action → next-state
+ * - Validator checks each step’s preconditions and applies effects
+ * - If invalid: try a simple fix and re-check; debate can try once more
+ * - Only execute the final step when the plan is valid
+ * Key terms: preconditions (must be true before), effects (become true after), facts (simple key=value truth), validator (checker)
+ *
+ * For engineers (generic):
+ * - Plan JSON: { steps: [ { state: string[], action: {name,args}, next_state: string[] }, ... ] }
+ * - Validate: PlanValidator::validate($plan, $initialFacts) → PlanReport
+ * - Auto-repair: insert a prerequisite action that makes the failed condition true
+ * - Gate: persist plan_report + plan_valid; only run the gated final step when plan_valid=true
+ * - Log: emit an activity/trace step containing the plan and the validator report
+ */
 
-PROCEDURE
+TESTS + VERIFY (after each logical unit)
+- php artisan test
+- php artisan migrate:fresh --seed (if schema touched)
+- Minimal Demo: php artisan scenario:run (ok to run once per feature)
+- Log quick metrics: php artisan agent:metrics --since=7d --limit=10
 
-1. Reproduce
+COMMITS (after each unit)
+<scope>: short summary
+WHAT: what changed
+WHY: why it matters
+TESTS: how verified
 
-* Run:
-  php artisan optimize:clear
-  php artisan test
-  php artisan scenario:run
-* Review the last ~200 lines in @storage/logs/laravel.log.
-* Summarize the first failing symptom in **Plain** language.
+OUTPUT (concise)
+RUN COMMANDS
+VERIFICATION (test results)
+GIT COMMITS (subjects only)
+NEXT STEP (next unit or done)
 
-2. Classify the failure and fix
-   Common buckets and actions:
+Begin.
+```
 
-* **Missing column / wrong type / index** → Update the relevant *create* migration (not a new alter migration); ensure pgvector dims match `config('llm.embeddings.dim')`. Re-run `php artisan migrate:fresh`.
-* **Routing/role config** → Check `config/llm.php`, `config/agents.php`, and `.env` bindings; align model names and thresholds.
-* **Plan validation** → Ensure `config/actions.php` has the needed preconditions/effects; adjust `PlanValidator` hints or initial facts extractor.
-* **Activity/Routes** → Ensure controller and routes exist; fix typehints/names; re-run `php artisan route:list`.
+---
 
-3. Verify
+### B2) **EXECUTE THE PLAN (feature branch + PR)** — For medium/large changes
 
-* After each change:
+```
+You are a senior Laravel 12 + Blade + Tailwind/Flowbite engineer and Cursor power-user.
+Implement TODAY’S PLAN on a feature branch with a PR and CI-style verification.
 
-  * Run `php artisan migrate:fresh` (if schema touched)
-  * Run `php artisan test`
-  * Run `php artisan scenario:run`
-  * Run `php artisan agent:metrics --since=7d --limit=20`
-* Confirm the Demo & Verification checklist passes.
+RULES (same as main) + branching workflow:
+- Branch: feat/<scope>-<yyyymmdd>
+- PR body includes: Context, Changes, Tests, Risks, Rollback plan, Doc sync diff
 
-4. Commit (small, coherent batches)
-
-* Use clear subjects, e.g.:
-
-  * `fix(embeddings): align EMBEDDINGS_DIM with mxbai-embed-large`
-  * `fix(validator): add ExtractText precondition and repair hint`
-  * `fix(activity): register route + view for step detail`
-
-5. Docs (if behavior changed)
-
-* Update @CURSOR-README.md and README.md (Plain wording).
-* Note visibility rule (user sees only their own threads) remains unchanged.
+FLOW
+- Preflight: list_branches; list_commits(default,1) (confirm)
+- create_branch feat/<scope>-<yyyymmdd> from default
+- Implement in small units (see EXECUTE main)
+- After each unit:
+  - php artisan test
+  - push_files with commit messages
+- create_pull_request (base=default, head=feature)
+- get_pull_request_status until green (or provide next actions)
+- Before merge: doc sync check vs @CURSOR-README.md; commit docs if mismatched
+- merge_pull_request (squash)
+- Print merge SHA and post-merge sanity (route:list | grep activity)
 
 OUTPUT
+RUN COMMANDS
+PR LINK/STATUS
+COMMITS
+MERGE (SHA)
+NEXT STEPS
 
-* Short “FIX SUMMARY” in Plain English (what broke, what you changed, why it works now).
-* List of commits with one-line subjects.
-* Rerun of the **Demo & Verification Prompt** (summarize PASS/FAIL).
-
+Begin.
 ```
 
-This prompt implements features from the plan with proper testing.
+---
+
+### C) **DEMO & VERIFICATION** — Run the scenario and prove end-to-end
+
+```
+You are a meticulous QA engineer. Do NOT change code. Only run and analyze.
+
+GOAL
+Run the demo. Verify multi-agent + symbolic plan validation end-to-end. Confirm visibility rules.
+
+STEPS
+0) Preflight
+   php artisan optimize:clear
+
+1) Scenario
+   php artisan scenario:run
+
+2) Metrics snapshot
+   php artisan agent:metrics --since=7d --limit=20
+
+3) Evidence via Tinker one-liners (print compact JSON; no interactive mode)
+
+# Thread
+php artisan tinker --execute='
+use App\Models\Thread;
+$t=Thread::latest("created_at")->first();
+echo json_encode(["thread_id"=>$t?->id,"subject"=>$t?->subject], JSON_PRETTY_PRINT), PHP_EOL;'
+
+# Contact ↔ User link
+php artisan tinker --execute='
+use App\Models\{Thread,EmailMessage,Contact};
+$t=Thread::latest("created_at")->first();
+$em=$t?->emailMessages()->latest("created_at")->first();
+$contact = $t ? Contact::where("account_id",$t->account_id)->where("email",$em?->from_email)->first() : null;
+$link=$contact?->contactLinks()->first();
+echo json_encode(["contact_email"=>$contact?->email,"user_linked"=>(bool)$link], JSON_PRETTY_PRINT), PHP_EOL;'
+
+# Agent run + roles
+php artisan tinker --execute='
+use App\Models\{AgentStep,Thread};
+$t=Thread::latest("created_at")->first();
+$roles=AgentStep::where("thread_id",$t->id)->selectRaw("agent_role,count(*) c,max(round_no) max_round")->groupBy("agent_role")->get();
+echo $roles->toJson(JSON_PRETTY_PRINT), PHP_EOL;'
+
+# Arbiter decision
+php artisan tinker --execute='
+use App\Models\{AgentStep,Thread};
+$t=Thread::latest("created_at")->first();
+$arb=AgentStep::where("thread_id",$t->id)->where("agent_role","Arbiter")->latest("created_at")->first();
+echo json_encode(["vote_score"=>$arb?->vote_score,"decision_reason"=>$arb?->decision_reason], JSON_PRETTY_PRINT), PHP_EOL;'
+
+# Plan validity (presence + hint)
+php artisan tinker --execute='
+use App\Models\{AgentStep,Thread};
+$t=Thread::latest("created_at")->first();
+$crit=AgentStep::where("thread_id",$t->id)->where("agent_role","Critic")->latest("created_at")->first();
+$oj=$crit?->output_json ?? [];
+echo json_encode(["plan_panel"=> isset($oj["plan"])||isset($oj["plan_report"]), "first_hint"=>$oj["plan_report"]["hint"]??null], JSON_PRETTY_PRINT), PHP_EOL;'
+
+# Decision memory
+php artisan tinker --execute='
+use App\Models\{Memory,Thread};
+$t=Thread::latest("created_at")->first();
+$m=Memory::where("thread_id",$t->id)->latest("created_at")->first();
+echo json_encode(["memory_type"=>$m?->type,"has_provenance"=>!empty($m?->provenance_ids??[])], JSON_PRETTY_PRINT), PHP_EOL;'
+
+# Embedding presence
+php artisan tinker --execute='
+use App\Models\{EmailMessage,Thread};
+$t=Thread::latest("created_at")->first();
+$em=EmailMessage::where("thread_id",$t->id)->latest("created_at")->first();
+echo json_encode(["email_id"=>$em?->id,"has_body_embedding"=> isset($em?->body_embedding)], JSON_PRETTY_PRINT), PHP_EOL;'
+
+4) Routes check
+php artisan route:list | grep -i activity || true
+
+OUTPUT FORMAT
+DEMO RUN SUMMARY — 2–3 sentences
+CHECKLIST — ✅/❌ bullets for:
+- Scenario finished
+- Metrics non-zero
+- Thread created
+- Contact↔User link exists
+- Roles present: Planner/Worker/Critic/Arbiter
+- Arbiter vote_score + decision_reason present
+- Plan panel present (+ hint if invalid first pass)
+- Decision memory saved with provenance
+- Latest email has embedding
+- Activity routes registered
+EVIDENCE — paste the JSON blobs
+NEXT ACTIONS — only if ❌, give 1–2 line Plain fixes with exact commands.
+
+Begin.
+```
+
+---
+
+### D) **DEMO FIX-IT** — Minimal surgical fixes, then re-run
+
+```
+You are a senior Laravel engineer. We ran the Demo and saw ❌ items.
+You will perform the smallest change(s) needed, then re-verify.
+
+RULES
+- No alter migrations. Edit create migrations and keep `migrate:fresh` green.
+- Tight scope. Each fix → tests, logs, docs updated.
+- Keep security & i18n intact.
+
+INPUTS TO INSPECT
+- storage/logs/laravel.log (last ~200 lines)
+- Test output
+- The same Tinker probes from the Demo
+
+PROCEDURE
+1) Reproduce
+   php artisan optimize:clear
+   php artisan test
+   php artisan scenario:run
+
+2) Classify the first failing symptom (Plain 1–2 lines)
+
+3) Fix by bucket
+   - Schema/columns: update the relevant *create* migration; `php artisan migrate:fresh`.
+   - LLM routing/tools: align `config/llm.php`, `.env` role models; ensure tool schemas exist.
+   - Plan validation: adjust `config/actions.php` pre/eff or `PlanValidator` hinting.
+   - Activity/Routes: ensure controllers and routes registered; fix typehints.
+
+4) Verify after each change
+   php artisan migrate:fresh --seed (if schema touched)
+   php artisan test
+   php artisan scenario:run
+   php artisan agent:metrics --since=7d --limit=20
+
+5) Commit per fix
+   fix(<scope>): short summary
+   WHAT/WHY/TESTS
+
+6) Docs
+   - Sync @CURSOR-README.md (project tree + behavior notes)
+   - If user-visible change: update README.md (Plain)
+
+OUTPUT
+FIX SUMMARY (Plain)
+COMMITS (subjects)
+DEMO CHECKLIST (re-run, now ✅)
+
+Begin.
+```
+
+---
+
+## 3) Auxiliary Prompts (drop-in when needed)
+
+### A1) **DOC SYNC** — Keep `CURSOR-README.md` 100% accurate
+
+```
+You are the repository librarian. No code edits beyond docs.
+
+GOAL
+Reconcile the actual file tree with the “Project Structure (Full)” section in @CURSOR-README.md:
+- Add missing paths, remove stale ones, fix counts/comments.
+- Keep wording brief and plain.
+
+STEPS
+- list_dir recursively on app/, config/, database/migrations/, resources/, routes/, tests/
+- Compare to README tree
+- Prepare an updated tree block with inline comments (why each path exists)
+- Also update “Currently Implemented / In Progress / Next” bullets if diverged
+
+OUTPUT
+- New tree block
+- Bullet list of deltas (Added/Removed/Renamed)
+- Commit: "docs: sync project structure (librarian pass)"
+
+Begin.
+```
+
+---
+
+### A2) **NEW MCP TOOL** — Add a safe, schema-bound tool (with tests)
+
+```
+You are implementing a new SSRF-safe MCP tool with strict JSON schema and tests.
+
+REQUIREMENTS
+- Location: app/Mcp/Tools/<Name>Tool.php
+- Register in MCP server; SSRF guard; http/https only; 2KB body cap (if fetch)
+- Provide PHP array schema in Mcp/Prompts/ToolSchemas.php (or dedicated class)
+- Add unit tests for:
+  - Schema validation success/failure
+  - SSRF block (private IPs)
+  - Max body limit (if fetch)
+
+TASK TEMPLATE
+1) Design tool: name, inputs, outputs, failure modes
+2) Write schema (arguments + return shape)
+3) Implement Tool class (guarded I/O)
+4) Bind in MCP server
+5) Tests (unit + feature if needed)
+6) Update @CURSOR-README.md (Available Safe Tools list)
+
+OUTPUT
+File diffs, tests added, and a short doc snippet (Plain).
+
+Begin.
+```
+
+---
+
+### A3) **PROMPT QA** — Ensure tool-enforced JSON everywhere
+
+```
+You are the Prompt QA gate.
+
+GOAL
+Audit prompts and LlmClient usage. Ensure every structured output prompt is wired to a tool function with a schema and tool_choice=required.
+
+STEPS
+- Grep for prompt keys in code (config/prompts.php, Services, Mcp/Prompts/*)
+- For each key that outputs JSON (e.g., action_interpret, memory_extract, attachment_summarize, thread_summarize, clarify_email_draft, csv_schema_detect, define_agents_plan, plan_symbolic_check, critic_review_step, arbiter_select, coord_synthesize_reply):
+  - Verify a corresponding schema exists and is registered with LlmClient::json()
+  - Verify provider/role mapping has tools=true
+  - If missing, create schema + tests
+
+OUTPUT
+- Table: Prompt Key | Schema Exists | Tools Enabled | Needs Fix
+- Minimal diffs to fix any “Needs Fix”
+- Commit message(s)
+
+Begin.
+```
+
+---
+
+### A4) **RELEASE PREP** — Cut a clean, test-backed release
+
+```
+You are preparing a release.
+
+CHECKLIST
+- Run:
+  php artisan optimize:clear
+  php artisan test
+  php artisan migrate:fresh --seed
+  php artisan scenario:run
+  php artisan agent:metrics --since=7d --limit=20
+  php artisan route:list | grep -i activity || true
+
+- Confirm:
+  - All tests pass
+  - Scenario checklist all ✅
+  - README files updated (Plain notes for users)
+  - .env.example comments still accurate
+  - Docker compose versions unchanged or documented
+
+OUTPUT
+RELEASE NOTES (Plain)
+CHANGES (bulleted)
+KNOWN LIMITS (bulleted)
+UPGRADE NOTES (if schema changed)
+TAG SUGGESTION (e.g., v0.3.0)
+
+Begin.
+```
+
+---
+
+## 4) Snippets you’ll reuse (paste into code when implementing)
+
+### 4.1 Symbolic Plan docblock (use verbatim in complex services)
+
+```php
+/**
+ * What this section does — Adds a clear, safe, symbolic plan validation loop.
+ * Plain: Before doing work, write a small checklist (a plan). Check it. If a step is missing, fix it, then go.
+ * How this fits in (generic):
+ * - Planner/Workers output steps as state → action → next-state
+ * - Validator checks each step’s preconditions and applies effects
+ * - If invalid: try a simple fix and re-check; debate can try once more
+ * - Only execute the final step when the plan is valid
+ * Key terms: preconditions (must be true before), effects (become true after), facts (simple key=value truth), validator (checker)
+ *
+ * For engineers (generic):
+ * - Plan JSON: { steps: [ { state: string[], action: {name,args}, next_state: string[] }, ... ] }
+ * - Validate: PlanValidator::validate($plan, $initialFacts) → PlanReport
+ * - Auto-repair: insert a prerequisite action that makes the failed condition true
+ * - Gate: persist plan_report + plan_valid; only run the gated final step when plan_valid=true
+ * - Log: emit an activity/trace step containing the plan and the validator report
+ */
+```
+
+### 4.2 Tool-enforced JSON call (sketch)
+
+```php
+// Example of enforcing tool-called JSON for a prompt key:
+$result = $llm->json(
+    promptKey: 'action_interpret',      // schema lives in Mcp/Prompts/ToolSchemas
+    vars: [
+        'detected_locale'     => $locale,
+        'thread_summary'      => $summary,
+        'clean_reply'         => $clean,
+        'attachments_excerpt' => $attachmentsExcerpt,
+        'recent_memories'     => $memSubset,
+    ]
+);
+// $result is validated args (not free text).
+```
+
+---
+
+## 5) Quick failure playbook (Plain cheatsheet)
+
+* **Vector dim mismatch** → `.env EMBEDDINGS_DIM` ↔ actual model; `migrate:fresh && embeddings:backfill`.
+* **Model tag missing (Ollama)** → pull the tag or switch role provider/model.
+* **No retrieval hits** → lower `LLM_GROUNDING_HIT_MIN` or `top_k ↑`; ensure embeddings exist.
+* **ClamAV refused** → ensure daemon running on `127.0.0.1:3310`; check logs.
+* **Webhook HMAC failed** → verify Basic Auth + raw body; reconfigure Postmark.
+* **Split threads** → inspect headers; subject normalization; X-Thread-ID if available.
+* **Invalid JSON from LLM** → you forgot tool-calling; add schema + `tool_choice=required`.

@@ -1,172 +1,248 @@
 # Agent AI
 
-**Email your AI employee. It remembers, coordinates agents with tools, and gets work done.**
+**Email your AI employee. It remembers, coordinates specialists, uses safe tools, and gets work done.**
 
-## Table of Contents
-- Why this matters
-- What it does (highlights)
-- How it works (architecture)
-- Quickstart (Herd & Docker)
-- Configure LLMs
-- Data model essentials
-- Develop & test
-- Security & privacy
-- License
+## What is Agent AI?
 
-## Why this matters
-Work starts in email—quotes, questions, decisions, approvals. But context is scattered, and generic chatbots don’t know your business. Agent AI is a personal assistant you can simply email. It builds long-term memory from your conversations and documents, then replies with grounded, practical help you can trust.
+Agent AI turns your inbox into an AI employee that learns to understand your context over time. Send it an email like you would to a coworker: ask questions, share documents, request tasks. It reads your message, checks facts from your email history, proposes a plan, and replies with something you can trust. No new app to learn.
 
-## What it does (Feature Highlights)
-- **Email‑native assistant** — Send questions, tasks, and documents by email. Agent AI replies in your thread.
-- **Multi‑agent orchestration (with tools)** — Specialized agents collaborate (e.g., extract, research, plan, draft, review) and call tools when needed.
-- **Compounding memory** — A growing knowledge base from your emails and attachments that improves answers over time.
-- **Grounded responses via pgvector** — Searches your own data (emails, attachments, memories) before it speaks.
-- **Transparent activity** — Full step‑by‑step trace so you see how decisions were made.
-- **Local‑first models (Ollama), optional cloud** — Private by default; role‑based model routing.
+## Why This Matters
 
-> Note: On the first inbound contact, an Account is auto-created from `APP_NAME`. Single-tenant by default, future-proof for multi-tenant.
+Work starts in email: quotes, questions, approvals, files. But context is scattered across threads and attachments, and generic chatbots don't know your business. Agent AI is an email-native teammate that:
 
-## How it works (detailed)
-At a high level: Email → Thread → Plan → Work → Debate → Decide → Memory → Reply.
+* Builds memory from your emails and documents
+* Grounds answers in your data (not the public web)
+* Plans work like a professional (checklist, validation, safe execution)
+* Explains itself with a clear activity trace
 
-1) You send an email. A Contact and Thread are ensured. Attachments (txt, md, csv, pdf) are stored.
-2) Attachments are scanned (ClamAV). Clean files continue to extraction/summarization; infected files trigger an incident email.
-3) The message is cleaned (quoted text/signatures removed), then interpreted into a structured Action via a schema‑validated tool.
-4) The Coordinator chooses a simple single‑agent path or a multi‑agent orchestration based on complexity.
-5) Retrieval (pgvector) fetches relevant snippets from prior emails, attachment text, and memories.
-6) An agent drafts a response (or a team does: Workers produce drafts, Critics check, Arbiter picks the best).
-7) The Curator saves a compact memory of what was decided, with provenance to the steps that led there.
-8) An email reply is sent only when there’s substantive content (or a personalized incident/clarification/options email).
+You keep using your inbox. Agent AI does the organizing, fact-finding, and drafting so you can approve and move on.
 
-LLM routing is explicit:
-- CLASSIFY → cheap/fast intent & complexity detection.
-- Retrieval → cosine KNN over embeddings to fetch relevant snippets.
-- GROUNDED or SYNTH → grounded response when retrieval is strong; otherwise synthesize with a larger model.
+## Core Features
 
-Grounding lives in Postgres (pgvector):
-- Embeddings in `email_messages.body_embedding`, `attachment_extractions.text_embedding`, `memories.content_embedding`.
-- Retrieval uses cosine KNN across these tables, with provenance kept for each snippet.
+### Email-Native Assistant
+Send questions, tasks, and files to a single email address. Agent AI replies in the same thread, maintaining full conversation context.
 
-## Email pipeline (end‑to‑end)
-1) Inbound webhook receives the email and stores a normalized `EmailMessage` with headers/body/attachments.
-2) Attachments pipeline: scan → (if clean) extract → summarize; summaries feed interpretation and retrieval.
-3) Action interpretation produces `{type, parameters, confidence}` with schemas enforced.
-4) Coordinator routes: simple (single agent) vs complex (multi‑agent with plan validation and auto‑repair).
-5) Response generation: agent(s) write a helpful reply using retrieval context; Critics check groundedness; Arbiter decides.
-6) Memory curation: decision/insight facts are saved with provenance and TTL.
-7) Email dispatch: only substantive content. Incident email if infected files; clarification/options when confidence is low.
+### Multi-Agent Orchestration
+Specialized agents (Planner, Workers, Critics, Arbiter, Curator) collaborate to handle complex requests. Each step is validated before execution.
 
-## Multi‑agent flow
-- **Coordinator**: decides simple vs complex, selects agents, manages orchestration.
-- **Planner**: proposes a symbolic plan (steps with preconditions/effects). Validator checks and can auto‑repair the plan.
-- **Workers**: create drafts, call tools, use retrieval context.
-- **Critics**: score groundedness/completeness/risk over K rounds.
-- **Arbiter**: picks the winner, records a short decision reason.
-- **Curator**: writes memories with provenance for traceability.
+### Compounding Memory
+Learns durable facts and preferences over time with confidence decay and TTL categories. Memory is scoped to thread, user, or account level.
 
-## Memory model
-- Scope: `conversation`, `user`, `account` with priority `conversation > user > account`.
-- TTL categories: `volatile`, `seasonal`, `durable`, `legal` with decay over time.
-- Read logic prefers newer, higher‑confidence memories after decay.
+### Grounded Responses
+Retrieves relevant snippets from your own emails, attachment text, and memories before answering. No hallucination, just facts from your data.
 
-## Quickstart
-> Warning: Enable `pgvector` in Postgres (CREATE EXTENSION IF NOT EXISTS vector) before first run.
+### Symbolic Plan Validation
+Before executing, the system writes a plan (state, action, next-state), validates preconditions and effects, auto-repairs simple gaps, then proceeds.
 
-### macOS (Herd)
-```bash
-cp .env.herd .env
-composer install
-npm install
-php artisan migrate
-npm run dev
-php artisan horizon
-php artisan boost:mcp
+### Transparency by Design
+The Activity screen shows every LLM and tool call: role, model, tokens, latency, decision reasons. Users only see their own threads.
+
+### Local-First Models
+Private by default using Ollama. You can mix local and cloud models per role. On first contact, an Account is automatically created from APP_NAME.
+
+## How It Works
+
+```
+Email → Thread → Plan → Work → Debate → Decide → Memory → Reply
 ```
 
-### Docker
+1. You send an email. A Contact and Thread are ensured.
+2. Attachments (txt, md, csv, pdf) are virus-scanned before processing.
+3. The message is cleaned and interpreted into a structured Action.
+4. The Coordinator picks a simple single-agent path or complex multi-agent orchestration.
+5. Retrieval fetches context from your messages, attachment text, and memories.
+6. Workers draft, Critics check groundedness and risk, the Arbiter picks the best.
+7. The Curator saves a short memory of the outcome with provenance.
+8. Agent AI emails back when there's substantive value or asks for clarification if confidence is low.
+
+### Why It's Better Than Prompting Yourself
+
+* **Grounded**: Searches your own history first
+* **Structured**: Actions and tool calls are schema-validated
+* **Safe**: Plans are validated before execution
+* **Transparent**: You see how and why decisions were made
+* **Persistent**: Remembers outcomes so future answers improve
+
+## Memory Model
+
+Agent AI builds institutional knowledge that compounds over time, making each interaction smarter than the last.
+
+### Scopes & Priority
+Memories operate at three levels: **conversation** (thread-specific), **user** (individual preferences), and **account** (organization-wide). When retrieving information, Agent AI prioritizes in that order.
+
+### Intelligent Retention
+Not all information stays relevant forever:
+* **Volatile** (30 days): Temporary facts like "John is out of office"
+* **Seasonal** (90 days): Quarterly targets, project deadlines
+* **Durable** (365 days): Standard procedures, key contacts
+* **Legal** (policy-based): Compliance records, audit trails
+
+### Confidence & Evolution
+Information naturally becomes less certain over time through confidence decay. Fresh, frequently-referenced facts maintain high confidence while older information gradually fades. When facts change, new ones supersede previous versions while maintaining history for audit purposes.
+
+This memory system means Agent AI becomes more valuable over time, learning your business without manual training or configuration.
+
+## Use Cases
+
+### Document Analysis
+*"Summarize the key points from these attached contracts"*
+Agent AI scans attachments for viruses, extracts text, and provides a summary grounded in the actual document content.
+
+### Information Retrieval
+*"What did John say about the Q2 budget in his last email?"*
+Searches your email history and returns the specific information with source attribution.
+
+### Task Processing
+*"Extract all email addresses from the attached CSV and format them for our newsletter"*
+Processes the file safely and returns formatted results ready for use.
+
+### Decision Support
+*"Based on the attached proposals, which vendor offers the best value?"*
+Analyzes documents and provides comparison based on the actual content, not generic assumptions.
+
+## Quick Start
+
+### Prerequisites
+* PHP 8.4+
+* PostgreSQL 17+ with pgvector
+* Redis 7+
+* Node.js 18+
+* ClamAV daemon
+* Ollama for local models (optional: OpenAI/Anthropic API keys)
+
+### Installation
+
+1. **Setup environment**
 ```bash
-cp .env.docker .env
+git clone https://github.com/yourorg/agent-ai.git
+cd agent-ai
+cp .env.example .env
 composer install
 npm install
+```
+
+2. **Configure database**
+```sql
+CREATE EXTENSION IF NOT EXISTS vector;
+```
+```bash
+php artisan migrate
+```
+
+3. **Start services**
+```bash
+npm run dev
+php artisan horizon
+php artisan serve
+```
+
+4. **Configure Postmark**
+Set up inbound webhook with Basic Auth credentials from your .env file.
+
+5. **Send first email**
+Email your Agent address. Watch it process and reply in thread.
+
+### Docker Alternative
+```bash
 docker compose up -d
 php artisan migrate
 ```
 
-First run checklist:
-- Postgres `vector` extension enabled
-- `.env` routing defaults okay for your machine
-- Inbound webhook configured (Postmark) or seed test data
+## Configuration
 
-## Configure LLMs
-Routing keys (see `.env` for comments):
-- `LLM_ROUTING_MODE` (auto | single)
-- `LLM_GROUNDING_HIT_MIN` (0–1.0)
-- `LLM_SYNTH_COMPLEXITY_TOKENS`
+### Model Routing
+Agent AI uses role-based routing for efficiency:
 
-Role bindings (defaults):
-- CLASSIFY → `mistral-small3.2:24b`
-- GROUNDED → `gpt-oss:20b`
-- SYNTH → `gpt-oss:120b`
+```env
+# Classification (fast, small)
+LLM_CLASSIFY_MODEL="mistral-small3.2:24b"
 
-Embeddings:
-- `EMBEDDINGS_MODEL=mxbai-embed-large`
-- `EMBEDDINGS_DIM=1024`
+# Grounded answers (medium, fact-based)
+LLM_GROUNDED_MODEL="gpt-oss:20b"
 
-Tip: If a tag isn’t local, flip the provider/model for that role in `.env` (or pull the tag in Ollama).
+# Complex reasoning (large, comprehensive)
+LLM_SYNTH_MODEL="gpt-oss:120b"
 
-## Data model essentials
-- `agent_steps` (trace): logs role, provider, model, tokens (in/out/total), latency_ms, confidence, and full `input_json`/`output_json`. The full trace is visible to the user for their own threads; other users cannot access it. Steps relate to `account`, `thread`, optional `email_message`/`action`, and optional `contact`/`user`.
-  - Multi-agent protocol fields: `agent_role` (Planner|Worker|Critic|Arbiter), `round_no`, optional `coalition_id`, `vote_score`, `decision_reason`.
-- Embeddings live in Postgres columns and power retrieval:
-  - `email_messages.body_embedding`
-  - `attachment_extractions.text_embedding`
-  - `memories.content_embedding`
-  Dim is the vector length (e.g., 1024 for `mxbai-embed-large`). Retrieval is cosine KNN with provenance.
-### Visibility rules
-- **You see the full trace for your own threads only.** A thread is yours if it involves a contact linked to your user (via `contact_links`).
-- **No separate admin role today.** (Future-ready: if teams/multi-tenant are introduced later, an account admin could see all threads within that account—without changing the data model.)
-
-## Develop & test
-```bash
-# Reset database
-php artisan migrate:fresh
-
-# Backfill embeddings (optional)
-php artisan embeddings:backfill --limit=1000
-
-# Routing dry-run (no LLM call)
-php artisan llm:routing-dry-run --text="Find the July invoice from Anna"
-
-# Run tests
-php artisan test
+# Embeddings for retrieval
+EMBEDDINGS_MODEL="mxbai-embed-large"
+EMBEDDINGS_DIM=1024
 ```
-Guidance: put business logic in Services/Jobs, not Controllers. Write unit and feature tests for new services, routes, and data flows.
 
-## Security & privacy
-- Multi-agent protocol (Plan → Allocate → Work → Debate → Decide → Curate): Planner creates tasks; Workers produce drafts; Critics debate for K rounds (2 by default); Arbiter selects a winner, logging `vote_score` and `decision_reason`; Memory Curator persists a summary with provenance.
-- Because this is your own data, Agent AI shows the full content of steps for your threads.
-- Tenant boundary is enforced by `accounts` and `memberships`.
+### Confidence Thresholds
+* High (≥0.75): Auto-execute
+* Medium (0.50-0.74): Ask one clarifying question
+* Low (<0.50): Present safe options
 
-## Multi-agent enhancements
-- Allocation (auction heuristic): utility = w_cap*capability_match + w_cost*(1/cost_hint) + w_rel*reliability. Picks top‑K workers per subtask; allocation is logged in `agent_steps` with `agent_role=Planner`.
-- Structured debate (K rounds + minority report): Critics score groundedness/completeness/risk; near‑top candidates are retained as a minority report (ε). Weighted voting aggregates Critic + Worker self‑scores; tie‑breakers prefer higher groundedness, then lower expected cost, then oldest candidate.
-- Typed memories: `Decision|Insight|Fact` with `provenance_ids[]` and a stable content hash to deduplicate outcomes. TTL/decay rules continue to apply.
-- Metrics & tooling: `php artisan agent:metrics --since=... --limit=...` prints rounds, per‑role activity, groundedness %, and win distribution.
+## Security & Privacy
 
-### Add a new agent (mini‑guide)
-1) Define capability tags and a rough `cost_hint` on the `Agent` (`capabilities_json.keywords|domains|expertise|action_types`).
-2) Register/seed the agent for the account; reliability will update automatically from wins.
-3) Provide a Worker handler implicitly via `AgentProcessor` prompts; optionally shape Critic policy by improving groundedness inputs.
+### Security First
+* Mandatory virus scanning for all attachments
+* SSRF-guarded network calls
+* Signed links with expiry for approvals
+* Schema validation for all AI outputs
 
-## Roadmap & contributions
-Near‑term polish:
-- More precise token/latency capture in `agent_steps`
-- Additional Activity filters and export
-- Seed data and live fixtures for demos
+### Privacy by Design
+* Local-first AI option
+* User data isolation
+* GDPR-compliant controls
+* No model training on your data
 
-Contributions welcome: small, focused PRs with tests. Follow existing conventions and keep `migrate:fresh` green.
+## Architecture
+
+### Multi-Agent Flow
+* **Coordinator**: Detects complexity, selects agents
+* **Planner**: Proposes symbolic plan with validation
+* **Workers**: Execute focused tasks
+* **Critics**: Score groundedness and risk
+* **Arbiter**: Selects best response
+* **Curator**: Saves compact memory
+
+### Data Model
+* Accounts, users, memberships for multi-tenancy
+* Threads and messages for email continuity
+* Attachments with scan status and extractions
+* Memories with scope, TTL, and confidence decay
+* Agent steps for complete audit trail
+
+### Technology Stack
+Laravel 12, PHP 8.4, PostgreSQL 17 + pgvector, Redis 7, Postmark, Tailwind/Flowbite, Ollama (optional OpenAI/Anthropic), ClamAV, Docker
+
+## Troubleshooting
+
+**Vector dimension mismatch**
+Check EMBEDDINGS_DIM matches model. Run `php artisan migrate:fresh` then `php artisan embeddings:backfill`.
+
+**Everything routes to SYNTH**
+Lower LLM_SYNTH_COMPLEXITY_TOKENS or improve retrieval settings.
+
+**ClamAV connection refused**
+Ensure daemon runs on 127.0.0.1:3310. Check container logs.
+
+**Webhook authentication failing**
+Verify WEBHOOK_USER/PASS and that raw request body is used for HMAC.
+
+## Roadmap
+
+### Near Term
+* Enhanced metrics and activity filters
+* Expanded tool library
+* Additional language support
+
+### Future
+* Calendar integration
+* Slack/Teams connectors
+* Workflow automation
+* Plugin ecosystem
+
+## Contributing
+
+PRs should be small, focused, and include tests. Keep `php artisan migrate:fresh` green. Document changes in README.md and CURSOR-README.md when behavior changes.
 
 ## License
-SPDX-License-Identifier: Apache-2.0
 
-Copyright (c) 2025 NowSquare and contributors.
+SPDX-License-Identifier: **Apache-2.0**
+Copyright (c) 2025 **NowSquare**
+
+---
+
+**Start with the Quickstart**, send an email to your Agent address, and watch it reply in the same thread, grounded in your own history. That's the whole point.
