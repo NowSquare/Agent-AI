@@ -138,6 +138,7 @@ class ProcessEmailAfterAttachments implements ShouldQueue
             try {
                 $prompt =
                     "Analyze the user's email and the FULL attachment content below.\n".
+                    "Respond in this locale: {$locale}. Do not switch languages.\n".
                     "Produce the most helpful response for the user. This can be an answer, a clarifying question, or constructive feedback.\n".
                     "If anything is unclear, ask for the minimum missing information to proceed.\n".
                     "Use the full texts (not summaries) when citing facts.\n\n".

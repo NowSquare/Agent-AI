@@ -79,7 +79,7 @@ class SendActionResponse implements ShouldQueue
 
                 $responseContent = (string) ($clarify['text'] ?? 'Could you clarify your request so we can proceed?');
             } catch (\Throwable $e) {
-                $responseContent = 'Could you clarify your request so we can proceed? Please add the goal, constraints, and any needed files or links.';
+                $responseContent = '';
             }
         }
 
